@@ -1,0 +1,4 @@
+profile_id,description,vehicles,routine_probability,exploration_probability,spawn_interval_seconds
+low_demand,Nivel bajo de demanda para pruebas iniciales.,20,0.8,0.2,2.0
+medium_demand,Nivel medio de demanda para pruebas de estabilidad.,40,0.8,0.2,1.5
+high_demand,Nivel alto de demanda para evaluación comparativa.,70,0.8,0.2,1.0

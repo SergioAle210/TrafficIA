@@ -1,0 +1,10 @@
+{
+  "scenario_name": "low_demand",
+  "town": "Town03",
+  "vehicles": 20,
+  "duration_seconds": 90,
+  "seed": 42,
+  "synchronous_mode": true,
+  "fixed_delta_seconds": 0.05,
+  "no_rendering_mode": false
+}

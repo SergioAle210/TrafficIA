@@ -1,0 +1,13 @@
+{
+  "port": 8000,
+  "random_seed": 42,
+  "synchronous_mode": true,
+  "global_distance_to_leading_vehicle": 5.0,
+  "vehicle_percentage_speed_difference": 30.0,
+  "auto_lane_change": false,
+  "ignore_lights_percentage": 0.0,
+  "ignore_signs_percentage": 0.0,
+  "ignore_vehicles_percentage": 0.0,
+  "ignore_walkers_percentage": 0.0,
+  "update_vehicle_lights": true
+}

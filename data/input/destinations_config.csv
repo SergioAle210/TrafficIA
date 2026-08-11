@@ -1,0 +1,11 @@
+destination_id,zone_id,destination_name,category,frequency_class,weight,description
+D_COM_01,Z_COM_01,Centro comercial principal,comercial,frecuente,0.25,Destino frecuente asociado a compras y actividad comercial.
+D_EDU_01,Z_EDU_01,Universidad o centro educativo,educativo,frecuente,0.2,Destino frecuente asociado a movilidad recurrente.
+D_SER_01,Z_SER_01,Hospital o servicios principales,servicios,frecuente,0.15,Destino frecuente asociado a servicios esenciales.
+D_RES_01,Z_RES_01,Retorno residencial norte,residencial,frecuente,0.1,Destino frecuente de retorno a zona residencial.
+D_RES_02,Z_RES_02,Retorno residencial sur,residencial,frecuente,0.1,Destino frecuente de retorno a zona residencial alternativa.
+D_COM_02,Z_COM_02,Comercio secundario,comercial,no_frecuente,0.07,Destino comercial menos visitado.
+D_SER_02,Z_SER_01,Banco o trámite ocasional,servicios,no_frecuente,0.05,Destino de servicios con menor frecuencia.
+D_REC_01,Z_COM_02,Destino recreativo ocasional,recreativo,no_frecuente,0.04,Destino de exploración o recreación.
+D_SER_03,Z_SER_01,Gasolinera o servicio rápido,servicios,no_frecuente,0.03,Destino ocasional de corta duración.
+D_MISC_01,Z_COM_02,Destino misceláneo,miscelaneo,no_frecuente,0.01,Destino poco frecuente para conservar variabilidad.
