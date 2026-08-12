@@ -152,6 +152,34 @@ DESTINATIONS: List[Dict[str, object]] = [
 ]
 
 
+# These are separate from the generic configuration above: they are the three
+# reusable road references for the single-vehicle Town01 trip validation.
+# These are CARLA-recommended spawn points selected visually in Town01.
+TOWN01_DESTINATIONS: List[Dict[str, object]] = [
+    {
+        "destination_id": "T01_A", "destination_name": "Lugar A", "map": "Town01",
+        "category": "residential", "frequency_class": "routine", "weight": 1.0,
+        "enabled": "true", "reference_type": "spawn_point", "spawn_point_index": 133,
+        "x": "", "y": "", "z": "", "road_id": "", "lane_id": "",
+        "description": "Origen inicial y destino de retorno; spawn point CARLA 133.",
+    },
+    {
+        "destination_id": "T01_B", "destination_name": "Lugar B", "map": "Town01",
+        "category": "commercial", "frequency_class": "exploration", "weight": 1.0,
+        "enabled": "true", "reference_type": "spawn_point", "spawn_point_index": 6,
+        "x": "", "y": "", "z": "", "road_id": "", "lane_id": "",
+        "description": "Primer destino del ciclo; spawn point CARLA 6.",
+    },
+    {
+        "destination_id": "T01_C", "destination_name": "Lugar C", "map": "Town01",
+        "category": "services", "frequency_class": "routine", "weight": 1.0,
+        "enabled": "true", "reference_type": "spawn_point", "spawn_point_index": 101,
+        "x": "", "y": "", "z": "", "road_id": "", "lane_id": "",
+        "description": "Segundo destino del ciclo; spawn point CARLA 101.",
+    },
+]
+
+
 DEMAND_PROFILES: List[Dict[str, object]] = [
     {
         "profile_id": "low_demand",
@@ -225,6 +253,7 @@ def main() -> None:
         (output_dir / "zones_config.csv", ZONES),
         (output_dir / "destinations_config.csv", DESTINATIONS),
         (output_dir / "demand_profiles.csv", DEMAND_PROFILES),
+        (output_dir / "Town01" / "destinations_config.csv", TOWN01_DESTINATIONS),
     )
 
     for path, rows in output_files:
