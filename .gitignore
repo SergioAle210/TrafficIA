@@ -1,1 +1,9 @@
 /carla-env
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Generated simulation outputs
+/data/output/*
+!/data/output/.gitkeep
