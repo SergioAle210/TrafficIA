@@ -1,0 +1,69 @@
+"""Run-scoped CSV writers for trajectories, trips, events, and summary metrics."""
+
+from __future__ import annotations
+
+import csv
+from pathlib import Path
+from typing import Dict, Iterable, List
+
+
+TRIP_FIELDS = [
+    "run_id", "vehicle_id", "trip_id", "seed", "origin_id", "origin_name",
+    "origin_x", "origin_y", "origin_z", "destination_id", "destination_name",
+    "destination_category", "frequency_class", "departure_sim_time_s",
+    "arrival_sim_time_s", "travel_time_s", "distance_traveled_m",
+    "average_speed_mps", "average_speed_kmh", "collision_count",
+    "lane_invasion_count", "status",
+]
+TRAJECTORY_FIELDS = [
+    "run_id", "vehicle_id", "trip_id", "frame", "simulation_time_s", "x", "y",
+    "z", "speed_mps", "speed_kmh", "acceleration_mps2", "road_id", "lane_id",
+    "distance_traveled_m",
+]
+EVENT_FIELDS = [
+    "run_id", "vehicle_id", "trip_id", "frame", "simulation_time_s", "event_type",
+    "other_actor_id", "x", "y", "z", "details",
+]
+METRICS_FIELDS = [
+    "run_id", "vehicle_count", "trips_started", "trips_completed", "trips_incomplete",
+    "simulation_duration_s", "total_distance_traveled_m", "aggregate_average_speed_mps",
+    "aggregate_average_speed_kmh", "total_collisions", "total_lane_invasions",
+    "observed_destination_distribution",
+]
+
+
+class RunLogger:
+    """Own the output files so simulation logic never writes CSV directly."""
+
+    def __init__(self, output_directory: Path) -> None:
+        output_directory.mkdir(parents=True, exist_ok=False)
+        self.output_directory = output_directory
+        self._files: List[object] = []
+        self._trip_writer = self._create_writer("trips_log.csv", TRIP_FIELDS)
+        self._trajectory_writer = self._create_writer("trajectory_log.csv", TRAJECTORY_FIELDS)
+        self._event_writer = self._create_writer("events_log.csv", EVENT_FIELDS)
+        self._metrics_writer = self._create_writer("metrics_summary.csv", METRICS_FIELDS)
+
+    def _create_writer(self, file_name: str, fieldnames: Iterable[str]) -> csv.DictWriter:
+        csv_file = (self.output_directory / file_name).open("w", newline="", encoding="utf-8")
+        self._files.append(csv_file)
+        writer = csv.DictWriter(csv_file, fieldnames=list(fieldnames))
+        writer.writeheader()
+        return writer
+
+    def write_trip(self, row: Dict[str, object]) -> None:
+        self._trip_writer.writerow(row)
+
+    def write_trajectory(self, row: Dict[str, object]) -> None:
+        self._trajectory_writer.writerow(row)
+
+    def write_event(self, row: Dict[str, object]) -> None:
+        self._event_writer.writerow(row)
+
+    def write_metrics(self, row: Dict[str, object]) -> None:
+        self._metrics_writer.writerow(row)
+
+    def close(self) -> None:
+        for csv_file in self._files:
+            csv_file.close()
+        self._files = []
