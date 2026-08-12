@@ -1,0 +1,6 @@
+destination_id,destination_name,map,category,frequency_class,weight,enabled,reference_type,spawn_point_index,x,y,z,road_id,lane_id,description
+T03_A,Lugar A,Town03,residential,routine,0.40,true,spawn_point,20,,,,,,Punto provisional Town03; sustituible por una referencia vial manual.
+T03_B,Lugar B,Town03,commercial,routine,0.35,true,spawn_point,70,,,,,,Punto provisional Town03; sustituible por una referencia vial manual.
+T03_C,Lugar C,Town03,services,routine,0.25,true,spawn_point,120,,,,,,Punto provisional Town03; sustituible por una referencia vial manual.
+T03_D,Lugar D,Town03,commercial,exploration,0.60,true,spawn_point,170,,,,,,Punto provisional Town03; sustituible por una referencia vial manual.
+T03_E,Lugar E,Town03,services,exploration,0.40,true,spawn_point,220,,,,,,Punto provisional Town03; sustituible por una referencia vial manual.
