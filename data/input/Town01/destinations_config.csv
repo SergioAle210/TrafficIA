@@ -1,0 +1,4 @@
+destination_id,destination_name,map,category,frequency_class,weight,enabled,reference_type,spawn_point_index,x,y,z,road_id,lane_id,description
+T01_A,Lugar A,Town01,residential,routine,1.0,true,spawn_point,133,,,,,,Origen inicial y destino de retorno; spawn point CARLA 133.
+T01_B,Lugar B,Town01,commercial,exploration,1.0,true,spawn_point,6,,,,,,Primer destino del ciclo; spawn point CARLA 6.
+T01_C,Lugar C,Town01,services,routine,1.0,true,spawn_point,101,,,,,,Segundo destino del ciclo; spawn point CARLA 101.
