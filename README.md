@@ -7,20 +7,66 @@ destino, ruta explícita, sensores y registros por corrida.
 
 ## Requisitos
 
-- Windows y CARLA 0.9.15 (`WindowsNoEditor`).
-- Una versión de Python compatible con la distribución local de la Python API
-  incluida con CARLA 0.9.15.
-- La Python API de CARLA disponible en el entorno mediante el `.egg` o paquete
-  local incluido en `PythonAPI/carla/dist`.
+- Windows de 64 bits y CARLA 0.9.15 (`WindowsNoEditor`).
+- Python 3.7.9 de 64 bits. Esta versión coincide con el wheel
+  `carla-0.9.15-cp37-cp37m-win_amd64.whl` incluido en la distribución utilizada.
+- `pip==24.0` dentro de un entorno virtual llamado `carla-env`.
+- La Python API de CARLA instalada desde el wheel local incluido en
+  `WindowsNoEditor/PythonAPI/carla/dist`.
 
-Instala las dependencias auxiliares desde la raíz del repositorio:
+Python 3.7 ya no recibe actualizaciones de seguridad. Se utiliza aquí únicamente
+para reproducir el entorno de CARLA 0.9.15 y debe mantenerse aislado dentro del
+entorno virtual.
+
+Desde la raíz del repositorio, crea y activa el entorno:
 
 ```powershell
+cd C:\CARLA\TrafficIA
+python -m venv carla-env
+.\carla-env\Scripts\Activate.ps1
+```
+
+Si PowerShell bloquea temporalmente la activación:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\carla-env\Scripts\Activate.ps1
+```
+
+Instala las versiones reproducibles:
+
+```powershell
+python -m pip install --upgrade pip==24.0
 python -m pip install -r .\requirements.txt
 ```
 
-`carla` no se incluye en `requirements.txt`: se debe usar la distribución local
-que acompaña a CARLA 0.9.15.
+Instala `carla` desde el wheel que acompaña al servidor:
+
+```powershell
+cd C:\CARLA\WindowsNoEditor\PythonAPI\carla\dist
+python -m pip install .\carla-0.9.15-cp37-cp37m-win_amd64.whl
+cd C:\CARLA\TrafficIA
+```
+
+La carpeta `agents` no forma parte del wheel. Define su ubicación en cada nueva
+sesión de PowerShell o utiliza el argumento `--carla-pythonapi` al ejecutar la
+simulación de viajes:
+
+```powershell
+$env:CARLA_PYTHONAPI = 'C:\CARLA\WindowsNoEditor\PythonAPI\carla'
+```
+
+Verifica el entorno antes de iniciar CARLA:
+
+```powershell
+python --version
+python -m pip --version
+python -c "import carla; print(carla.__file__)"
+python -m unittest discover -s tests -v
+```
+
+`carla-env` está excluido de Git. Debe recrearse en cada computadora y activarse
+al abrir una terminal nueva. Usa `deactivate` para cerrarlo.
 
 ## Estructura principal
 
@@ -95,7 +141,7 @@ desactiva el modo síncrono de Traffic Manager y restaura la configuración orig
 del mundo. Para corridas sin renderizado:
 
 ```powershell
-python .\scripts\stable_traffic.py --town Town03 --vehicles 30 --seconds 120 --no-rendering
+python .\scripts\stable_traffic.py --town Town01 --vehicles 30 --seconds 120 --no-rendering
 ```
 
 El script elimina al inicio cualquier vehículo que ya exista en el mapa para que
