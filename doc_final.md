@@ -5,14 +5,16 @@
 La primera iteración continúa disponible sin cambios en
 `scripts/stable_traffic.py`: genera tráfico estable con Traffic Manager. La
 nueva iteración usa exactamente un actor lógico `vehicle_001`, lo reutiliza en
-varios viajes y se limita a Town01. No implementa todavía múltiples vehículos,
-comparación random-vs-stochastic, peatones, ML ni optimización por congestión.
+varios viajes y se limita a Town01. El catálogo actual contiene 42 destinos y el
+modo predeterminado elige mediante historial individual 80/20. No implementa
+todavía múltiples vehículos, comparación final random-vs-stochastic, peatones,
+ML ni optimización por congestión.
 
 ## Archivos creados
 
 - `config/single_vehicle_trip.json`: parámetros reproducibles de la prueba.
-- `data/input/Town01/destinations_config.csv`: tres destinos manuales Lugar A-C
-  sobre waypoints viales de Town01.
+- `data/input/Town01/destinations_config.csv`: 42 destinos normalizados sobre
+  spawn points viales de Town01.
 - `scripts/run_trip_simulation.py`: punto de entrada de la nueva corrida.
 - `scripts/inspect_location.py`: obtiene la posición del spectator y el
   waypoint vial apto para registrar destinos manuales.
@@ -22,21 +24,26 @@ comparación random-vs-stochastic, peatones, ML ni optimización por congestión
 - `src/run_logger.py`: escritores CSV por corrida.
 - `src/trip_runner.py`: ciclo del vehículo, llegada, espera, sensores,
   limpieza, métricas y restauración del mundo.
+- `src/vehicle_history.py`: historial individual, generación dummy y selección
+  80/20 sin pesos manuales.
+- `config/single_vehicle_trip_cyclic.json`: regresión de las tres rutas 6, 101
+  y 133 que ya funcionaban.
 
 ## Archivos modificados
 
-- `scripts/generate_dummy_data.py`: además de los CSV dummy heredados,
-  reconstruye `data/input/Town01/destinations_config.csv`.
+- `scripts/generate_dummy_data.py`: además de los CSV dummy heredados, genera
+  `data/input/Town01/vehicle_history_dummy.csv` sin sobrescribir el catálogo.
 - `README.md`: documenta ejecución, rutas, no-rendering, velocidad y captura
   manual de lugares.
 
 ## Funcionamiento
 
 La configuración contiene `routine_probability=0.8` y
-`exploration_probability=0.2`. Para cada viaje se hace primero esa elección de
-clase y luego una selección ponderada dentro de la clase. Se usa una instancia
-local `random.Random(seed)`; no se cambia ningún peso como consecuencia de los
-resultados. El destino conceptual actual queda excluido.
+`exploration_probability=0.2`. El historial dummy inicial es distinto por
+`vehicle_id` y reproducible con la semilla. El 80 % elige entre los tres destinos
+personales con mayor conteo y el 20 % entre los demás, priorizando los nunca
+visitados. Solo una llegada `completed` agrega una visita y cambia decisiones
+posteriores dentro de la corrida. El destino conceptual actual queda excluido.
 
 `GlobalRoutePlanner` construye su grafo desde la topología OpenDRIVE que expone
 el mapa de CARLA. `trace_route(origen, destino)` devuelve una secuencia ordenada
@@ -60,12 +67,15 @@ para limitar la velocidad visible de la ejecución.
 ## Formato de CSV
 
 `destinations_config.csv` es configuración: `destination_id`,
-`destination_name`, `map`, `category`, `frequency_class`, `weight`, `enabled`,
-`reference_type`, `spawn_point_index`, `x`, `y`, `z`, `road_id`, `lane_id` y
-`description`. `frequency_class` usa `routine` o `exploration`, equivalentes en
-esta prueba a frecuente/rutina y no-frecuente/exploración. Las categorías
-provisionales son `residential`, `commercial` y `services`, manteniendo tres
-categorías preparadas para el reemplazo definitivo.
+`destination_name`, `map`, `category`, `enabled`, `reference_type`,
+`spawn_point_index`, `x`, `y`, `z`, `road_id`, `lane_id` y `description`. No
+contiene pesos ni frecuencia manual. Las tres categorías son `residential`,
+`work_education` y `services_leisure`.
+
+`vehicle_history_dummy.csv` contiene `vehicle_id`, `sequence`,
+`destination_id` y `source`. Cada salida `vehicle_history.csv` añade `run_id`,
+`trip_id` y `completed_sim_time_s` para distinguir la base dummy de las visitas
+producidas por la simulación.
 
 Cada `data/output/<run_id>/` contiene:
 
@@ -81,11 +91,13 @@ Cada `data/output/<run_id>/` contiene:
 - `metrics_summary.csv`: viajes iniciados/completados/incompletos, tiempo y
   distancia total, velocidad agregada, conteos de eventos y distribución
   observada de destinos.
+- `vehicle_history.csv`: copia del historial dummy más cada destino alcanzado
+  durante la corrida.
 
 Los estados posibles registrados son `completed`, `timeout`, `route_failed`,
 `blocked` y `aborted`.
 
-## Cambiar Lugar A-C y agregar destinos reales
+## Cambiar o agregar destinos reales
 
 Ejecuta `inspect_location.py` con Town01 activo, posicionando primero el
 spectator junto al lugar conceptual. El script muestra tanto la posición del
@@ -95,21 +107,17 @@ coordenadas del waypoint vial; no navegues hacia el interior de un edificio.
 
 Puedes conservar `reference_type=spawn_point` y cambiar
 `spawn_point_index`, o usar `reference_type=coordinates` con x/y/z y los IDs
-viales inspeccionados. Para esta prueba, mantén las tres filas habilitadas y
-sus IDs en `destination_cycle_order`. Para futuros destinos reales, sustituye
-las filas manteniendo sus IDs o adapta el ciclo. Cada fila ya tiene categoría,
-clase de frecuencia y peso: las categorías definitivas se podrán introducir sin
-alterar los resultados históricos.
+viales inspeccionados. Cada fila requiere una de las tres categorías, pero no
+requiere clase de frecuencia ni peso. Si cambia el catálogo, vuelve a generar el
+historial dummy para evitar referencias a IDs eliminados.
 
-## Secuencia manual actual
+## Selección actual y regresión cíclica
 
-El vehículo aparece en el spawn point 133, cercano a Lugar A, proyectado al
-carril de conducción. La selección está en modo `cyclic` y el ciclo configurado
-es `T01_B → T01_C → T01_A`: por eso el primer viaje no es hacia A. Tras llegar,
-espera el tiempo configurado y continúa con el siguiente ID; después de A vuelve
-a B. Para cambiar el orden, edita solo `destination_cycle_order` en
-`config/single_vehicle_trip.json` y usa IDs existentes, sin repetirlos dentro
-de la misma vuelta.
+El vehículo aparece en el spawn 133, reconocido también como `T01_133`, por lo
+que nunca se selecciona como primer destino. La configuración normal usa
+`history_80_20`. Para repetir la secuencia verificada
+`T01_006 → T01_101 → T01_133`, utiliza
+`config/single_vehicle_trip_cyclic.json`.
 
 Para inspeccionar visualmente los spawn points, ejecuta:
 
@@ -121,9 +129,10 @@ CARLA dibuja los índices y su orientación; el punto resaltado aparece en rojo.
 
 ## Limitaciones conocidas
 
-- Los tres waypoints manuales se validan al inicio contra el `road_id` y
-  `lane_id` de Town01. Si se modifica el mapa o una coordenada, vuelve a
-  ejecutar `inspect_location.py` y actualiza la fila correspondiente.
+- Los 42 destinos se proyectan al carril de Town01 antes de crear actores. La
+  herramienta `validate_destinations.py` confirmó 41 rutas desde `T01_133` hacia
+  los demás IDs. El ID 75 fue excluido porque CARLA devolvía una ruta degenerada
+  de 0 m; los IDs 24 y 49 se excluyeron por ser puentes.
 - La reproducibilidad de selección está cubierta por la semilla. La trayectoria
   física puede seguir dependiendo de la versión exacta de CARLA, condiciones del
   servidor y controlador; `run_config.json` conserva esos parámetros.
@@ -148,6 +157,10 @@ CARLA dibuja los índices y su orientación; el punto resaltado aparece en rojo.
   se valida contra el origen; una desalineación cancela el viaje antes de
   aplicar control. Esto corrige el giro hacia paredes causado por planificar
   temporalmente desde `(0,0,0)`.
+- Los crash contexts locales registraron `DXGI_ERROR_INVALID_CALL` en D3D11 y
+  `EXCEPTION_ACCESS_VIOLATION`; CARLA estaba usando `Intel UHD Graphics 770`.
+  Para cambiar Town01/Town04 se recomienda reiniciar el servidor, y para corridas
+  largas usar una GPU dedicada o `--no-rendering`.
 
 ## Comandos PowerShell
 
