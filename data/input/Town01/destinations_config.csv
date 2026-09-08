@@ -1,4 +1,43 @@
-destination_id,destination_name,map,category,frequency_class,weight,enabled,reference_type,spawn_point_index,x,y,z,road_id,lane_id,description
-T01_A,Lugar A,Town01,residential,routine,1.0,true,spawn_point,133,,,,,,Origen inicial y destino de retorno; spawn point CARLA 133.
-T01_B,Lugar B,Town01,commercial,exploration,1.0,true,spawn_point,6,,,,,,Primer destino del ciclo; spawn point CARLA 6.
-T01_C,Lugar C,Town01,services,routine,1.0,true,spawn_point,101,,,,,,Segundo destino del ciclo; spawn point CARLA 101.
+destination_id,destination_name,map,category,enabled,reference_type,spawn_point_index,x,y,z,road_id,lane_id,description
+T01_000,Parque,Town01,services_leisure,true,spawn_point,0,,,,,,Destino recreativo.
+T01_003,Casa 003,Town01,residential,true,spawn_point,3,,,,,,Destino residencial.
+T01_004,Casa 004,Town01,residential,true,spawn_point,4,,,,,,Destino residencial.
+T01_005,Casa 005,Town01,residential,true,spawn_point,5,,,,,,Destino residencial.
+T01_006,Casa 006,Town01,residential,true,spawn_point,6,,,,,,Ruta validada previamente como Lugar B.
+T01_010,Cabaña para turistas,Town01,services_leisure,true,spawn_point,10,,,,,,Destino turístico.
+T01_011,Casa 011,Town01,residential,true,spawn_point,11,,,,,,Destino residencial.
+T01_014,Casa 014,Town01,residential,true,spawn_point,14,,,,,,Destino residencial.
+T01_015,Hospital,Town01,services_leisure,true,spawn_point,15,,,,,,Destino de salud.
+T01_017,Casa 017,Town01,residential,true,spawn_point,17,,,,,,Destino residencial.
+T01_018,Clínica 018,Town01,services_leisure,true,spawn_point,18,,,,,,Destino de salud.
+T01_020,Apartamento 020,Town01,residential,true,spawn_point,20,,,,,,Destino residencial.
+T01_022,Apartamento 022,Town01,residential,true,spawn_point,22,,,,,,Destino residencial.
+T01_023,Restaurante 023,Town01,services_leisure,true,spawn_point,23,,,,,,Destino de alimentación.
+T01_027,Apartamento 027,Town01,residential,true,spawn_point,27,,,,,,Destino residencial.
+T01_030,Oficina 030,Town01,work_education,true,spawn_point,30,,,,,,Destino de trabajo.
+T01_032,Hotel 032,Town01,services_leisure,true,spawn_point,32,,,,,,Destino turístico.
+T01_033,Tienda,Town01,services_leisure,true,spawn_point,33,,,,,,Destino comercial.
+T01_035,Hotel 035,Town01,services_leisure,true,spawn_point,35,,,,,,Destino turístico.
+T01_037,Oficina 037,Town01,work_education,true,spawn_point,37,,,,,,Destino de trabajo.
+T01_039,Oficina 039,Town01,work_education,true,spawn_point,39,,,,,,Destino de trabajo.
+T01_041,Hotel 041,Town01,services_leisure,true,spawn_point,41,,,,,,Destino turístico.
+T01_043,Hotel 043,Town01,services_leisure,true,spawn_point,43,,,,,,Destino turístico.
+T01_044,Oficina 044,Town01,work_education,true,spawn_point,44,,,,,,Destino de trabajo.
+T01_045,Apartamento 045,Town01,residential,true,spawn_point,45,,,,,,Destino residencial.
+T01_050,Clínica 050,Town01,services_leisure,true,spawn_point,50,,,,,,Destino de salud.
+T01_052,Hotel 052,Town01,services_leisure,true,spawn_point,52,,,,,,Destino turístico.
+T01_054,Oficina 054,Town01,work_education,true,spawn_point,54,,,,,,Destino de trabajo; duplicado eliminado del inventario.
+T01_055,Hotel 055,Town01,services_leisure,true,spawn_point,55,,,,,,Destino turístico.
+T01_058,Casa 058,Town01,residential,true,spawn_point,58,,,,,,Destino residencial.
+T01_060,Casa 060,Town01,residential,true,spawn_point,60,,,,,,Destino residencial.
+T01_067,Restaurante 067,Town01,services_leisure,true,spawn_point,67,,,,,,Destino de alimentación.
+T01_068,Apartamento 068,Town01,residential,true,spawn_point,68,,,,,,Destino residencial.
+T01_069,Clínica 069,Town01,services_leisure,true,spawn_point,69,,,,,,Destino de salud.
+T01_074,Área de juegos,Town01,services_leisure,true,spawn_point,74,,,,,,Destino recreativo.
+T01_084,Apartamento 084,Town01,residential,true,spawn_point,84,,,,,,Destino residencial.
+T01_091,Restaurante 091,Town01,services_leisure,true,spawn_point,91,,,,,,Destino de alimentación.
+T01_093,Casa para turistas,Town01,services_leisure,true,spawn_point,93,,,,,,Destino turístico.
+T01_094,Casa 094,Town01,residential,true,spawn_point,94,,,,,,Destino residencial.
+T01_095,Casa 095,Town01,residential,true,spawn_point,95,,,,,,Destino residencial.
+T01_101,Jardín de niños,Town01,work_education,true,spawn_point,101,,,,,,Ruta validada previamente como Lugar C.
+T01_133,Casa 133 / origen habitual,Town01,residential,true,spawn_point,133,,,,,,Origen fijo y ruta de retorno validada previamente.
