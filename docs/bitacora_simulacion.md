@@ -160,3 +160,47 @@ afirmar que el ajuste resuelva toda la conducción o toda la seguridad.
   recuperar callbacks que se pierdan ante un crash del servidor o cierre abrupto.
 - Ctrl+C sigue limpiando los actores, pero puede dejar CSV parciales sin resumen
   final. No mezclar esas carpetas con corridas completas.
+
+## 2026-09-08 — Guardado de la fase y revisión previa a escalar
+
+Commits de la implementación existente, creados antes de continuar:
+
+- `7e78670`: escenario aleatorio, compatibilidad del agente, contabilidad de
+  eventos y pruebas.
+- `463e159`: README y evidencia de las corridas anteriores.
+
+Se repitieron las 48 pruebas con `carla-env` y `CARLA_PYTHONAPI`: todas pasaron.
+Los CSV genéricos y el documento LaTeX con cambios previos quedaron fuera.
+
+La conexión de diagnóstico a `localhost:2000` agotó su timeout de 5 segundos.
+No se ejecutó una nueva corrida real en esta revisión. Para continuar la
+validación física hace falta un servidor accesible, preferiblemente ya en
+Town01; las pruebas unitarias no lo requieren.
+
+### Revisión del seguimiento lateral (todavía sin ajuste)
+
+El `LocalPlanner` instalado de CARLA usa `base_min_distance=3.0` y
+`distance_ratio=0.5`. En `run_step` elimina consecutivamente los waypoints
+iniciales que están a menos de `3 + 0.5 * velocidad_mps` del vehículo, salvo
+el último punto. A 20 km/h eso equivale a aproximadamente 5.78 m. El primer
+punto restante es el objetivo del PID. Esto permite plantear una hipótesis
+de recorte de curvas, pero no demuestra la causa de los contactos registrados.
+El paso del PID por defecto (0.05 s) coincide con el de estas corridas:
+no hay evidencia de un desajuste temporal en esta configuración.
+
+El baseline registrado usó Audi e-tron (`vehicle_001`), Volkswagen T2 2021
+(`vehicle_002`) y Audi TT (`vehicle_003`). No se deben atribuir todos los
+contactos a un mismo modelo ni sustituirlos sin registrar esa variación.
+
+Próxima validación, antes de aumentar la flota:
+
+1. Reconstruir las rutas de los viajes con contactos cerca de `(96, 202)` y
+   `(98, 325)` y contrastarlas con carriles y geometría de Town01.
+2. Registrar el waypoint objetivo, orientación, dirección aplicada y separación
+   lateral del vehículo en esos tramos; los CSV actuales no contienen esos
+   datos y no permiten demostrar un error del PID por sí solos.
+3. Si se confirma un problema de seguimiento, variar un solo parámetro por
+   prueba, conservando modelos, semilla, clima y escenario. No eliminar eventos
+   ni mover destinos para ocultar el síntoma.
+4. Repetir ambos escenarios con tres carros y documentar resultados antes de
+   pasar a cinco. La corrección de contactos estáticos sigue pendiente.
