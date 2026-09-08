@@ -143,7 +143,7 @@ def main() -> int:
         print("spawn_point_index más cercano: {0}".format(spawn_index))
         print("\nPlantilla CSV (usa el waypoint vial, no la ubicación física del edificio):")
         print(
-            "DEST_MANUAL,Nombre editable,{0},categoria_provisional,routine,1.0,true,coordinates,,{1:.3f},{2:.3f},{3:.3f},{4},{5},Descripción editable".format(
+            "DEST_MANUAL,Nombre editable,{0},categoria_provisional,true,coordinates,,{1:.3f},{2:.3f},{3:.3f},{4},{5},Descripción editable".format(
                 args.town, road_location.x, road_location.y, road_location.z,
                 waypoint.road_id, waypoint.lane_id
             )
