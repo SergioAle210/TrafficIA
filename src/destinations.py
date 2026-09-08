@@ -26,6 +26,8 @@ class Destination:
     destination_name: str
     map_name: str
     category: str
+    # Legacy fields remain optional so older scenario CSV files still load.
+    # The history-based model does not read either value.
     frequency_class: str
     weight: float
     enabled: bool
@@ -63,8 +65,6 @@ def load_destinations(path: Path, active_map_name: str) -> List[Destination]:
         "destination_name",
         "map",
         "category",
-        "frequency_class",
-        "weight",
         "enabled",
         "reference_type",
         "spawn_point_index",
@@ -95,14 +95,14 @@ def load_destinations(path: Path, active_map_name: str) -> List[Destination]:
             if not destination_id or destination_id in seen_ids:
                 raise ValueError("destination_id vacío o duplicado: {0}".format(destination_id))
             seen_ids.add(destination_id)
-            frequency_class = row["frequency_class"].strip().lower()
-            if frequency_class not in VALID_FREQUENCY_CLASSES:
+            frequency_class = row.get("frequency_class", "").strip().lower()
+            if frequency_class and frequency_class not in VALID_FREQUENCY_CLASSES:
                 raise ValueError(
                     "Clase de frecuencia inválida para {0}: {1}".format(
                         destination_id, frequency_class
                     )
                 )
-            weight = float(row["weight"])
+            weight = float(row.get("weight") or 1.0)
             if weight <= 0.0:
                 raise ValueError("El peso debe ser positivo para {0}".format(destination_id))
             reference_type = row["reference_type"].strip().lower()
@@ -136,9 +136,6 @@ def load_destinations(path: Path, active_map_name: str) -> List[Destination]:
 
     if len(destinations) < 2:
         raise ValueError("Se requieren al menos dos destinos habilitados para el mapa activo.")
-    for frequency_class in VALID_FREQUENCY_CLASSES:
-        if not any(item.frequency_class == frequency_class for item in destinations):
-            raise ValueError("Falta al menos un destino de clase {0}".format(frequency_class))
     return destinations
 
 
