@@ -11,7 +11,7 @@ from src.trip_runner import (
     spawn_vehicle_at_first_available_point,
     validate_initial_spawn_location,
 )
-from src.route_planner import validate_route_start
+from src.route_planner import plan_route, validate_route_start
 
 
 class DestinationSelectionTests(unittest.TestCase):
@@ -35,15 +35,18 @@ class DestinationSelectionTests(unittest.TestCase):
             self.assertNotEqual(destination.destination_id, "T01_A")
 
     def test_configured_cycle_visits_remaining_destinations_in_order(self):
-        config = TripSimulationConfig.from_json(Path("config/single_vehicle_trip.json"))
+        config = TripSimulationConfig.from_json(Path("config/single_vehicle_trip_cyclic.json"))
         simulation = TripSimulation(config, Path("."), 1)
         simulation.destinations = self.destinations
         simulation.destinations_by_id = {
             destination.destination_id: destination for destination in self.destinations
         }
         simulation._validate_destination_cycle()
-        selected = [simulation._select_next_destination().destination_id for _ in range(6)]
-        self.assertEqual(selected, ["T01_B", "T01_C", "T01_A", "T01_B", "T01_C", "T01_A"])
+        selected = [simulation._select_next_destination() for _ in range(6)]
+        self.assertEqual(
+            [decision.destination.destination_id for decision in selected],
+            ["T01_006", "T01_101", "T01_133", "T01_006", "T01_101", "T01_133"],
+        )
 
 
 class SpawnFallbackTests(unittest.TestCase):
@@ -166,6 +169,20 @@ class RouteOriginValidationTests(unittest.TestCase):
                 self.FakeLocation(259.6, 129.5),
                 5.0,
             )
+
+    def test_route_rejects_an_endpoint_far_from_requested_destination(self):
+        waypoint = type(
+            "Waypoint",
+            (),
+            {"transform": type("Transform", (), {"location": self.FakeLocation(0.0, 0.0)})()},
+        )()
+        planner = type(
+            "Planner",
+            (),
+            {"trace_route": lambda _self, _origin, _destination: [(waypoint, "LANEFOLLOW")]},
+        )()
+        with self.assertRaisesRegex(RuntimeError, "terminó a"):
+            plan_route(planner, self.FakeLocation(), self.FakeLocation(62.5, 0.0))
 
 
 if __name__ == "__main__":
