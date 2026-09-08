@@ -197,8 +197,9 @@ Para continuar una corrida de tres carros, añade también
 `--config .\config\multi_vehicle_trip.json`; el historial debe contener filas
 para los tres `vehicle_id` configurados.
 
-Sin `--history-in`, cada corrida vuelve al mismo dummy inicial, requisito útil
-para comparar experimentos bajo condiciones equivalentes.
+En `history_80_20`, sin `--history-in` cada corrida vuelve al mismo dummy inicial.
+`random_baseline` comienza sin historial de entrada, aunque el JSON tenga una
+ruta de dummy configurada.
 
 ## Ejecutar viajes sucesivos en Town01
 
@@ -335,10 +336,12 @@ los IDs 24 y 49 permanecen fuera por representar puentes.
 
 Cada corrida guarda `run_config.json`, `trips_log.csv`, `trajectory_log.csv`,
 `events_log.csv`, `metrics_summary.csv` y `vehicle_history.csv` en
-`data/output/<run_id>/`. Todos los registros incluyen `vehicle_id`; la pareja
-`vehicle_id` + `trip_id` identifica un viaje. El historial de salida copia los
-eventos iniciales de cada carro y agrega sus llegadas completadas. La
-configuración de entrada nunca se modifica con resultados.
+`data/output/<run_id>/`. Viajes, trayectorias, eventos e historial incluyen
+`vehicle_id`; la clave `run_id` + `vehicle_id` + `trip_id` identifica un viaje
+entre corridas. Las métricas son agregadas por corrida. En `history_80_20`, el
+historial de salida copia los eventos iniciales y agrega las llegadas; en
+`random_baseline`, solo contiene llegadas de esa corrida. La configuración de
+entrada nunca se modifica con resultados.
 
 ### Ajustar el origen inicial fijo
 
@@ -352,6 +355,209 @@ claro. Para elegir otro punto de carretera, ubica el spectator sobre el carril,
 ejecuta `inspect_location.py` y copia el índice mostrado. El programa proyecta
 cada punto al waypoint de conducción antes de crear el vehículo.
 
+## Dos escenarios: aleatorio e historial 80/20
+
+Ambos modos usan el mismo catálogo de Town01, los mismos tres vehículos, un
+`GlobalRoutePlanner` compartido y un `BasicAgent` independiente por carro.
+Solo cambia la elección del siguiente destino; el planificador y el controlador
+vial permanecen iguales.
+
+### `random_baseline`: elección uniforme por ID
+
+En cada salida se toman los destinos habilitados del mapa, se excluye el destino
+actual, se ordenan por ID y se elige uno con `random.Random.choice()` usando la
+semilla individual del carro. Con los 42 destinos actuales, al salir de uno del
+catálogo hay 41 candidatos: cada uno tiene probabilidad `1/41`, aproximadamente
+2.44 %. Si el carro queda en una posición intermedia tras un viaje incompleto,
+no tiene un destino actual identificado y pueden ser elegibles los 42.
+
+No se sortea primero una categoría: una categoría con más IDs puede recibir más
+viajes. El selector no consulta pesos, etiquetas de frecuencia ni historial.
+Empieza con cero visitas y registra cada llegada completada para análisis. Ese
+historial es pasivo: no influye en las elecciones siguientes.
+Las decisiones son independientes, pero dos carros sí pueden elegir el mismo
+destino; no se reservan destinos exclusivos por vehículo.
+
+### `history_80_20`: preferencias derivadas de visitas individuales
+
+Cada carro carga solo sus filas del dummy y recalcula sus tres destinos más
+visitados antes de cada elección. Los empates de conteos se resuelven por ID.
+Después excluye el destino actual de los candidatos, sin reemplazarlo por un
+cuarto destino dentro del grupo rutinario.
+
+- Con probabilidad 80 %, elige entre los recurrentes elegibles proporcionalmente
+  a sus visitas. Conteos de 10, 6 y 4 implican 50 %, 30 % y 20 % dentro de esa
+  rama si los tres son elegibles.
+- Con probabilidad 20 %, explora uniformemente destinos nunca visitados. Cuando
+  se agotan, elige entre los restantes fuera de su grupo recurrente.
+- Si una rama queda sin candidatos, se utiliza la otra. Solo una llegada
+  `completed` incrementa las visitas del carro correspondiente y puede cambiar
+  su ranking futuro.
+
+80/20 es una probabilidad por decisión, no una proporción exacta exigible a una
+corrida corta. Los campos `selection_class` y `selection_candidate_count` del
+log permiten revisar la rama realmente utilizada y su cantidad de candidatos.
+
+### Ejecutar las dos pruebas de 600 segundos
+
+Estas corridas reales pueden ejecutarse manualmente o por el agente cuando el
+usuario lo autorice expresamente. No se programa monitoreo automático. Primero
+ejecuta el baseline y espera a que termine; después ejecuta el histórico.
+No deben correr simultáneamente contra el mismo servidor.
+
+Requisitos: servidor CARLA 0.9.15 abierto, Town01 cargado, sin otros clientes que
+generen tráfico, cambien el clima o avancen el mundo. Los spawn points 133, 6 y
+101 deben estar libres. No vuelvas a generar el dummy actual: ya tiene cinco
+vehículos con 30 visitas cada uno y el generador reemplaza ese CSV.
+
+Desde PowerShell, sin necesidad de activar el entorno:
+
+```powershell
+cd C:\CARLA\TrafficIA
+.\carla-env\Scripts\python.exe .\scripts\run_trip_simulation.py --config .\config\multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+Después de que aparezca `Corrida completada`, ejecuta:
+
+```powershell
+.\carla-env\Scripts\python.exe .\scripts\run_trip_simulation.py --config .\config\multi_vehicle_trip.json --scenario history_80_20 --town Town01 --seed 42 --seconds 600 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+Si Town01 aún no está cargado, antes de las corridas usa:
+
+```powershell
+.\carla-env\Scripts\python.exe .\scripts\change_map.py --town Town01
+```
+
+Conserva la misma sesión, clima e iluminación entre ambas pruebas y no cambies
+de mapa. El runner no modifica el clima ni la posición del sol. Reinicia los
+ciclos de semáforos antes del frame inicial y registra su estado, tiempos y si
+están congelados, además del clima, posición solar y presencia de otros carros
+o peatones. El reinicio utiliza la
+[API oficial `World.reset_all_traffic_lights()` de CARLA 0.9.15](https://carla.readthedocs.io/en/0.9.15/python_api/#carla.World).
+Si reinicias el servidor, verifica que las condiciones registradas coincidan;
+el runner no restaura automáticamente el clima de una corrida anterior.
+
+### Configuración y reproducibilidad
+
+Los dos comandos usan `config/multi_vehicle_trip.json`. `--scenario` sobrescribe
+`destination_selection_mode` antes de validar la configuración efectiva; sin
+ese argumento se conserva el modo del JSON (`history_80_20` actualmente).
+Los modos anteriores `cyclic` y `stochastic` siguen disponibles mediante JSON.
+
+| Parámetro | Valor de estas pruebas |
+|---|---|
+| `vehicle_count`, `initial_spawn_point_indices` | `3`, `[133, 6, 101]` |
+| `initial_spawn_point_index`, `initial_spawn_fallback_enabled` | `133`, `false`; el escalar coincide con el primer índice |
+| `seed`, `target_speed_kmh` | `42`, `20` |
+| `duration_seconds`, `fixed_delta_seconds` | `600`, `0.05` s simulados |
+| `arrival_threshold_m`, `destination_dwell_time_seconds` | `4` m, `5` s |
+| `max_trip_time_seconds` | `300` s por viaje |
+| `blocked_speed_threshold_mps`, `blocked_time_threshold_seconds` | `0.2` m/s durante `60` s |
+| `trajectory_sampling_interval_seconds` | `0.5` s |
+| `routine_destination_count`, `routine_probability`, `exploration_probability` | `3`, `0.8`, `0.2`; no intervienen en baseline |
+
+`--seed`, `--seconds`, `--town` y `--no-rendering` permiten sobrescribir sus
+valores correspondientes. `--simulation-speed` controla el objetivo de ritmo
+real, no la física: 600 segundos son tiempo simulado y pueden tardar más en un
+equipo lento. Si usas `--no-rendering`, úsalo en ambas corridas.
+
+Para el carro de índice `i` (empezando en cero), la semilla de destinos es
+`seed + i * 1000003`; la de modelo/color vehicular suma uno más. Los sorteos
+vehiculares no consumen los sorteos de destinos. Mismo catálogo, semilla e
+historial y misma secuencia de llegadas producen las mismas decisiones; esto
+no garantiza trayectorias físicas idénticas si cambian el servidor o los eventos.
+Los modelos y atributos realmente creados también quedan en `run_config.json`.
+
+`history_80_20` carga 30 visitas de cada uno de los primeros tres carros; los
+historiales de `vehicle_004` y `vehicle_005` quedan disponibles para después.
+Cada corrida vuelve al dummy; no reutiliza resultados anteriores automáticamente.
+`--history-in <ruta>` permite continuar explícitamente un historial en modo
+histórico, pero no debe usarse en esta primera comparación. El baseline funciona
+sin archivo dummy y rechaza cualquier `--history-in` explícito.
+
+### Resultados y estados de viaje
+
+Las carpetas nuevas incluyen mapa, escenario, semilla y fecha UTC, por ejemplo:
+
+```text
+data/output/town01_random_baseline_seed_42_<fechaUTC>/
+data/output/town01_history_80_20_seed_42_<fechaUTC>/
+```
+
+- `run_config.json`: escenario efectivo, parámetros, destinos, condiciones del
+  mundo y datos iniciales por carro. En baseline, `history_input` es `null` y
+  los conteos iniciales están vacíos, aunque el JSON original configure un dummy.
+- `trips_log.csv`: origen, destino, rama de elección, tiempo, distancia,
+  velocidad, incidentes y estado. Baseline registra
+  `selection_class=random_baseline`; el histórico, `routine` o `exploration`.
+  `history_visit_count_before` es telemetría de visitas previas, no un peso de
+  selección en baseline.
+- `trajectory_log.csv`: muestras de posición, velocidad y carril por vehículo y
+  viaje, con tiempo simulado. El frame inicial no se reinicia a cero entre corridas.
+- `events_log.csv`: colisiones e invasiones de carril separadas; una invasión no
+  equivale automáticamente a un accidente.
+- `vehicle_history.csv`: en baseline comienza vacío y añade solo llegadas; en
+  histórico comienza con 90 visitas (30 por carro) y añade las nuevas con
+  `source=simulation`. La secuencia pertenece a cada `vehicle_id`.
+- `metrics_summary.csv`: una fila agregada con `vehicle_count=3`, viajes,
+  distancia, velocidad, incidentes y distribución de destinos completados.
+  Desde `metrics_semantics_version=2`, los totales de eventos incluyen las
+  esperas, por lo que pueden superar la suma de los eventos por viaje.
+  `total_collisions` cuenta callbacks, no accidentes independientes.
+
+| Estado | Significado |
+|---|---|
+| `completed` | Llegó dentro del umbral; se añade una visita al historial. |
+| `aborted` | Seguía viajando cuando terminó la duración de la corrida. No es por sí solo un error de ruta. |
+| `blocked` | Permaneció por debajo del umbral de velocidad demasiado tiempo; puede incluir una espera prolongada en semáforo. |
+| `timeout` | Superó el tiempo máximo por viaje sin llegar. |
+| `route_failed` | No pudo obtener o validar el plan antes de circular. |
+
+Con `Ctrl+C` se ejecuta la limpieza de sensores, vehículos y ajustes del mundo.
+Una interrupción deja resultados parciales: actualmente no garantiza cerrar
+los viajes activos ni escribir `metrics_summary.csv`. Si CARLA se cierra o pierde
+la conexión, tampoco se puede garantizar la destrucción remota de actores; hay
+que reiniciar el servidor. Para comparar 600 segundos, deja finalizar cada comando.
+
+### Verificación realizada y pendiente
+
+Las 48 pruebas automatizadas pasan con `carla-env` y agents disponible: incluyen selector uniforme,
+exclusión, reproducibilidad, independencia de pesos/historial, validación CLI,
+aislamiento por carro y actualización solo por llegadas. Las pruebas con un
+doble de CARLA también cubren ambos modos, CSV reales en directorios temporales,
+un tick por frame y limpieza ante `Ctrl+C`, spawn fallido o fallo de sensor.
+No son una validación de circulación ni física real.
+
+```powershell
+.\carla-env\Scripts\python.exe -c "import carla; print('CARLA SDK disponible')"
+$env:CARLA_PYTHONAPI = 'C:\CARLA\WindowsNoEditor\PythonAPI\carla'
+.\carla-env\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+Como antecedente, la fase multivehículo pasó 21 pruebas y una corrida CARLA real
+de 180 segundos: los tres carros completaron un viaje y empezaron otro; hubo
+cero colisiones y tres eventos de invasión de carril. Esa evidencia corresponde
+al modo histórico previo, no valida el nuevo baseline durante 600 segundos.
+
+El 2026-09-08 el usuario autorizó al agente a ejecutar ambas corridas de 600
+segundos. Terminaron sin crash, con 11 viajes completados por escenario, pero
+mostraron contactos repetidos entre carros en baseline y cuatro eventos durante
+esperas omitidos del resumen histórico. La evidencia, correcciones y revalidación
+están en la [bitácora de simulación](docs/bitacora_simulacion.md).
+Después del ajuste, ambas repeticiones completaron 11 viajes sin contactos entre
+los carros. El baseline pasó de 857 a 7 callbacks de colisión; el histórico tuvo
+2. Los contactos restantes son con elementos estáticos y siguen pendientes de
+diagnóstico. El resumen histórico ya coincide con sus 27 invasiones registradas,
+incluidas las cuatro durante las esperas.
+No se inicia monitoreo automático. La comparación estadística formal, las
+gráficas de densidad/flujo y más vehículos quedan para el siguiente incremento.
+
+Para conservar contexto entre sesiones, registrar cada ajuste de simulación en
+esa bitácora: fecha, causa o hipótesis, archivos, pruebas, carpetas de resultados
+y limitaciones. Mantener los logs originales y documentar cambios de significado
+de las métricas antes de comparar corridas antiguas y nuevas.
+
 ## Configuración base
 
 Los archivos de `config/` documentan los parámetros previstos para escenarios
@@ -362,14 +568,34 @@ separar la lógica común hacia `src/`.
 
 ## Próximos pasos
 
-Validar visualmente la corrida simultánea en 133, 6 y 101, implementar
-posteriormente el escenario aleatorio equivalente y escalar gradualmente a 5,
-10, 20 y 30 vehículos. Todavía no se calculan densidad o flujo para diagramas
+Investigar los contactos con elementos estáticos documentados en la bitácora,
+especialmente cerca de `(96, 202)` y `(98, 325)`, y estabilizar tres vehículos
+antes de escalar gradualmente a 5, 10, 20 y 30 vehículos.
+Todavía no se calculan densidad o flujo para diagramas
 fundamentales, ni se implementan comparación estadística final, visualizaciones
 avanzadas o Google Maps API.
 
 ## Extra: errores de dependencias de rutas
 
+- **Un carro alcanza a otro perfectamente alineado delante**: CARLA 0.9.15
+  excluye el ángulo exacto de 0° en su detector básico. El proyecto usa ahora
+  `CollinearSafeBasicAgent` para incluirlo sin alterar el plan de ruta ni los
+  parámetros de frenado. Las pruebas de regresión contra la SDK requieren
+  `$env:CARLA_PYTHONAPI = 'C:\CARLA\WindowsNoEditor\PythonAPI\carla'`.
+- **El resumen muestra menos eventos que `events_log.csv`**: antes se omitían
+  las esperas. La versión 2 cuenta todos los callbacks drenados; los eventos
+  sin viaje tienen `trip_id` vacío. Los logs antiguos se conservan sin reescribir.
+- **Cientos de colisiones en un contacto**: cada sensor puede emitir múltiples
+  callbacks. Se preservan para diagnóstico; no son un conteo de accidentes
+  únicos. `carla_actor_id` y `other_actor_type` ayudan a identificar participantes.
+- **`--history-in no se puede combinar con random_baseline`**: elimina
+  `--history-in`; el baseline solo registra llegadas nuevas. Para consumir un
+  historial, usa `--scenario history_80_20`.
+- **`No existe el historial dummy` / `No hay historial dummy para vehicle_XXX`**:
+  en modo histórico, comprueba `vehicle_history_config` o `--history-in` y que
+  existan filas de cada carro configurado. El baseline no necesita ese archivo.
+- **`El mapa activo es ...; se esperaba Town01`**: detén los clientes y carga
+  Town01 antes de ejecutar. `--town` valida el mapa esperado, no lo cambia.
 - **`No module named 'agents'`**: la API `carla` está disponible, pero faltan
   los agentes oficiales. Añade
   `--carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla` al comando, o
