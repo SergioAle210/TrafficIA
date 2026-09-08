@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from pathlib import Path
 from typing import Dict, List
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.destinations import load_destinations
+from src.vehicle_history import generate_dummy_events, write_history_csv
+
+
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "input"
 
 
@@ -152,34 +160,6 @@ DESTINATIONS: List[Dict[str, object]] = [
 ]
 
 
-# These are separate from the generic configuration above: they are the three
-# reusable road references for the single-vehicle Town01 trip validation.
-# These are CARLA-recommended spawn points selected visually in Town01.
-TOWN01_DESTINATIONS: List[Dict[str, object]] = [
-    {
-        "destination_id": "T01_A", "destination_name": "Lugar A", "map": "Town01",
-        "category": "residential", "frequency_class": "routine", "weight": 1.0,
-        "enabled": "true", "reference_type": "spawn_point", "spawn_point_index": 133,
-        "x": "", "y": "", "z": "", "road_id": "", "lane_id": "",
-        "description": "Origen inicial y destino de retorno; spawn point CARLA 133.",
-    },
-    {
-        "destination_id": "T01_B", "destination_name": "Lugar B", "map": "Town01",
-        "category": "commercial", "frequency_class": "exploration", "weight": 1.0,
-        "enabled": "true", "reference_type": "spawn_point", "spawn_point_index": 6,
-        "x": "", "y": "", "z": "", "road_id": "", "lane_id": "",
-        "description": "Primer destino del ciclo; spawn point CARLA 6.",
-    },
-    {
-        "destination_id": "T01_C", "destination_name": "Lugar C", "map": "Town01",
-        "category": "services", "frequency_class": "routine", "weight": 1.0,
-        "enabled": "true", "reference_type": "spawn_point", "spawn_point_index": 101,
-        "x": "", "y": "", "z": "", "road_id": "", "lane_id": "",
-        "description": "Segundo destino del ciclo; spawn point CARLA 101.",
-    },
-]
-
-
 DEMAND_PROFILES: List[Dict[str, object]] = [
     {
         "profile_id": "low_demand",
@@ -240,6 +220,21 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OUTPUT_DIR,
         help="Directorio donde se crearán los CSV de entrada.",
     )
+    parser.add_argument("--seed", type=int, default=42, help="Semilla del historial dummy.")
+    parser.add_argument(
+        "--vehicles", type=int, default=1, help="Cantidad de historiales individuales a generar."
+    )
+    parser.add_argument(
+        "--history-length", type=int, default=30, help="Visitas previas por vehículo."
+    )
+    parser.add_argument(
+        "--routine-destinations", type=int, default=3,
+        help="Cantidad de destinos recurrentes iniciales por vehículo.",
+    )
+    parser.add_argument(
+        "--routine-probability", type=float, default=0.8,
+        help="Proporción de visitas dummy hacia los destinos personales recurrentes.",
+    )
     return parser.parse_args()
 
 
@@ -253,7 +248,6 @@ def main() -> None:
         (output_dir / "zones_config.csv", ZONES),
         (output_dir / "destinations_config.csv", DESTINATIONS),
         (output_dir / "demand_profiles.csv", DEMAND_PROFILES),
-        (output_dir / "Town01" / "destinations_config.csv", TOWN01_DESTINATIONS),
     )
 
     for path, rows in output_files:
@@ -262,6 +256,21 @@ def main() -> None:
     print("Datos dummy generados correctamente:")
     for path, _ in output_files:
         print(f"- {path}")
+
+    town01_catalog_path = output_dir / "Town01" / "destinations_config.csv"
+    town01_destinations = load_destinations(town01_catalog_path, "Town01")
+    vehicle_ids = ["vehicle_{0:03d}".format(index) for index in range(1, args.vehicles + 1)]
+    history_events = generate_dummy_events(
+        destinations=town01_destinations,
+        vehicle_ids=vehicle_ids,
+        history_length=args.history_length,
+        routine_destination_count=args.routine_destinations,
+        routine_probability=args.routine_probability,
+        seed=args.seed,
+    )
+    history_path = output_dir / "Town01" / "vehicle_history_dummy.csv"
+    write_history_csv(history_path, history_events)
+    print(f"- {history_path}")
 
 
 if __name__ == "__main__":
