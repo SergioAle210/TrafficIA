@@ -264,7 +264,9 @@ Cada `BasicAgent` controla un vehículo y sigue su plan completo; por ello no se
 activa Traffic Manager para estos actores. `stable_traffic.py` sigue utilizando
 Traffic Manager sin cambios.
 
-La llegada se detecta con `arrival_threshold_m`; al llegar, el actor frena,
+La llegada exige estar dentro de `arrival_threshold_m` **y en el mismo
+`road_id`/`lane_id` que el destino**. Pasar cerca por el carril contrario no
+completa el viaje. Al llegar, el actor frena,
 espera `destination_dwell_time_seconds` de **tiempo simulado**, y recibe un
 nuevo plan. `travel_time`, espera y duración se obtienen de
 `WorldSnapshot.timestamp.elapsed_seconds`, nunca de reloj de pared.
@@ -342,6 +344,41 @@ entre corridas. Las métricas son agregadas por corrida. En `history_80_20`, el
 historial de salida copia los eventos iniciales y agrega las llegadas; en
 `random_baseline`, solo contiene llegadas de esa corrida. La configuración de
 entrada nunca se modifica con resultados.
+
+### Diagnosticar el seguimiento de curvas
+
+El controlador conserva `CollinearSafeBasicAgent` y los PID oficiales. Tras
+reproducir los contactos estáticos de Town01, se redujo únicamente
+`controller_distance_ratio` de 0.5 a **0.1**. Este valor se entrega como
+`distance_ratio` al `LocalPlanner`: el radio de descarte pasa de
+`3 + 0.5 * velocidad_mps` a `3 + 0.1 * velocidad_mps`, aproximadamente de
+5.78 a 3.56 m a 20 km/h. Así se conservan objetivos intermedios de curvas
+estrechas. Se mantienen los 3 m de base, las ganancias PID, la velocidad,
+el timestep, el plan completo y la selección de destinos.
+
+Para registrar una prueba de tres vehículos con semilla 42:
+
+```powershell
+.\carla-env\Scripts\python.exe scripts/run_trip_simulation.py --config config/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --navigation-diagnostics --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+Después de finalizar, repite el comando con `--scenario history_80_20`.
+`--controller-distance-ratio 0.5` permite reproducir el seguimiento anterior;
+ambos valores usan ahora la misma comprobación del carril de llegada.
+
+`--navigation-diagnostics` añade `route_log.csv` (todos los waypoints del plan)
+y `control_log.csv` (pose, velocidad, objetivo, dirección, acelerador, freno,
+radio de descarte y error lateral por frame de control activo). El control
+registrado en un frame se aplica para el siguiente tick; las colisiones se
+asocian a la pose por `vehicle_id` y `frame`. El error lateral es positivo a la
+derecha y se mide contra el segmento más cercano del plan completo, incluso
+dentro de intersecciones; **no es una distancia física a la acera**. No se
+muestrean controles durante las esperas ni después de cerrar el viaje.
+
+Los diagnósticos están desactivados por defecto. No cambian los CSV anteriores
+ni filtran callbacks. `run_config.json` registra las opciones del controlador,
+la política de llegada y la versión/semántica de los diagnósticos. La evidencia
+y las limitaciones de las pruebas están en la [bitácora](docs/bitacora_simulacion.md).
 
 ### Ajustar el origen inicial fijo
 
@@ -508,7 +545,7 @@ data/output/town01_history_80_20_seed_42_<fechaUTC>/
 
 | Estado | Significado |
 |---|---|
-| `completed` | Llegó dentro del umbral; se añade una visita al historial. |
+| `completed` | Llegó dentro del umbral y al carril del destino; se añade una visita al historial. |
 | `aborted` | Seguía viajando cuando terminó la duración de la corrida. No es por sí solo un error de ruta. |
 | `blocked` | Permaneció por debajo del umbral de velocidad demasiado tiempo; puede incluir una espera prolongada en semáforo. |
 | `timeout` | Superó el tiempo máximo por viaje sin llegar. |
@@ -522,7 +559,7 @@ que reiniciar el servidor. Para comparar 600 segundos, deja finalizar cada coman
 
 ### Verificación realizada y pendiente
 
-Las 48 pruebas automatizadas pasan con `carla-env` y agents disponible: incluyen selector uniforme,
+Las 64 pruebas automatizadas pasan con `carla-env` y agents disponible: incluyen selector uniforme,
 exclusión, reproducibilidad, independencia de pesos/historial, validación CLI,
 aislamiento por carro y actualización solo por llegadas. Las pruebas con un
 doble de CARLA también cubren ambos modos, CSV reales en directorios temporales,
@@ -547,9 +584,37 @@ esperas omitidos del resumen histórico. La evidencia, correcciones y revalidaci
 están en la [bitácora de simulación](docs/bitacora_simulacion.md).
 Después del ajuste, ambas repeticiones completaron 11 viajes sin contactos entre
 los carros. El baseline pasó de 857 a 7 callbacks de colisión; el histórico tuvo
-2. Los contactos restantes son con elementos estáticos y siguen pendientes de
-diagnóstico. El resumen histórico ya coincide con sus 27 invasiones registradas,
+2. Esos contactos estáticos motivaron la investigación de curvas descrita abajo.
+El resumen histórico ya coincide con sus 27 invasiones registradas,
 incluidas las cuatro durante las esperas.
+
+La investigación posterior confirmó un recorte de curvas por el descarte
+anticipado de waypoints y corrigió además una llegada prematura desde el
+carril contrario. Con `distance_ratio=0.1`, las corridas finales de 600 s,
+tres vehículos y semilla 42 produjeron:
+
+| Resultado final | random_baseline | history_80_20 |
+|---|---:|---:|
+| Viajes iniciados / completados / aborted | 14 / 11 / 3 | 14 / 11 / 3 |
+| Callbacks de colisión | 0 | 0 |
+| Invasiones de carril | 0 | 2 |
+
+Las referencias con 0.5 y la misma regla de llegada habían registrado seis
+colisiones en baseline y una en histórico. Los pasos por ambas curvas se
+conservaron. La desviación interior máxima del baseline bajó de 1.90 a 0.86 m
+cerca de `(96, 202)` y de 1.61 a 0.72 m cerca de `(98, 325)`. Las dos invasiones
+restantes del histórico son de marca `Broken`, cerca de `(2, 321)` y `(1, 318)`;
+una ocurrió durante la espera y ambas entran en el resumen. Las 64 pruebas
+incluyen regresiones del seguimiento y la llegada, además de los diagnósticos.
+
+Resultados finales:
+
+- `data/output/town01_random_baseline_seed_42_20260908T182618700799Z/`
+- `data/output/town01_history_80_20_seed_42_20260908T182846213527Z/`
+
+La limpieza final dejó cero vehículos y sensores, modo asíncrono y no-rendering.
+Esto valida la corrección en esas condiciones; no demuestra ausencia de
+contactos con otros modelos, semillas o cargas.
 No se inicia monitoreo automático. La comparación estadística formal, las
 gráficas de densidad/flujo y más vehículos quedan para el siguiente incremento.
 
@@ -568,9 +633,11 @@ separar la lógica común hacia `src/`.
 
 ## Próximos pasos
 
-Investigar los contactos con elementos estáticos documentados en la bitácora,
-especialmente cerca de `(96, 202)` y `(98, 325)`, y estabilizar tres vehículos
-antes de escalar gradualmente a 5, 10, 20 y 30 vehículos.
+Los contactos investigados cerca de `(96, 202)` y `(98, 325)` no reaparecieron
+en la validación final. Se mantienen tres vehículos. Antes de escalar,
+ampliar la validación con otras semillas/modelos y revisar las dos invasiones
+residuales del histórico, sin ocultarlas ni interpretar callbacks como accidentes.
+El aumento gradual a 5, 10, 20 y 30 vehículos queda para una fase posterior.
 Todavía no se calculan densidad o flujo para diagramas
 fundamentales, ni se implementan comparación estadística final, visualizaciones
 avanzadas o Google Maps API.
