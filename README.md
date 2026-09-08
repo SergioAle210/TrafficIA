@@ -91,12 +91,16 @@ cd C:\CARLA\WindowsNoEditor
 .\CarlaUE4.exe -quality-level=Low
 ```
 
-En un equipo con GPU integrada o recursos limitados, usa DirectX 11 y una ventana
-pequeña:
+Para una inspección visual corta puede reducirse la ventana:
 
 ```powershell
 .\CarlaUE4.exe -quality-level=Low -dx11 -windowed -ResX=800 -ResY=600
 ```
+
+Esta configuración no vuelve adecuada una GPU integrada para corridas largas.
+Los registros locales muestran que CARLA está usando `Intel UHD Graphics 770` y
+ha fallado dentro de D3D11. Si existe una GPU NVIDIA/AMD, configura
+`CarlaUE4.exe` como aplicación de alto rendimiento en Windows.
 
 Espera a que el simulador termine de cargar. Los scripts se conectan a
 `localhost:2000` con un timeout de 30 segundos.
@@ -113,6 +117,10 @@ python .\scripts\change_map.py --town Town01
 
 Espera entre 10 y 15 segundos después de ver `Mapa cargado` para que el servidor se
 estabilice. `change_map.py` no recarga el mapa si ya está activo.
+
+Para cambiar de Town01 a Town04, detén primero cualquier cliente con `Ctrl+C`,
+espera su limpieza, cierra CARLA y vuelve a iniciarlo. Evita cargar varios mapas
+sucesivamente en el mismo proceso de Unreal cuando se usa calidad `Low`.
 
 ## Ejecutar tráfico estable
 
@@ -156,29 +164,52 @@ Ejecuta:
 python .\scripts\generate_dummy_data.py
 ```
 
-El comando valida que los pesos de destinos sumen `1.0` y regenera:
+El comando conserva los CSV genéricos anteriores y genera además un historial
+inicial individual y reproducible para Town01:
 
 ```text
 data/input/zones_config.csv
 data/input/destinations_config.csv
 data/input/demand_profiles.csv
+data/input/Town01/vehicle_history_dummy.csv
 ```
 
-Estos CSV son configuración sintética fija; no contienen resultados ni viajes.
-Los resultados futuros deberán guardarse exclusivamente bajo `data/output/`.
+El catálogo Town01 no contiene pesos ni etiquetas permanentes de frecuencia. El
+historial dummy contiene 30 destinos previos de `vehicle_001`; sus conteos son
+los pesos derivados por el modelo. Para preparar dos carros futuros:
+
+```powershell
+python .\scripts\generate_dummy_data.py --seed 42 --vehicles 2 --history-length 30
+```
+
+La misma semilla genera los mismos historiales, pero cada `vehicle_id` recibe un
+perfil distinto. Durante una corrida solo los viajes `completed` se agregan al
+historial de salida; no se modifica el CSV de entrada.
+
+Para continuar explícitamente desde el estado de una corrida anterior:
+
+```powershell
+python .\scripts\run_trip_simulation.py --town Town01 --seed 42 --history-in .\data\output\<run_id>\vehicle_history.csv --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+Sin `--history-in`, cada corrida vuelve al mismo dummy inicial, requisito útil
+para comparar experimentos bajo condiciones equivalentes.
 
 ## Ejecutar viajes sucesivos en Town01
 
-La segunda iteración está deliberadamente limitada a **un vehículo** y tres
-destinos manuales en `data/input/Town01/destinations_config.csv`. Cada destino
-usa las coordenadas de un **waypoint vial accesible**, no la ubicación física de
-un edificio.
+La iteración continúa limitada a **un vehículo**, pero el catálogo contiene 42
+destinos Town01 tomados de `rutas.md`. Cada destino referencia un spawn point
+válido sobre la red vial.
 
 Con Town01 ya cargado, ejecuta:
 
 ```powershell
 python .\scripts\run_trip_simulation.py --town Town01 --seed 42 --simulation-speed 1
 ```
+
+La duración predeterminada es 600 s simulados y el timeout individual es 300 s.
+Esto permite completar rutas largas de Town01 a 20 km/h; para una comprobación
+corta puede usarse `--seconds 120`.
 
 Si Python encuentra `carla` pero muestra `No module named 'agents'`, usa el
 directorio de la distribución de CARLA que contiene la carpeta `agents`:
@@ -193,12 +224,18 @@ También puede definirse una vez por sesión de PowerShell:
 $env:CARLA_PYTHONAPI = 'C:\CARLA\WindowsNoEditor\PythonAPI\carla'
 ```
 
-La configuración actual usa el ciclo fijo `Lugar B → Lugar C → Lugar A` y lo
-repite. El vehículo empieza junto a Lugar A (spawn 133), pero A no es su primer
-destino: primero va a B, luego C y finalmente A. Esto se controla con
-`destination_selection_mode` y `destination_cycle_order` en
-`config/single_vehicle_trip.json`. El modo `stochastic` continúa disponible
-para una futura prueba ponderada con semilla.
+La configuración predeterminada usa `history_80_20`. Para cada viaje hace una
+decisión reproducible: 80 % entre los tres IDs más visitados por el vehículo,
+ponderados por sus conteos históricos, y 20 % entre los demás IDs, priorizando
+los nunca visitados. No se selecciona la ubicación actual. Una llegada completada
+se guarda en `vehicle_history.csv` y afecta la siguiente decisión de esa corrida.
+
+Para comprobar únicamente las tres rutas ya validadas (6 → 101 → 133), conserva
+el modo anterior con:
+
+```powershell
+python .\scripts\run_trip_simulation.py --config .\config\single_vehicle_trip_cyclic.json --town Town01 --seed 42 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
 
 Las rutas se crean antes de circular con `GlobalRoutePlanner.trace_route()` y
 se entregan como pares `[Waypoint, RoadOption]` a
@@ -226,7 +263,7 @@ Una inicialización correcta muestra algo similar a:
 
 ```text
 Spawn 133 sincronizado: x=..., y=..., z=...; error=0.02 m
-trip_001: ORIGIN_SPAWN_133 -> T01_B; ruta planificada ... m; inicio alineado 0.10 m
+trip_001: T01_133 -> T01_... [routine]; ruta planificada ... m; inicio alineado 0.10 m
 ```
 
 Si CARLA devuelve temporalmente `(0,0,0)` u otra posición desactualizada, la
@@ -268,9 +305,20 @@ los dibujos permanecen 300 segundos simulados. Mueve el spectator por el mapa
 para comparar el origen con otros puntos antes de poner el índice elegido en
 `initial_spawn_point_index`.
 
-Cada corrida guarda `run_config.json`, `trips_log.csv`,
-`trajectory_log.csv`, `events_log.csv` y `metrics_summary.csv` en
-`data/output/<run_id>/`. La configuración nunca se modifica con resultados.
+Para validar sin crear actores que todos los destinos tengan ruta desde 133:
+
+```powershell
+python .\scripts\validate_destinations.py --town Town01 --origin-id T01_133 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+La validación actual obtiene 41 rutas válidas y ninguna fallida desde `T01_133`.
+El ID 75 fue retirado porque CARLA devolvía para él una ruta degenerada de 0 m;
+los IDs 24 y 49 permanecen fuera por representar puentes.
+
+Cada corrida guarda `run_config.json`, `trips_log.csv`, `trajectory_log.csv`,
+`events_log.csv`, `metrics_summary.csv` y `vehicle_history.csv` en
+`data/output/<run_id>/`. Este último copia el dummy inicial y agrega las llegadas
+completadas. La configuración de entrada nunca se modifica con resultados.
 
 ### Ajustar el origen inicial fijo
 
@@ -293,11 +341,10 @@ separar la lógica común hacia `src/`.
 
 ## Próximos pasos
 
-Cuando las pruebas con 10, 20 y 30 vehículos sean estables, las siguientes fases
-podrán separar la conexión y gestión de actores en módulos reutilizables, agregar
-logs CSV, zonas origen-destino, selección estocástica y planificación de rutas.
-Todavía no se implementan sensores de colisión o invasión de carril,
-visualizaciones avanzadas, comparación estadística ni Google Maps API.
+Validar visualmente una muestra de los 42 destinos, implementar posteriormente
+el escenario aleatorio equivalente y escalar el mismo historial individual a
+múltiples vehículos. Todavía no se implementan comparación estadística final,
+visualizaciones avanzadas ni Google Maps API.
 
 ## Extra: errores de dependencias de rutas
 
@@ -332,9 +379,20 @@ visualizaciones avanzadas, comparación estadística ni Google Maps API.
 - **Cambiar el origen fijo**: modifica `initial_spawn_point_index` en
   `config/single_vehicle_trip.json`. Usa `inspect_location.py` con el spectator
   situado sobre la carretera para conocer un índice cercano y válido.
-- **Tres destinos consecutivos actuales**: las filas `T01_A`, `T01_B` y
-  `T01_C` usan los spawn points 133, 6 y 101. Ajusta `spawn_point_index` en el
-  CSV y `destination_cycle_order` en el JSON para cambiar posiciones u orden.
+- **Tres destinos consecutivos de regresión**: `T01_006`, `T01_101` y
+  `T01_133` usan los spawn points 6, 101 y 133. Se ejecutan con
+  `config/single_vehicle_trip_cyclic.json`; el modo normal usa historial 80/20.
+- **CARLA se cierra con `DXGI_ERROR_INVALID_CALL`**: es un fallo del servidor
+  Unreal/D3D11, no del planificador Python. En este equipo el crash context
+  identifica `Intel UHD Graphics 770`, aunque CARLA recomienda una GPU dedicada
+  con al menos 6 GB. Usa GPU de alto rendimiento si existe, evita recargar mapas
+  repetidamente, reinicia CARLA entre Town01 y Town04 y usa `--no-rendering` en
+  corridas largas.
+- **Ventana que solo dice `Fatal error!`**: los registros locales muestran una
+  `EXCEPTION_ACCESS_VIOLATION` posterior. Aplica el mismo procedimiento: detener
+  clientes, reiniciar el servidor y no reutilizar la sesión para otro mapa.
 
+```powershell
 cd C:\CARLA\WindowsNoEditor
 .\CarlaUE4.exe -quality-level=Low -dx11 -windowed -ResX=800 -ResY=600
+```
