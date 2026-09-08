@@ -1,4 +1,4 @@
-"""CARLA navigation wrappers used by the one-vehicle trip runner."""
+"""CARLA navigation wrappers used by the multi-vehicle trip runner."""
 
 from __future__ import annotations
 
@@ -128,8 +128,9 @@ def route_distance_m(route: Sequence[Any]) -> float:
 def build_basic_agent(vehicle: Any, route: Sequence[Any], target_speed_kmh: float) -> Any:
     """Create an official CARLA BasicAgent configured with a precomputed plan."""
 
-    from agents.navigation.basic_agent import BasicAgent
+    from src.carla_agent import CollinearSafeBasicAgent
 
-    agent = BasicAgent(vehicle, target_speed=target_speed_kmh)
+    # A fresh options dict avoids CARLA's mutable default being shared by agents.
+    agent = CollinearSafeBasicAgent(vehicle, target_speed=target_speed_kmh, opt_dict={})
     agent.set_global_plan(list(route), stop_waypoint_creation=True, clean_queue=True)
     return agent

@@ -154,6 +154,27 @@ def weighted_choice(destinations: Sequence[Destination], rng: random.Random) -> 
     return destinations[-1]
 
 
+def select_uniform_destination(
+    destinations: Iterable[Destination],
+    current_destination_id: Optional[str],
+    rng: random.Random,
+) -> Destination:
+    """Choose uniformly among enabled IDs in an already map-filtered catalog.
+
+    Sorting makes CSV order irrelevant. History, categories, frequency labels
+    and legacy weights never participate in the draw.
+    """
+
+    eligible = sorted(
+        (item for item in destinations
+         if item.enabled and item.destination_id != current_destination_id),
+        key=lambda item: item.destination_id,
+    )
+    if not eligible:
+        raise ValueError("No existe un destino distinto de la ubicación actual.")
+    return rng.choice(eligible)
+
+
 def select_destination(
     destinations: Iterable[Destination],
     current_destination_id: Optional[str],

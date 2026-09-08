@@ -28,6 +28,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, help="Sobrescribe la semilla del JSON.")
     parser.add_argument("--seconds", type=float, help="Sobrescribe la duración simulada.")
     parser.add_argument(
+        "--scenario",
+        choices=("random_baseline", "history_80_20"),
+        help="Sobrescribe destination_selection_mode del JSON antes de validarlo.",
+    )
+    parser.add_argument(
         "--history-in",
         type=Path,
         help=(
@@ -58,21 +63,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def configuration_from_args(args: argparse.Namespace) -> TripSimulationConfig:
+    """Apply CLI inputs before validating the effective scenario configuration."""
+
+    overrides = {}
+    if args.town:
+        overrides["town"] = args.town
+    if args.seed is not None:
+        overrides["seed"] = args.seed
+    if args.seconds is not None:
+        overrides["duration_seconds"] = args.seconds
+    if args.scenario is not None:
+        overrides["destination_selection_mode"] = args.scenario
+    if args.history_in is not None:
+        overrides["vehicle_history_config"] = str(args.history_in.resolve())
+    if args.no_rendering:
+        overrides["no_rendering_mode"] = True
+    config = TripSimulationConfig.from_json(args.config, overrides=overrides)
+    if config.destination_selection_mode == "random_baseline" and args.history_in is not None:
+        raise ValueError("--history-in no se puede combinar con random_baseline; no utiliza historial de entrada.")
+    return config
+
+
 def main() -> int:
     args = parse_args()
-    config = TripSimulationConfig.from_json(args.config)
-    if args.town:
-        config.town = args.town
-    if args.seed is not None:
-        config.seed = args.seed
-    if args.seconds is not None:
-        config.duration_seconds = args.seconds
-    if args.history_in is not None:
-        config.vehicle_history_config = str(args.history_in.resolve())
-    if args.no_rendering:
-        config.no_rendering_mode = True
-    config.validate()
     try:
+        config = configuration_from_args(args)
         output_directory = TripSimulation(
             config, PROJECT_ROOT, args.simulation_speed, str(args.carla_pythonapi)
             if args.carla_pythonapi else None
@@ -104,7 +120,7 @@ def main() -> int:
         print("Error de dependencia CARLA: {0}".format(error), file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("Simulación detenida con Ctrl+C; actores y sensores eliminados.")
+        print("Simulación detenida con Ctrl+C; se ejecutó la limpieza de actores y sensores.")
         return 130
     except (RuntimeError, ValueError, FileNotFoundError) as error:
         print("Error de simulación: {0}".format(error), file=sys.stderr)

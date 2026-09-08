@@ -13,7 +13,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src.destinations import Destination, load_destinations, select_destination
+from src.destinations import (
+    Destination, load_destinations, select_destination, select_uniform_destination,
+)
 from src.route_planner import (
     build_basic_agent,
     build_global_route_planner,
@@ -72,9 +74,15 @@ class TripSimulationConfig:
     client_timeout_seconds: float = 30.0
 
     @classmethod
-    def from_json(cls, path: Path) -> "TripSimulationConfig":
+    def from_json(
+        cls, path: Path, overrides: Optional[Dict[str, Any]] = None
+    ) -> "TripSimulationConfig":
         with path.open("r", encoding="utf-8") as config_file:
             payload = json.load(config_file)
+        # CLI overrides belong to the effective config, before any validation.
+        payload.update(overrides or {})
+        if payload.get("destination_selection_mode") == "random_baseline":
+            payload.setdefault("vehicle_history_config", "")
         payload.setdefault("vehicle_count", 1)
         payload.setdefault(
             "initial_spawn_point_indices",
@@ -136,9 +144,12 @@ class TripSimulationConfig:
             raise ValueError("Estos parámetros deben ser positivos: {0}".format(", ".join(invalid)))
         if self.destination_dwell_time_seconds < 0.0:
             raise ValueError("destination_dwell_time_seconds no puede ser negativo.")
-        if self.destination_selection_mode not in {"stochastic", "cyclic", "history_80_20"}:
+        if self.destination_selection_mode not in {
+            "stochastic", "cyclic", "history_80_20", "random_baseline"
+        }:
             raise ValueError(
-                "destination_selection_mode debe ser 'stochastic', 'cyclic' o 'history_80_20'."
+                "destination_selection_mode debe ser 'stochastic', 'cyclic', "
+                "'history_80_20' o 'random_baseline'."
             )
         if self.routine_destination_count <= 0:
             raise ValueError("routine_destination_count debe ser positivo.")
@@ -213,6 +224,7 @@ class EventCollector:
         details = "normal_impulse=({0:.3f},{1:.3f},{2:.3f})".format(
             impulse.x, impulse.y, impulse.z
         )
+        details += "; other_actor_type={0}".format(getattr(event.other_actor, "type_id", "unknown"))
         self._append("collision", event, event.other_actor.id, details)
 
     def lane_invasion(self, event: Any) -> None:
@@ -403,8 +415,9 @@ class TripSimulation:
         self.project_root = project_root
         self.simulation_speed = simulation_speed
         self.carla_pythonapi = carla_pythonapi
-        self.run_id = "{0}_trip_seed_{1}_{2}".format(
-            config.town.lower(), config.seed, datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        self.run_id = "{0}_{1}_seed_{2}_{3}".format(
+            config.town.lower(), config.destination_selection_mode, config.seed,
+            datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ"),
         )
         self.vehicle_states = []
         for vehicle_index, spawn_point_index in enumerate(
@@ -424,6 +437,7 @@ class TripSimulation:
         self.destinations: List[Destination] = []
         self.destinations_by_id: Dict[str, Destination] = {}
         self.logger = None
+        self.environment_conditions: Dict[str, Any] = {}
 
     @property
     def primary_vehicle_state(self) -> VehicleState:
@@ -489,18 +503,32 @@ class TripSimulation:
             {
                 "vehicle_id": state.vehicle_id,
                 "initial_spawn_point_index_requested": state.requested_spawn_point_index,
+                "carla_actor_id": state.actor.id if state.actor is not None else None,
                 "initial_spawn_point_index_used": state.actual_initial_spawn_point_index,
                 "initial_spawn_location_used": state.actual_initial_spawn_location,
                 "initial_spawn_position_error_m": state.initial_spawn_position_error_m,
                 "initial_visit_counts": state.initial_history_counts,
+                "destination_seed": self.config.seed + index * 1_000_003,
+                "actor_seed": self.config.seed + 1 + index * 1_000_003,
+                "blueprint_id": state.actor.type_id if state.actor is not None else None,
+                "actor_attributes": dict(state.actor.attributes) if state.actor is not None else {},
             }
-            for state in self.vehicle_states
+            for index, state in enumerate(self.vehicle_states)
         ]
         payload = {
             "run_id": self.run_id,
             "carla_version": server_version,
             "map": self.config.town,
             "seed": self.config.seed,
+            "scenario": self.config.destination_selection_mode,
+            "metrics_semantics_version": 2,
+            "event_counting": {
+                "totals_scope": "all drained sensor callbacks, including destination dwell",
+                "collision_unit": "raw sensor callback, not unique accident",
+                "trip_scope": "callbacks drained during an active trip with timestamp at or after departure",
+                "unassigned_events": "empty trip_id; included in run totals",
+            },
+            "environment": self.environment_conditions,
             "vehicle_count": len(self.vehicle_states),
             "initial_spawn_point_indices_requested": [
                 state.requested_spawn_point_index for state in self.vehicle_states
@@ -524,6 +552,7 @@ class TripSimulation:
                 "routine_probability": self.config.routine_probability,
                 "exploration_probability": self.config.exploration_probability,
                 "method": {
+                    "random_baseline": "uniform draw over eligible destination IDs; no history input",
                     "cyclic": "configured fixed cycle per vehicle",
                     "stochastic": "legacy seeded static-class selection per vehicle",
                     "history_80_20": (
@@ -534,7 +563,11 @@ class TripSimulation:
                 "mode": self.config.destination_selection_mode,
                 "cycle_order": self.config.destination_cycle_order,
                 "routine_destination_count": self.config.routine_destination_count,
-                "history_input": self.config.vehicle_history_config,
+                "history_input": (
+                    None if self.config.destination_selection_mode == "random_baseline"
+                    else self.config.vehicle_history_config
+                ),
+                "history_affects_selection": self.config.destination_selection_mode == "history_80_20",
                 "initial_visit_counts": primary.initial_history_counts,
                 "initial_visit_counts_by_vehicle": {
                     state.vehicle_id: state.initial_history_counts
@@ -544,6 +577,8 @@ class TripSimulation:
             "route_planning": {
                 "planner": "GlobalRoutePlanner",
                 "controller": "one BasicAgent.set_global_plan per vehicle",
+                "controller_compatibility_fix": "CollinearSafeBasicAgent: include zero-degree obstacles",
+                "obstacle_lower_angle_epsilon_deg": 0.001,
                 "sampling_resolution_m": self.config.route_sampling_resolution_m,
                 "origin_validation_tolerance_m": self.config.route_origin_validation_tolerance_m,
                 "optimality": "shortest route according to CARLA road-network graph cost; not traffic/time optimal",
@@ -565,6 +600,39 @@ class TripSimulation:
         settings.fixed_delta_seconds = config.fixed_delta_seconds
         settings.no_rendering_mode = config.no_rendering_mode
         world.apply_settings(settings)
+
+    def _capture_environment_conditions(self, world: Any) -> None:
+        """Record the unchanged weather and the just-reset signal cycle."""
+
+        weather = world.get_weather()
+        actors = world.get_actors()
+        self.environment_conditions = {
+            "weather_policy": "preserve current server weather and lighting; no dynamic weather client",
+            "weather": {
+                name: getattr(weather, name)
+                for name in dir(weather)
+                if not name.startswith("_")
+                and isinstance(getattr(weather, name), (int, float))
+            },
+            "traffic_lights_reset": True,
+            "traffic_lights": [
+                {
+                    "opendrive_id": light.get_opendrive_id(),
+                    "state": str(light.get_state()),
+                    "elapsed_time_s": light.get_elapsed_time(),
+                    "green_time_s": light.get_green_time(),
+                    "yellow_time_s": light.get_yellow_time(),
+                    "red_time_s": light.get_red_time(),
+                    "frozen": light.is_frozen(),
+                }
+                for light in sorted(
+                    actors.filter("traffic.traffic_light*"),
+                    key=lambda actor: actor.get_opendrive_id(),
+                )
+            ],
+            "external_vehicle_count": len(actors.filter("vehicle.*")) - len(self.vehicle_states),
+            "walker_count": len(actors.filter("walker.*")),
+        }
 
     def _validate_destination_cycle(self) -> None:
         if self.config.destination_selection_mode != "cyclic":
@@ -595,6 +663,17 @@ class TripSimulation:
         self, state: Optional[VehicleState] = None
     ) -> DestinationDecision:
         state = self._state_or_primary(state)
+        if self.config.destination_selection_mode == "random_baseline":
+            destination = select_uniform_destination(
+                self.destinations, state.current_destination_id, state.rng
+            )
+            # Counts are passive telemetry, read only AFTER the uniform draw.
+            return DestinationDecision(
+                destination, "random_baseline",
+                state.vehicle_history.counts[destination.destination_id],
+                sum(1 for item in self.destinations
+                    if item.enabled and item.destination_id != state.current_destination_id),
+            )
         if self.config.destination_selection_mode == "cyclic":
             destination_id = self.config.destination_cycle_order[
                 state.destination_cycle_index % len(self.config.destination_cycle_order)
@@ -811,7 +890,12 @@ class TripSimulation:
         del now_s
         state = self._state_or_primary(state)
         for event in state.event_collector.drain():
-            trip_id = state.active_trip.trip_id if state.active_trip else ""
+            # Totals include every phase. A callback from before this departure
+            # must not be charged to a newly started trip merely because it was late.
+            trip = state.active_trip
+            if trip is not None and float(event["simulation_time_s"]) < trip.departure_time_s:
+                trip = None
+            trip_id = trip.trip_id if trip else ""
             self.logger.write_event(
                 dict(
                     event,
@@ -820,13 +904,14 @@ class TripSimulation:
                     trip_id=trip_id,
                 )
             )
-            if state.active_trip is not None:
-                if event["event_type"] == "collision":
-                    state.active_trip.collision_count += 1
-                    state.total_collisions += 1
-                elif event["event_type"] == "lane_invasion":
-                    state.active_trip.lane_invasion_count += 1
-                    state.total_lane_invasions += 1
+            if event["event_type"] == "collision":
+                state.total_collisions += 1
+                if trip is not None:
+                    trip.collision_count += 1
+            elif event["event_type"] == "lane_invasion":
+                state.total_lane_invasions += 1
+                if trip is not None:
+                    trip.lane_invasion_count += 1
 
     def _sample_trajectory(
         self,
@@ -951,6 +1036,11 @@ class TripSimulation:
         )
 
     def _load_vehicle_histories(self) -> None:
+        if self.config.destination_selection_mode == "random_baseline":
+            for state in self.vehicle_states:
+                state.vehicle_history = VehicleHistory(state.vehicle_id)
+                state.initial_history_counts = {}
+            return
         history_path = self.project_root / self.config.vehicle_history_config
         allowed_destination_ids = set(self.destinations_by_id)
         for state in self.vehicle_states:
@@ -1126,13 +1216,16 @@ class TripSimulation:
                     sensor = world.spawn_actor(
                         sensor_bp, carla.Transform(), attach_to=state.actor
                     )
-                    sensor.listen(callback)
                     state.sensors.append(sensor)
+                    sensor.listen(callback)
 
+            # Reset immediately before the shared start frame, regardless of scenario.
+            world.reset_all_traffic_lights()
             world.tick()
             snapshot = world.get_snapshot()
             start_sim_time_s = snapshot.timestamp.elapsed_seconds
             now_s = start_sim_time_s
+            self._capture_environment_conditions(world)
             output_directory = self._output_directory()
             self.logger = RunLogger(output_directory)
             self._write_initial_histories()
@@ -1189,9 +1282,9 @@ class TripSimulation:
                     time.sleep(remaining)
 
             for state in self.vehicle_states:
+                self._drain_events(now_s, state)
                 if state.active_trip is not None:
                     self._finish_trip(now_s, "aborted", state)
-                self._drain_events(now_s, state)
             self._write_metrics(self.logger, now_s - start_sim_time_s)
             print("Corrida completada. Resultados: {0}".format(output_directory))
             return output_directory
