@@ -1,4 +1,4 @@
-"""Run one CARLA vehicle through successive, explicitly planned trips."""
+"""Run one or more CARLA vehicles through successive planned trips."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from src.trip_runner import TripSimulation, TripSimulationConfig
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Ejecuta viajes sucesivos de un vehículo con rutas explícitas."
+        description="Ejecuta viajes sucesivos de uno o más vehículos con rutas explícitas."
     )
     parser.add_argument(
         "--config",
@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
         "--history-in",
         type=Path,
         help=(
-            "Historial de entrada para vehicle_001. Puede ser el dummy inicial o "
+            "Historial de entrada para los vehículos configurados. Puede ser el dummy inicial o "
             "vehicle_history.csv de una corrida anterior."
         ),
     )
@@ -103,6 +103,9 @@ def main() -> int:
             return 1
         print("Error de dependencia CARLA: {0}".format(error), file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("Simulación detenida con Ctrl+C; actores y sensores eliminados.")
+        return 130
     except (RuntimeError, ValueError, FileNotFoundError) as error:
         print("Error de simulación: {0}".format(error), file=sys.stderr)
         return 1

@@ -1,4 +1,4 @@
-"""One-vehicle, successive origin-destination trip simulation for CARLA 0.9.15."""
+"""Multi-vehicle, successive origin-destination trip simulation for CARLA 0.9.15."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import random
 import threading
 import time
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -65,6 +65,8 @@ class TripSimulationConfig:
     initial_spawn_validation_tolerance_m: float
     target_speed_kmh: float
     vehicle_blueprint_filter: str
+    vehicle_count: int = 1
+    initial_spawn_point_indices: List[int] = field(default_factory=list)
     host: str = "localhost"
     port: int = 2000
     client_timeout_seconds: float = 30.0
@@ -73,6 +75,11 @@ class TripSimulationConfig:
     def from_json(cls, path: Path) -> "TripSimulationConfig":
         with path.open("r", encoding="utf-8") as config_file:
             payload = json.load(config_file)
+        payload.setdefault("vehicle_count", 1)
+        payload.setdefault(
+            "initial_spawn_point_indices",
+            [payload["initial_spawn_point_index"]] if "initial_spawn_point_index" in payload else [],
+        )
         required = {
             "town", "seed", "duration_seconds", "fixed_delta_seconds", "no_rendering_mode",
             "initial_spawn_point_index", "initial_spawn_fallback_enabled", "destinations_config", "output_root",
@@ -94,6 +101,22 @@ class TripSimulationConfig:
         return config
 
     def validate(self) -> None:
+        spawn_point_indices = self.resolved_spawn_point_indices()
+        if self.vehicle_count <= 0:
+            raise ValueError("vehicle_count debe ser positivo.")
+        if len(spawn_point_indices) != self.vehicle_count:
+            raise ValueError(
+                "initial_spawn_point_indices debe contener exactamente vehicle_count elementos."
+            )
+        if len(set(spawn_point_indices)) != len(spawn_point_indices):
+            raise ValueError("initial_spawn_point_indices no puede contener índices repetidos.")
+        if any(index < 0 for index in spawn_point_indices):
+            raise ValueError("Los índices de initial_spawn_point_indices no pueden ser negativos.")
+        if spawn_point_indices[0] != self.initial_spawn_point_index:
+            raise ValueError(
+                "initial_spawn_point_index debe coincidir con el primer elemento de "
+                "initial_spawn_point_indices."
+            )
         if abs((self.routine_probability + self.exploration_probability) - 1.0) > 1e-9:
             raise ValueError("routine_probability + exploration_probability debe sumar 1.0.")
         positive_values = {
@@ -130,6 +153,11 @@ class TripSimulationConfig:
                 raise ValueError("destination_cycle_order debe contener al menos dos destinos.")
             if len(set(self.destination_cycle_order)) != len(self.destination_cycle_order):
                 raise ValueError("destination_cycle_order no puede repetir destinos en una vuelta.")
+
+    def resolved_spawn_point_indices(self) -> List[int]:
+        """Return the explicit list while preserving legacy one-vehicle configs."""
+
+        return list(self.initial_spawn_point_indices or [self.initial_spawn_point_index])
 
 
 @dataclass
@@ -198,6 +226,38 @@ class EventCollector:
         return events
 
 
+@dataclass
+class VehicleState:
+    """All mutable simulation state owned by one logical vehicle."""
+
+    vehicle_id: str
+    requested_spawn_point_index: int
+    rng: random.Random
+    actor_rng: random.Random
+    vehicle_history: VehicleHistory
+    actor: Any = None
+    sensors: List[Any] = field(default_factory=list)
+    event_collector: EventCollector = field(default_factory=EventCollector)
+    active_trip: Optional[ActiveTrip] = None
+    current_destination_id: Optional[str] = None
+    current_location_id: str = "INITIAL_POSITION"
+    current_location_name: str = "Initial spawn point"
+    next_trip_number: int = 1
+    dwell_started_time_s: Optional[float] = None
+    completed_trips: int = 0
+    trips_started: int = 0
+    destination_counts: Counter = field(default_factory=Counter)
+    total_collisions: int = 0
+    total_lane_invasions: int = 0
+    total_distance_traveled_m: float = 0.0
+    total_trip_duration_s: float = 0.0
+    actual_initial_spawn_point_index: Optional[int] = None
+    actual_initial_spawn_location: Optional[Dict[str, float]] = None
+    initial_spawn_position_error_m: Optional[float] = None
+    destination_cycle_index: int = 0
+    initial_history_counts: Dict[str, int] = field(default_factory=dict)
+
+
 def speed_mps(vector: Any) -> float:
     return math.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
 
@@ -256,6 +316,7 @@ def spawn_vehicle_at_first_available_point(
     spawn_points: List[Any],
     preferred_index: int,
     allow_fallback: bool,
+    vehicle_id: str = "vehicle_001",
 ) -> tuple[Any, int]:
     """Spawn on a projected driving lane, trying points in deterministic order."""
 
@@ -276,11 +337,13 @@ def spawn_vehicle_at_first_available_point(
         if vehicle is not None:
             return vehicle, index
     if allow_fallback:
-        raise RuntimeError("No se pudo crear vehicle_001 en ningún spawn point del mapa activo.")
+        raise RuntimeError(
+            "No se pudo crear {0} en ningún spawn point del mapa activo.".format(vehicle_id)
+        )
     raise RuntimeError(
-        "No se pudo crear vehicle_001 en el spawn point fijo {0}. "
-        "Cambia initial_spawn_point_index en config/single_vehicle_trip.json "
-        "o activa initial_spawn_fallback_enabled.".format(preferred_index)
+        "No se pudo crear {0} en el spawn point fijo {1}. "
+        "Revisa initial_spawn_point_indices en la configuración "
+        "o activa initial_spawn_fallback_enabled.".format(vehicle_id, preferred_index)
     )
 
 
@@ -324,7 +387,7 @@ def validate_destinations_on_map(
 
 
 class TripSimulation:
-    """Orchestrates exactly one reusable vehicle and its successive trips."""
+    """Orchestrate reusable vehicles and their independent successive trips."""
 
     def __init__(
         self,
@@ -335,52 +398,119 @@ class TripSimulation:
     ) -> None:
         if simulation_speed not in (1, 2, 3, 4, 5):
             raise ValueError("simulation_speed debe ser un entero entre 1 y 5.")
+        config.validate()
         self.config = config
         self.project_root = project_root
         self.simulation_speed = simulation_speed
         self.carla_pythonapi = carla_pythonapi
-        self.rng = random.Random(config.seed)
-        self.actor_rng = random.Random(config.seed + 1)
         self.run_id = "{0}_trip_seed_{1}_{2}".format(
             config.town.lower(), config.seed, datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         )
-        self.vehicle_id = "vehicle_001"
-        self.active_trip: Optional[ActiveTrip] = None
-        self.current_destination_id: Optional[str] = None
-        self.current_location_id = "INITIAL_POSITION"
-        self.current_location_name = "Initial spawn point"
-        self.next_trip_number = 1
-        self.dwell_started_time_s: Optional[float] = None
-        self.completed_trips = 0
-        self.trips_started = 0
-        self.destination_counts: Counter = Counter()
-        self.total_collisions = 0
-        self.total_lane_invasions = 0
-        self.total_distance_traveled_m = 0.0
-        self.total_trip_duration_s = 0.0
-        self.actual_initial_spawn_point_index: Optional[int] = None
-        self.actual_initial_spawn_location: Optional[Dict[str, float]] = None
-        self.initial_spawn_position_error_m: Optional[float] = None
+        self.vehicle_states = []
+        for vehicle_index, spawn_point_index in enumerate(
+            config.resolved_spawn_point_indices()
+        ):
+            vehicle_id = "vehicle_{0:03d}".format(vehicle_index + 1)
+            seed_offset = vehicle_index * 1_000_003
+            self.vehicle_states.append(
+                VehicleState(
+                    vehicle_id=vehicle_id,
+                    requested_spawn_point_index=spawn_point_index,
+                    rng=random.Random(config.seed + seed_offset),
+                    actor_rng=random.Random(config.seed + 1 + seed_offset),
+                    vehicle_history=VehicleHistory(vehicle_id),
+                )
+            )
         self.destinations: List[Destination] = []
         self.destinations_by_id: Dict[str, Destination] = {}
-        self.destination_cycle_index = 0
-        self.vehicle_history = VehicleHistory(self.vehicle_id)
-        self.initial_history_counts: Dict[str, int] = {}
+        self.logger = None
+
+    @property
+    def primary_vehicle_state(self) -> VehicleState:
+        """Expose vehicle_001 for compatibility with the original unit-level API."""
+
+        return self.vehicle_states[0]
+
+    @property
+    def vehicle_id(self) -> str:
+        return self.primary_vehicle_state.vehicle_id
+
+    @property
+    def vehicle_history(self) -> VehicleHistory:
+        return self.primary_vehicle_state.vehicle_history
+
+    @vehicle_history.setter
+    def vehicle_history(self, value: VehicleHistory) -> None:
+        self.primary_vehicle_state.vehicle_history = value
+
+    @property
+    def active_trip(self) -> Optional[ActiveTrip]:
+        return self.primary_vehicle_state.active_trip
+
+    @active_trip.setter
+    def active_trip(self, value: Optional[ActiveTrip]) -> None:
+        self.primary_vehicle_state.active_trip = value
+
+    @property
+    def current_destination_id(self) -> Optional[str]:
+        return self.primary_vehicle_state.current_destination_id
+
+    @current_destination_id.setter
+    def current_destination_id(self, value: Optional[str]) -> None:
+        self.primary_vehicle_state.current_destination_id = value
+
+    @property
+    def current_location_id(self) -> str:
+        return self.primary_vehicle_state.current_location_id
+
+    @current_location_id.setter
+    def current_location_id(self, value: str) -> None:
+        self.primary_vehicle_state.current_location_id = value
+
+    @property
+    def current_location_name(self) -> str:
+        return self.primary_vehicle_state.current_location_name
+
+    @current_location_name.setter
+    def current_location_name(self, value: str) -> None:
+        self.primary_vehicle_state.current_location_name = value
+
+    def _state_or_primary(self, state: Optional[VehicleState]) -> VehicleState:
+        return state if state is not None else self.primary_vehicle_state
 
     def _output_directory(self) -> Path:
         return self.project_root / self.config.output_root / self.run_id
 
-    def _write_run_config(self, output_directory: Path, server_version: str, destinations: List[Destination]) -> None:
+    def _write_run_config(
+        self, output_directory: Path, server_version: str, destinations: List[Destination]
+    ) -> None:
+        primary = self.primary_vehicle_state
+        vehicles = [
+            {
+                "vehicle_id": state.vehicle_id,
+                "initial_spawn_point_index_requested": state.requested_spawn_point_index,
+                "initial_spawn_point_index_used": state.actual_initial_spawn_point_index,
+                "initial_spawn_location_used": state.actual_initial_spawn_location,
+                "initial_spawn_position_error_m": state.initial_spawn_position_error_m,
+                "initial_visit_counts": state.initial_history_counts,
+            }
+            for state in self.vehicle_states
+        ]
         payload = {
             "run_id": self.run_id,
             "carla_version": server_version,
             "map": self.config.town,
             "seed": self.config.seed,
-            "vehicle_count": 1,
-            "initial_spawn_point_index_requested": self.config.initial_spawn_point_index,
-            "initial_spawn_point_index_used": self.actual_initial_spawn_point_index,
-            "initial_spawn_location_used": self.actual_initial_spawn_location,
-            "initial_spawn_position_error_m": self.initial_spawn_position_error_m,
+            "vehicle_count": len(self.vehicle_states),
+            "initial_spawn_point_indices_requested": [
+                state.requested_spawn_point_index for state in self.vehicle_states
+            ],
+            "vehicles": vehicles,
+            # Legacy keys continue to describe vehicle_001.
+            "initial_spawn_point_index_requested": primary.requested_spawn_point_index,
+            "initial_spawn_point_index_used": primary.actual_initial_spawn_point_index,
+            "initial_spawn_location_used": primary.actual_initial_spawn_location,
+            "initial_spawn_position_error_m": primary.initial_spawn_position_error_m,
             "synchronous_mode": True,
             "fixed_delta_seconds": self.config.fixed_delta_seconds,
             "no_rendering_mode": self.config.no_rendering_mode,
@@ -394,10 +524,10 @@ class TripSimulation:
                 "routine_probability": self.config.routine_probability,
                 "exploration_probability": self.config.exploration_probability,
                 "method": {
-                    "cyclic": "configured fixed cycle",
-                    "stochastic": "legacy seeded static-class selection",
+                    "cyclic": "configured fixed cycle per vehicle",
+                    "stochastic": "legacy seeded static-class selection per vehicle",
                     "history_80_20": (
-                        "seeded 80/20 draw from per-vehicle visit counts; "
+                        "seeded 80/20 draw from each vehicle's visit counts; "
                         "no user-authored destination weights"
                     ),
                 }[self.config.destination_selection_mode],
@@ -405,18 +535,22 @@ class TripSimulation:
                 "cycle_order": self.config.destination_cycle_order,
                 "routine_destination_count": self.config.routine_destination_count,
                 "history_input": self.config.vehicle_history_config,
-                "initial_visit_counts": self.initial_history_counts,
+                "initial_visit_counts": primary.initial_history_counts,
+                "initial_visit_counts_by_vehicle": {
+                    state.vehicle_id: state.initial_history_counts
+                    for state in self.vehicle_states
+                },
             },
             "route_planning": {
                 "planner": "GlobalRoutePlanner",
-                "controller": "BasicAgent.set_global_plan",
+                "controller": "one BasicAgent.set_global_plan per vehicle",
                 "sampling_resolution_m": self.config.route_sampling_resolution_m,
                 "origin_validation_tolerance_m": self.config.route_origin_validation_tolerance_m,
                 "optimality": "shortest route according to CARLA road-network graph cost; not traffic/time optimal",
             },
             "traffic_manager": {
                 "used_for_route_following": False,
-                "reason": "BasicAgent follows the complete precomputed route precisely for this single-vehicle validation.",
+                "reason": "Each BasicAgent follows its own complete precomputed route.",
             },
             "simulation_config": asdict(self.config),
             "destinations": [asdict(destination) for destination in destinations],
@@ -457,43 +591,55 @@ class TripSimulation:
                 )
             )
 
-    def _select_next_destination(self) -> DestinationDecision:
+    def _select_next_destination(
+        self, state: Optional[VehicleState] = None
+    ) -> DestinationDecision:
+        state = self._state_or_primary(state)
         if self.config.destination_selection_mode == "cyclic":
             destination_id = self.config.destination_cycle_order[
-                self.destination_cycle_index % len(self.config.destination_cycle_order)
+                state.destination_cycle_index % len(self.config.destination_cycle_order)
             ]
-            self.destination_cycle_index += 1
+            state.destination_cycle_index += 1
             destination = self.destinations_by_id[destination_id]
             return DestinationDecision(
-                destination, "cyclic", self.vehicle_history.counts[destination_id], 1
+                destination, "cyclic", state.vehicle_history.counts[destination_id], 1
             )
         if self.config.destination_selection_mode == "history_80_20":
             return select_from_history(
                 self.destinations,
-                self.vehicle_history,
-                self.current_destination_id,
+                state.vehicle_history,
+                state.current_destination_id,
                 self.config.routine_probability,
                 self.config.routine_destination_count,
-                self.rng,
+                state.rng,
             )
         destination = select_destination(
             self.destinations,
-            self.current_destination_id,
+            state.current_destination_id,
             self.config.routine_probability,
-            self.rng,
+            state.rng,
         )
         return DestinationDecision(
             destination,
             destination.frequency_class or "legacy_stochastic",
-            self.vehicle_history.counts[destination.destination_id],
+            state.vehicle_history.counts[destination.destination_id],
             1,
         )
 
-    def _start_trip(self, carla_module: Any, carla_map: Any, planner: Any, vehicle: Any, now_s: float) -> None:
+    def _start_trip(
+        self,
+        carla_module: Any,
+        carla_map: Any,
+        planner: Any,
+        vehicle: Any,
+        now_s: float,
+        state: Optional[VehicleState] = None,
+    ) -> None:
+        state = self._state_or_primary(state)
         origin_location = vehicle.get_location()
-        decision = self._select_next_destination()
+        decision = self._select_next_destination(state)
         destination = decision.destination
-        self.trips_started += 1
+        state.trips_started += 1
         try:
             origin_waypoint = carla_map.get_waypoint(
                 origin_location,
@@ -510,7 +656,9 @@ class TripSimulation:
                         road_offset_m, self.config.route_origin_validation_tolerance_m
                     )
                 )
-            destination_location = resolve_destination_location(carla_module, carla_map, destination)
+            destination_location = resolve_destination_location(
+                carla_module, carla_map, destination
+            )
             route = plan_route(planner, route_origin_location, destination_location)
             route_start_offset_m = validate_route_start(
                 route,
@@ -520,9 +668,9 @@ class TripSimulation:
             agent = build_basic_agent(vehicle, route, self.config.target_speed_kmh)
         except (RuntimeError, ValueError) as error:
             failed = ActiveTrip(
-                trip_number=self.next_trip_number,
-                origin_id=self.current_location_id,
-                origin_name=self.current_location_name,
+                trip_number=state.next_trip_number,
+                origin_id=state.current_location_id,
+                origin_name=state.current_location_name,
                 origin_location=origin_location,
                 destination=destination,
                 destination_location=origin_location,
@@ -535,15 +683,19 @@ class TripSimulation:
                 history_visit_count_before=decision.visit_count_before,
                 selection_candidate_count=decision.candidate_count,
             )
-            self.next_trip_number += 1
-            self._write_trip(self.logger, failed, now_s, "route_failed")
-            print("Ruta fallida para {0}: {1}".format(destination.destination_id, error))
-            self.dwell_started_time_s = now_s
+            state.next_trip_number += 1
+            self._write_trip(self.logger, failed, now_s, "route_failed", state)
+            print(
+                "{0}: ruta fallida para {1}: {2}".format(
+                    state.vehicle_id, destination.destination_id, error
+                )
+            )
+            state.dwell_started_time_s = now_s
             return
-        self.active_trip = ActiveTrip(
-            trip_number=self.next_trip_number,
-            origin_id=self.current_location_id,
-            origin_name=self.current_location_name,
+        state.active_trip = ActiveTrip(
+            trip_number=state.next_trip_number,
+            origin_id=state.current_location_id,
+            origin_name=state.current_location_name,
             origin_location=origin_location,
             destination=destination,
             destination_location=destination_location,
@@ -556,85 +708,141 @@ class TripSimulation:
             history_visit_count_before=decision.visit_count_before,
             selection_candidate_count=decision.candidate_count,
         )
-        self.next_trip_number += 1
-        print("{0}: {1} -> {2} [{3}]; ruta planificada {4:.1f} m; inicio alineado {5:.2f} m".format(
-            self.active_trip.trip_id, self.active_trip.origin_id, destination.destination_id,
-            decision.selection_class, self.active_trip.planned_route_distance_m, route_start_offset_m
-        ))
+        state.next_trip_number += 1
+        print(
+            "{0}/{1}: {2} -> {3} [{4}]; ruta planificada {5:.1f} m; "
+            "inicio alineado {6:.2f} m".format(
+                state.vehicle_id,
+                state.active_trip.trip_id,
+                state.active_trip.origin_id,
+                destination.destination_id,
+                decision.selection_class,
+                state.active_trip.planned_route_distance_m,
+                route_start_offset_m,
+            )
+        )
 
-    def _write_trip(self, logger: RunLogger, trip: ActiveTrip, now_s: float, status: str) -> None:
+    def _write_trip(
+        self,
+        logger: RunLogger,
+        trip: ActiveTrip,
+        now_s: float,
+        status: str,
+        state: Optional[VehicleState] = None,
+    ) -> None:
+        state = self._state_or_primary(state)
         duration = max(0.0, now_s - trip.departure_time_s)
         average_speed = trip.distance_traveled_m / duration if duration else 0.0
-        logger.write_trip({
-            "run_id": self.run_id, "vehicle_id": self.vehicle_id, "trip_id": trip.trip_id,
-            "seed": self.config.seed, "origin_id": trip.origin_id, "origin_name": trip.origin_name,
-            "origin_x": trip.origin_location.x, "origin_y": trip.origin_location.y,
-            "origin_z": trip.origin_location.z, "destination_id": trip.destination.destination_id,
-            "destination_name": trip.destination.destination_name,
-            "destination_category": trip.destination.category,
-            "frequency_class": trip.selection_class,
-            "selection_class": trip.selection_class,
-            "history_visit_count_before": trip.history_visit_count_before,
-            "selection_candidate_count": trip.selection_candidate_count,
-            "departure_sim_time_s": trip.departure_time_s,
-            "arrival_sim_time_s": now_s if status == "completed" else "",
-            "travel_time_s": duration, "distance_traveled_m": trip.distance_traveled_m,
-            "average_speed_mps": average_speed, "average_speed_kmh": average_speed * 3.6,
-            "collision_count": trip.collision_count,
-            "lane_invasion_count": trip.lane_invasion_count, "status": status,
-        })
-
-    def _finish_trip(self, now_s: float, status: str) -> None:
-        if self.active_trip is None:
-            return
-        trip = self.active_trip
-        self._write_trip(self.logger, trip, now_s, status)
-        self.total_distance_traveled_m += trip.distance_traveled_m
-        self.total_trip_duration_s += max(0.0, now_s - trip.departure_time_s)
-        if status == "completed":
-            self.completed_trips += 1
-            self.destination_counts[trip.destination.destination_id] += 1
-            history_event = self.vehicle_history.record(trip.destination.destination_id)
-            self.logger.write_history({
+        logger.write_trip(
+            {
                 "run_id": self.run_id,
-                "vehicle_id": history_event.vehicle_id,
-                "sequence": history_event.sequence,
-                "destination_id": history_event.destination_id,
-                "source": history_event.source,
+                "vehicle_id": state.vehicle_id,
                 "trip_id": trip.trip_id,
-                "completed_sim_time_s": now_s,
-            })
-            self.current_destination_id = trip.destination.destination_id
-            self.current_location_id = trip.destination.destination_id
-            self.current_location_name = trip.destination.destination_name
+                "seed": self.config.seed,
+                "origin_id": trip.origin_id,
+                "origin_name": trip.origin_name,
+                "origin_x": trip.origin_location.x,
+                "origin_y": trip.origin_location.y,
+                "origin_z": trip.origin_location.z,
+                "destination_id": trip.destination.destination_id,
+                "destination_name": trip.destination.destination_name,
+                "destination_category": trip.destination.category,
+                "frequency_class": trip.selection_class,
+                "selection_class": trip.selection_class,
+                "history_visit_count_before": trip.history_visit_count_before,
+                "selection_candidate_count": trip.selection_candidate_count,
+                "departure_sim_time_s": trip.departure_time_s,
+                "arrival_sim_time_s": now_s if status == "completed" else "",
+                "travel_time_s": duration,
+                "distance_traveled_m": trip.distance_traveled_m,
+                "average_speed_mps": average_speed,
+                "average_speed_kmh": average_speed * 3.6,
+                "collision_count": trip.collision_count,
+                "lane_invasion_count": trip.lane_invasion_count,
+                "status": status,
+            }
+        )
+
+    def _finish_trip(
+        self, now_s: float, status: str, state: Optional[VehicleState] = None
+    ) -> None:
+        state = self._state_or_primary(state)
+        if state.active_trip is None:
+            return
+        trip = state.active_trip
+        self._write_trip(self.logger, trip, now_s, status, state)
+        state.total_distance_traveled_m += trip.distance_traveled_m
+        state.total_trip_duration_s += max(0.0, now_s - trip.departure_time_s)
+        if status == "completed":
+            state.completed_trips += 1
+            state.destination_counts[trip.destination.destination_id] += 1
+            history_event = state.vehicle_history.record(trip.destination.destination_id)
+            self.logger.write_history(
+                {
+                    "run_id": self.run_id,
+                    "vehicle_id": history_event.vehicle_id,
+                    "sequence": history_event.sequence,
+                    "destination_id": history_event.destination_id,
+                    "source": history_event.source,
+                    "trip_id": trip.trip_id,
+                    "completed_sim_time_s": now_s,
+                }
+            )
+            state.current_destination_id = trip.destination.destination_id
+            state.current_location_id = trip.destination.destination_id
+            state.current_location_name = trip.destination.destination_name
         else:
-            self.current_destination_id = None
-            self.current_location_id = "POSITION_AFTER_{0}".format(trip.trip_id.upper())
-            self.current_location_name = "Position after {0} ({1})".format(
+            state.current_destination_id = None
+            state.current_location_id = "POSITION_AFTER_{0}".format(trip.trip_id.upper())
+            state.current_location_name = "Position after {0} ({1})".format(
                 trip.trip_id, status
             )
-        self.active_trip = None
-        self.dwell_started_time_s = now_s
-        print("{0}: {1} ({2:.1f} m)".format(trip.trip_id, status, trip.distance_traveled_m))
+        state.active_trip = None
+        state.dwell_started_time_s = now_s
+        print(
+            "{0}/{1}: {2} ({3:.1f} m)".format(
+                state.vehicle_id, trip.trip_id, status, trip.distance_traveled_m
+            )
+        )
 
-    def _drain_events(self, now_s: float) -> None:
-        for event in self.event_collector.drain():
-            trip_id = self.active_trip.trip_id if self.active_trip else ""
-            self.logger.write_event(dict(event, run_id=self.run_id, vehicle_id=self.vehicle_id, trip_id=trip_id))
-            if self.active_trip is not None:
+    def _drain_events(
+        self, now_s: float, state: Optional[VehicleState] = None
+    ) -> None:
+        del now_s
+        state = self._state_or_primary(state)
+        for event in state.event_collector.drain():
+            trip_id = state.active_trip.trip_id if state.active_trip else ""
+            self.logger.write_event(
+                dict(
+                    event,
+                    run_id=self.run_id,
+                    vehicle_id=state.vehicle_id,
+                    trip_id=trip_id,
+                )
+            )
+            if state.active_trip is not None:
                 if event["event_type"] == "collision":
-                    self.active_trip.collision_count += 1
-                    self.total_collisions += 1
+                    state.active_trip.collision_count += 1
+                    state.total_collisions += 1
                 elif event["event_type"] == "lane_invasion":
-                    self.active_trip.lane_invasion_count += 1
-                    self.total_lane_invasions += 1
+                    state.active_trip.lane_invasion_count += 1
+                    state.total_lane_invasions += 1
 
-    def _sample_trajectory(self, carla_map: Any, vehicle: Any, frame: int, now_s: float) -> None:
-        trip = self.active_trip
+    def _sample_trajectory(
+        self,
+        carla_map: Any,
+        vehicle: Any,
+        frame: int,
+        now_s: float,
+        state: Optional[VehicleState] = None,
+    ) -> None:
+        state = self._state_or_primary(state)
+        trip = state.active_trip
         if trip is None:
             return
         if trip.last_trajectory_sample_time_s is not None and (
-            now_s - trip.last_trajectory_sample_time_s < self.config.trajectory_sampling_interval_seconds
+            now_s - trip.last_trajectory_sample_time_s
+            < self.config.trajectory_sampling_interval_seconds
         ):
             return
         location = vehicle.get_location()
@@ -642,18 +850,36 @@ class TripSimulation:
         acceleration = vehicle.get_acceleration()
         waypoint = carla_map.get_waypoint(location, project_to_road=True)
         speed = speed_mps(velocity)
-        self.logger.write_trajectory({
-            "run_id": self.run_id, "vehicle_id": self.vehicle_id, "trip_id": trip.trip_id,
-            "frame": frame, "simulation_time_s": now_s, "x": location.x, "y": location.y,
-            "z": location.z, "speed_mps": speed, "speed_kmh": speed * 3.6,
-            "acceleration_mps2": speed_mps(acceleration),
-            "road_id": waypoint.road_id if waypoint else "", "lane_id": waypoint.lane_id if waypoint else "",
-            "distance_traveled_m": trip.distance_traveled_m,
-        })
+        self.logger.write_trajectory(
+            {
+                "run_id": self.run_id,
+                "vehicle_id": state.vehicle_id,
+                "trip_id": trip.trip_id,
+                "frame": frame,
+                "simulation_time_s": now_s,
+                "x": location.x,
+                "y": location.y,
+                "z": location.z,
+                "speed_mps": speed,
+                "speed_kmh": speed * 3.6,
+                "acceleration_mps2": speed_mps(acceleration),
+                "road_id": waypoint.road_id if waypoint else "",
+                "lane_id": waypoint.lane_id if waypoint else "",
+                "distance_traveled_m": trip.distance_traveled_m,
+            }
+        )
         trip.last_trajectory_sample_time_s = now_s
 
-    def _update_active_trip(self, carla_map: Any, vehicle: Any, frame: int, now_s: float) -> None:
-        trip = self.active_trip
+    def _update_active_trip(
+        self,
+        carla_map: Any,
+        vehicle: Any,
+        frame: int,
+        now_s: float,
+        state: Optional[VehicleState] = None,
+    ) -> None:
+        state = self._state_or_primary(state)
+        trip = state.active_trip
         if trip is None:
             return
         location = vehicle.get_location()
@@ -662,41 +888,121 @@ class TripSimulation:
         current_speed = speed_mps(vehicle.get_velocity())
         if current_speed > self.config.blocked_speed_threshold_mps:
             trip.last_moving_time_s = now_s
-        self._sample_trajectory(carla_map, vehicle, frame, now_s)
+        self._sample_trajectory(carla_map, vehicle, frame, now_s, state)
         if location.distance(trip.destination_location) <= self.config.arrival_threshold_m:
-            self._finish_trip(now_s, "completed")
+            self._finish_trip(now_s, "completed", state)
         elif now_s - trip.departure_time_s >= self.config.max_trip_time_seconds:
-            self._finish_trip(now_s, "timeout")
+            self._finish_trip(now_s, "timeout", state)
         elif now_s - trip.last_moving_time_s >= self.config.blocked_time_threshold_seconds:
-            self._finish_trip(now_s, "blocked")
+            self._finish_trip(now_s, "blocked", state)
 
     @staticmethod
     def _brake(carla_module: Any, vehicle: Any) -> None:
-        vehicle.apply_control(carla_module.VehicleControl(throttle=0.0, steer=0.0, brake=1.0))
+        vehicle.apply_control(
+            carla_module.VehicleControl(throttle=0.0, steer=0.0, brake=1.0)
+        )
 
     def _write_metrics(self, logger: RunLogger, simulation_duration_s: float) -> None:
-        # The counter only records completed arrivals, so it is the observed destination distribution.
-        distribution = {
-            destination.destination_id: self.destination_counts[destination.destination_id] / self.completed_trips
+        trips_started = sum(state.trips_started for state in self.vehicle_states)
+        trips_completed = sum(state.completed_trips for state in self.vehicle_states)
+        total_distance = sum(
+            state.total_distance_traveled_m for state in self.vehicle_states
+        )
+        total_duration = sum(
+            state.total_trip_duration_s for state in self.vehicle_states
+        )
+        destination_counts = Counter()
+        for state in self.vehicle_states:
+            destination_counts.update(state.destination_counts)
+        distribution = (
+            {
+                destination.destination_id: (
+                    destination_counts[destination.destination_id] / trips_completed
+                )
+                for destination in self.destinations
+            }
+            if trips_completed
+            else {}
+        )
+        aggregate_average_speed_mps = (
+            total_distance / total_duration if total_duration else 0.0
+        )
+        logger.write_metrics(
+            {
+                "run_id": self.run_id,
+                "vehicle_count": len(self.vehicle_states),
+                "trips_started": trips_started,
+                "trips_completed": trips_completed,
+                "trips_incomplete": trips_started - trips_completed,
+                "simulation_duration_s": simulation_duration_s,
+                "total_distance_traveled_m": total_distance,
+                "aggregate_average_speed_mps": aggregate_average_speed_mps,
+                "aggregate_average_speed_kmh": aggregate_average_speed_mps * 3.6,
+                "total_collisions": sum(
+                    state.total_collisions for state in self.vehicle_states
+                ),
+                "total_lane_invasions": sum(
+                    state.total_lane_invasions for state in self.vehicle_states
+                ),
+                "observed_destination_distribution": json.dumps(
+                    distribution, ensure_ascii=False, sort_keys=True
+                ),
+            }
+        )
+
+    def _load_vehicle_histories(self) -> None:
+        history_path = self.project_root / self.config.vehicle_history_config
+        allowed_destination_ids = set(self.destinations_by_id)
+        for state in self.vehicle_states:
+            state.vehicle_history = VehicleHistory.from_csv(
+                history_path, state.vehicle_id, allowed_destination_ids
+            )
+            state.initial_history_counts = dict(
+                sorted(state.vehicle_history.counts.items())
+            )
+
+    def _configure_blueprint(
+        self, blueprint: Any, state: VehicleState
+    ) -> None:
+        if blueprint.has_attribute("role_name"):
+            blueprint.set_attribute("role_name", state.vehicle_id)
+        if blueprint.has_attribute("color"):
+            colors = blueprint.get_attribute("color").recommended_values
+            if colors:
+                blueprint.set_attribute("color", state.actor_rng.choice(colors))
+
+    def _set_initial_location_metadata(self, state: VehicleState) -> None:
+        state.current_location_name = "Initial spawn point {0}".format(
+            state.actual_initial_spawn_point_index
+        )
+        state.current_location_id = "ORIGIN_SPAWN_{0:03d}".format(
+            state.actual_initial_spawn_point_index
+        )
+        matching_origins = [
+            destination
             for destination in self.destinations
-        } if self.completed_trips else {}
-        logger.write_metrics({
-            "run_id": self.run_id, "vehicle_count": 1, "trips_started": self.trips_started,
-            "trips_completed": self.completed_trips,
-            "trips_incomplete": self.trips_started - self.completed_trips,
-            "simulation_duration_s": simulation_duration_s,
-            "total_distance_traveled_m": self.total_distance_traveled_m,
-            "aggregate_average_speed_mps": (
-                self.total_distance_traveled_m / self.total_trip_duration_s
-                if self.total_trip_duration_s else 0.0
-            ),
-            "aggregate_average_speed_kmh": (
-                3.6 * self.total_distance_traveled_m / self.total_trip_duration_s
-                if self.total_trip_duration_s else 0.0
-            ),
-            "total_collisions": self.total_collisions, "total_lane_invasions": self.total_lane_invasions,
-            "observed_destination_distribution": json.dumps(distribution, ensure_ascii=False, sort_keys=True),
-        })
+            if destination.reference_type == "spawn_point"
+            and destination.spawn_point_index == state.actual_initial_spawn_point_index
+        ]
+        if matching_origins:
+            state.current_destination_id = matching_origins[0].destination_id
+            state.current_location_id = matching_origins[0].destination_id
+            state.current_location_name = matching_origins[0].destination_name
+
+    def _write_initial_histories(self) -> None:
+        for state in self.vehicle_states:
+            for history_event in state.vehicle_history.events:
+                self.logger.write_history(
+                    {
+                        "run_id": self.run_id,
+                        "vehicle_id": history_event.vehicle_id,
+                        "sequence": history_event.sequence,
+                        "destination_id": history_event.destination_id,
+                        "source": history_event.source,
+                        "trip_id": "",
+                        "completed_sim_time_s": "",
+                    }
+                )
 
     def run(self) -> Path:
         import carla
@@ -707,173 +1013,207 @@ class TripSimulation:
         client.set_timeout(self.config.client_timeout_seconds)
         world = None
         original_settings = None
-        vehicle = None
-        sensors: List[Any] = []
-        self.logger = None
-        self.event_collector = EventCollector()
         start_sim_time_s = 0.0
         try:
             world = client.get_world()
             active_map = world.get_map()
-            if active_map.name.replace("\\", "/").rsplit("/", 1)[-1].lower() != self.config.town.lower():
-                raise RuntimeError("El mapa activo es {0}; se esperaba {1}.".format(active_map.name, self.config.town))
+            if (
+                active_map.name.replace("\\", "/").rsplit("/", 1)[-1].lower()
+                != self.config.town.lower()
+            ):
+                raise RuntimeError(
+                    "El mapa activo es {0}; se esperaba {1}.".format(
+                        active_map.name, self.config.town
+                    )
+                )
             self.destinations = load_destinations(
                 self.project_root / self.config.destinations_config, active_map.name
             )
             self.destinations_by_id = {
-                destination.destination_id: destination for destination in self.destinations
+                destination.destination_id: destination
+                for destination in self.destinations
             }
             self._validate_destination_categories()
             self._validate_destination_cycle()
             validate_destinations_on_map(carla, active_map, self.destinations)
-            self.vehicle_history = VehicleHistory.from_csv(
-                self.project_root / self.config.vehicle_history_config,
-                self.vehicle_id,
-                set(self.destinations_by_id),
-            )
-            self.initial_history_counts = dict(sorted(self.vehicle_history.counts.items()))
+            self._load_vehicle_histories()
+
             original_settings = world.get_settings()
             self._apply_world_settings(world, self.config)
             world.tick()
             spawn_points = active_map.get_spawn_points()
-            blueprints = safe_vehicle_blueprints(world, self.config.vehicle_blueprint_filter)
-            blueprint = self.actor_rng.choice(blueprints)
-            if blueprint.has_attribute("role_name"):
-                blueprint.set_attribute("role_name", "hero")
-            if blueprint.has_attribute("color"):
-                colors = blueprint.get_attribute("color").recommended_values
-                if colors:
-                    blueprint.set_attribute("color", self.actor_rng.choice(colors))
-            vehicle, self.actual_initial_spawn_point_index = spawn_vehicle_at_first_available_point(
-                world,
-                blueprint,
-                carla,
-                active_map,
-                spawn_points,
-                self.config.initial_spawn_point_index,
-                self.config.initial_spawn_fallback_enabled,
+            blueprints = safe_vehicle_blueprints(
+                world, self.config.vehicle_blueprint_filter
             )
-            self.current_location_name = "Initial spawn point {0}".format(
-                self.actual_initial_spawn_point_index
-            )
-            self.current_location_id = "ORIGIN_SPAWN_{0:03d}".format(
-                self.actual_initial_spawn_point_index
-            )
-            matching_origins = [
-                destination
-                for destination in self.destinations
-                if destination.reference_type == "spawn_point"
-                and destination.spawn_point_index == self.actual_initial_spawn_point_index
-            ]
-            if matching_origins:
-                self.current_destination_id = matching_origins[0].destination_id
-                self.current_location_id = matching_origins[0].destination_id
-                self.current_location_name = matching_origins[0].destination_name
-            if self.actual_initial_spawn_point_index != self.config.initial_spawn_point_index:
-                print(
-                    "Spawn point {0} ocupado/no disponible; se usará {1}.".format(
-                        self.config.initial_spawn_point_index, self.actual_initial_spawn_point_index
+
+            for state in self.vehicle_states:
+                blueprint = state.actor_rng.choice(blueprints)
+                self._configure_blueprint(blueprint, state)
+                state.actor, state.actual_initial_spawn_point_index = (
+                    spawn_vehicle_at_first_available_point(
+                        world,
+                        blueprint,
+                        carla,
+                        active_map,
+                        spawn_points,
+                        state.requested_spawn_point_index,
+                        self.config.initial_spawn_fallback_enabled,
+                        state.vehicle_id,
                     )
                 )
-            expected_spawn_transform = driving_transform_from_spawn_point(
-                carla,
-                active_map,
-                spawn_points[self.actual_initial_spawn_point_index],
-            )
-            if expected_spawn_transform is None:
-                raise RuntimeError("No se pudo reconstruir el waypoint del spawn inicial utilizado.")
-            # In synchronous mode a newly spawned actor must receive a frame before
-            # its physical transform is used as a route origin.
-            self._brake(carla, vehicle)
+                self._set_initial_location_metadata(state)
+                if (
+                    state.actual_initial_spawn_point_index
+                    != state.requested_spawn_point_index
+                ):
+                    print(
+                        "{0}: spawn point {1} ocupado/no disponible; se usará {2}.".format(
+                            state.vehicle_id,
+                            state.requested_spawn_point_index,
+                            state.actual_initial_spawn_point_index,
+                        )
+                    )
+                self._brake(carla, state.actor)
+
+            # Every newly spawned actor receives the same synchronization frame.
             world.tick()
-            synchronized_location = vehicle.get_location()
-            self.initial_spawn_position_error_m = validate_initial_spawn_location(
-                synchronized_location,
-                expected_spawn_transform.location,
-                self.config.initial_spawn_validation_tolerance_m,
-            )
-            self.actual_initial_spawn_location = {
-                "x": synchronized_location.x,
-                "y": synchronized_location.y,
-                "z": synchronized_location.z,
-            }
-            print(
-                "Spawn {0} sincronizado: x={1:.3f}, y={2:.3f}, z={3:.3f}; error={4:.2f} m".format(
-                    self.actual_initial_spawn_point_index,
-                    synchronized_location.x,
-                    synchronized_location.y,
-                    synchronized_location.z,
-                    self.initial_spawn_position_error_m,
+            for state in self.vehicle_states:
+                expected_spawn_transform = driving_transform_from_spawn_point(
+                    carla,
+                    active_map,
+                    spawn_points[state.actual_initial_spawn_point_index],
                 )
+                if expected_spawn_transform is None:
+                    raise RuntimeError(
+                        "No se pudo reconstruir el waypoint del spawn inicial de {0}.".format(
+                            state.vehicle_id
+                        )
+                    )
+                synchronized_location = state.actor.get_location()
+                state.initial_spawn_position_error_m = validate_initial_spawn_location(
+                    synchronized_location,
+                    expected_spawn_transform.location,
+                    self.config.initial_spawn_validation_tolerance_m,
+                )
+                state.actual_initial_spawn_location = {
+                    "x": synchronized_location.x,
+                    "y": synchronized_location.y,
+                    "z": synchronized_location.z,
+                }
+                print(
+                    "{0}: spawn {1} sincronizado: x={2:.3f}, y={3:.3f}, z={4:.3f}; "
+                    "error={5:.2f} m".format(
+                        state.vehicle_id,
+                        state.actual_initial_spawn_point_index,
+                        synchronized_location.x,
+                        synchronized_location.y,
+                        synchronized_location.z,
+                        state.initial_spawn_position_error_m,
+                    )
+                )
+
+            collision_bp = world.get_blueprint_library().find(
+                "sensor.other.collision"
             )
-            collision_bp = world.get_blueprint_library().find("sensor.other.collision")
-            lane_bp = world.get_blueprint_library().find("sensor.other.lane_invasion")
-            for sensor_bp, callback in ((collision_bp, self.event_collector.collision), (lane_bp, self.event_collector.lane_invasion)):
-                sensor = world.spawn_actor(sensor_bp, carla.Transform(), attach_to=vehicle)
-                sensor.listen(callback)
-                sensors.append(sensor)
+            lane_bp = world.get_blueprint_library().find(
+                "sensor.other.lane_invasion"
+            )
+            for state in self.vehicle_states:
+                for sensor_bp, callback in (
+                    (collision_bp, state.event_collector.collision),
+                    (lane_bp, state.event_collector.lane_invasion),
+                ):
+                    sensor = world.spawn_actor(
+                        sensor_bp, carla.Transform(), attach_to=state.actor
+                    )
+                    sensor.listen(callback)
+                    state.sensors.append(sensor)
+
             world.tick()
             snapshot = world.get_snapshot()
             start_sim_time_s = snapshot.timestamp.elapsed_seconds
+            now_s = start_sim_time_s
             output_directory = self._output_directory()
             self.logger = RunLogger(output_directory)
-            for history_event in self.vehicle_history.events:
-                self.logger.write_history({
-                    "run_id": self.run_id,
-                    "vehicle_id": history_event.vehicle_id,
-                    "sequence": history_event.sequence,
-                    "destination_id": history_event.destination_id,
-                    "source": history_event.source,
-                    "trip_id": "",
-                    "completed_sim_time_s": "",
-                })
-            self._write_run_config(output_directory, client.get_server_version(), self.destinations)
-            planner = build_global_route_planner(active_map, self.config.route_sampling_resolution_m)
-            self._start_trip(carla, active_map, planner, vehicle, start_sim_time_s)
+            self._write_initial_histories()
+            self._write_run_config(
+                output_directory, client.get_server_version(), self.destinations
+            )
+            planner = build_global_route_planner(
+                active_map, self.config.route_sampling_resolution_m
+            )
+            for state in self.vehicle_states:
+                self._start_trip(
+                    carla,
+                    active_map,
+                    planner,
+                    state.actor,
+                    start_sim_time_s,
+                    state,
+                )
+
             wall_start = time.monotonic()
             while True:
                 frame = world.tick()
                 snapshot = world.get_snapshot()
                 now_s = snapshot.timestamp.elapsed_seconds
                 elapsed_s = now_s - start_sim_time_s
-                self._drain_events(now_s)
-                self._update_active_trip(active_map, vehicle, frame, now_s)
+                for state in self.vehicle_states:
+                    self._drain_events(now_s, state)
+                    self._update_active_trip(
+                        active_map, state.actor, frame, now_s, state
+                    )
                 if elapsed_s >= self.config.duration_seconds:
                     break
-                if self.active_trip is None:
-                    self._brake(carla, vehicle)
-                    if self.dwell_started_time_s is not None and (
-                        now_s - self.dwell_started_time_s >= self.config.destination_dwell_time_seconds
-                    ):
-                        self._start_trip(carla, active_map, planner, vehicle, now_s)
-                else:
-                    vehicle.apply_control(self.active_trip.agent.run_step())
-                # This only caps wall-clock pace; all academic time remains CARLA simulated time.
+                for state in self.vehicle_states:
+                    if state.active_trip is None:
+                        self._brake(carla, state.actor)
+                        if state.dwell_started_time_s is not None and (
+                            now_s - state.dwell_started_time_s
+                            >= self.config.destination_dwell_time_seconds
+                        ):
+                            self._start_trip(
+                                carla,
+                                active_map,
+                                planner,
+                                state.actor,
+                                now_s,
+                                state,
+                            )
+                    else:
+                        state.actor.apply_control(state.active_trip.agent.run_step())
+                # This only caps wall-clock pace; academic time remains simulated time.
                 target_wall_elapsed = elapsed_s / float(self.simulation_speed)
                 remaining = target_wall_elapsed - (time.monotonic() - wall_start)
                 if remaining > 0.0:
                     time.sleep(remaining)
-            if self.active_trip is not None:
-                self._finish_trip(now_s, "aborted")
-            self._drain_events(now_s)
+
+            for state in self.vehicle_states:
+                if state.active_trip is not None:
+                    self._finish_trip(now_s, "aborted", state)
+                self._drain_events(now_s, state)
             self._write_metrics(self.logger, now_s - start_sim_time_s)
             print("Corrida completada. Resultados: {0}".format(output_directory))
             return output_directory
         finally:
             if self.logger is not None:
                 self.logger.close()
-            for sensor in sensors:
+            for state in self.vehicle_states:
+                for sensor in state.sensors:
+                    try:
+                        if sensor.is_alive:
+                            sensor.stop()
+                            sensor.destroy()
+                    except RuntimeError:
+                        pass
+                state.sensors = []
+            for state in reversed(self.vehicle_states):
                 try:
-                    if sensor.is_alive:
-                        sensor.stop()
-                        sensor.destroy()
+                    if state.actor is not None and state.actor.is_alive:
+                        state.actor.destroy()
                 except RuntimeError:
                     pass
-            try:
-                if vehicle is not None and vehicle.is_alive:
-                    vehicle.destroy()
-            except RuntimeError:
-                pass
+                state.actor = None
             if world is not None and original_settings is not None:
                 try:
                     world.tick()
