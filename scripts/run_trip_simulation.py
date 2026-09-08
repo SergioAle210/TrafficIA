@@ -28,6 +28,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, help="Sobrescribe la semilla del JSON.")
     parser.add_argument("--seconds", type=float, help="Sobrescribe la duración simulada.")
     parser.add_argument(
+        "--history-in",
+        type=Path,
+        help=(
+            "Historial de entrada para vehicle_001. Puede ser el dummy inicial o "
+            "vehicle_history.csv de una corrida anterior."
+        ),
+    )
+    parser.add_argument(
         "--carla-pythonapi",
         type=Path,
         help=(
@@ -59,6 +67,8 @@ def main() -> int:
         config.seed = args.seed
     if args.seconds is not None:
         config.duration_seconds = args.seconds
+    if args.history_in is not None:
+        config.vehicle_history_config = str(args.history_in.resolve())
     if args.no_rendering:
         config.no_rendering_mode = True
     config.validate()
