@@ -6,6 +6,8 @@ import csv
 from pathlib import Path
 from typing import Dict, Iterable, List
 
+from src.navigation_diagnostics import CONTROL_FIELDS, ROUTE_FIELDS
+
 
 TRIP_FIELDS = [
     "run_id", "vehicle_id", "trip_id", "seed", "origin_id", "origin_name",
@@ -49,6 +51,8 @@ class RunLogger:
         self._event_writer = self._create_writer("events_log.csv", EVENT_FIELDS)
         self._metrics_writer = self._create_writer("metrics_summary.csv", METRICS_FIELDS)
         self._history_writer = self._create_writer("vehicle_history.csv", HISTORY_FIELDS)
+        self._route_writer = None
+        self._control_writer = None
 
     def _create_writer(self, file_name: str, fieldnames: Iterable[str]) -> csv.DictWriter:
         csv_file = (self.output_directory / file_name).open("w", newline="", encoding="utf-8")
@@ -71,6 +75,16 @@ class RunLogger:
 
     def write_history(self, row: Dict[str, object]) -> None:
         self._history_writer.writerow(row)
+
+    def write_route(self, row: Dict[str, object]) -> None:
+        if self._route_writer is None:
+            self._route_writer = self._create_writer("route_log.csv", ROUTE_FIELDS)
+        self._route_writer.writerow(row)
+
+    def write_control(self, row: Dict[str, object]) -> None:
+        if self._control_writer is None:
+            self._control_writer = self._create_writer("control_log.csv", CONTROL_FIELDS)
+        self._control_writer.writerow(row)
 
     def close(self) -> None:
         for csv_file in self._files:

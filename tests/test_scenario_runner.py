@@ -32,10 +32,11 @@ class Actors(list):
 
 
 class RunnerScenarioTests(unittest.TestCase):
-    def run_with_fake_server(self, mode, directory, failure=None):
+    def run_with_fake_server(self, mode, directory, failure=None, diagnostics=False):
         config = TripSimulationConfig.from_json(ROOT / "config/multi_vehicle_trip.json", {
             "destination_selection_mode": mode, "duration_seconds": 0.11,
             "output_root": directory,
+            "navigation_diagnostics_enabled": diagnostics,
         })
         if mode == "random_baseline":
             config.vehicle_history_config = "deliberately-missing.csv"
@@ -106,6 +107,13 @@ class RunnerScenarioTests(unittest.TestCase):
             VehicleControl=lambda **kwargs: SimpleNamespace(**kwargs),
             LaneType=SimpleNamespace(Driving=1),
         )
+        agents = []
+
+        def build_agent(*args):
+            agent = Mock()
+            agents.append(agent)
+            return agent
+
         replacements = {
             "configure_carla_agents": Mock(),
             "validate_destinations_on_map": Mock(),
@@ -117,7 +125,11 @@ class RunnerScenarioTests(unittest.TestCase):
             "plan_route": Mock(return_value=["fake road route"]),
             "validate_route_start": Mock(return_value=0.0),
             "route_distance_m": Mock(return_value=50.0),
-            "build_basic_agent": Mock(side_effect=lambda *args: Mock()),
+            "build_basic_agent": Mock(side_effect=build_agent),
+            "RouteTrace": Mock(side_effect=lambda route: SimpleNamespace(
+                points=[dict(index=0, x=1, y=2)],
+                sample=lambda vehicle, agent, control: dict(steer=0.25),
+            )),
         }
         with ExitStack() as stack:
             stack.enter_context(patch.dict("sys.modules", {"carla": fake_carla}))
@@ -139,7 +151,33 @@ class RunnerScenarioTests(unittest.TestCase):
         self.assertEqual(world.apply_settings.call_args[0][0], settings)
         self.assertTrue(all(state.actor is None and not state.sensors for state in simulation.vehicle_states))
         world.set_weather.assert_not_called()
+        if not failure:
+            for agent, actor in zip(agents, actors.filter("vehicle.*")):
+                self.assertEqual(agent.run_step.call_count, 2)
+                # One initial brake and the two unmodified agent commands.
+                self.assertEqual(actor.apply_control.call_count, 3)
+                for call in actor.apply_control.call_args_list[1:]:
+                    self.assertIs(call[0][0], agent.run_step.return_value)
         return simulation, world, spawn_indices, replacements
+
+    def test_diagnostics_capture_each_command_without_extra_ticks_or_agent_steps(self):
+        with TemporaryDirectory() as directory:
+            simulation, world, _, helpers = self.run_with_fake_server(
+                "random_baseline", directory, diagnostics=True)
+            self.assertEqual(world.tick.call_count, 7)
+            self.assertEqual(helpers["RouteTrace"].call_count, 3)
+            output = simulation._output_directory()
+            with (output / "control_log.csv").open(newline="") as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(len(rows), 6)
+            self.assertEqual({row["frame"] for row in rows}, {"4", "5"})
+            self.assertEqual({row["trip_id"] for row in rows}, {"trip_001"})
+            for state in simulation.vehicle_states:
+                # The runner clears actor/trip references in cleanup, but the
+                # builder has exactly one call per car, with the same setting.
+                self.assertEqual(sum(row["vehicle_id"] == state.vehicle_id for row in rows), 2)
+            self.assertEqual([call[0][3] for call in helpers["build_basic_agent"].call_args_list],
+                             [0.1, 0.1, 0.1])
 
     def test_both_scenarios_write_all_vehicle_ids_and_share_one_tick_per_frame(self):
         for mode in ("random_baseline", "history_80_20"):
@@ -152,6 +190,8 @@ class RunnerScenarioTests(unittest.TestCase):
                 helpers["build_global_route_planner"].assert_called_once()
                 self.assertEqual(helpers["build_basic_agent"].call_count, 3)
                 output = simulation._output_directory()
+                self.assertFalse((output / "control_log.csv").exists())
+                helpers["RouteTrace"].assert_not_called()
                 expected_ids = {"vehicle_001", "vehicle_002", "vehicle_003"}
                 for name in ("trips_log.csv", "trajectory_log.csv"):
                     with (output / name).open(encoding="utf-8", newline="") as file:

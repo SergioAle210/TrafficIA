@@ -125,12 +125,20 @@ def route_distance_m(route: Sequence[Any]) -> float:
     return total_distance
 
 
-def build_basic_agent(vehicle: Any, route: Sequence[Any], target_speed_kmh: float) -> Any:
+def build_basic_agent(
+    vehicle: Any, route: Sequence[Any], target_speed_kmh: float,
+    distance_ratio: float = 0.1,
+) -> Any:
     """Create an official CARLA BasicAgent configured with a precomputed plan."""
 
     from src.carla_agent import CollinearSafeBasicAgent
 
     # A fresh options dict avoids CARLA's mutable default being shared by agents.
-    agent = CollinearSafeBasicAgent(vehicle, target_speed=target_speed_kmh, opt_dict={})
+    # Town01 tight turns: the stock 0.5 s horizon skips the curve's interior
+    # waypoints at 20 km/h and cuts toward the curb. Keep the stock 3 m base,
+    # PID gains and speed; shorten only the speed-dependent purge distance.
+    agent = CollinearSafeBasicAgent(
+        vehicle, target_speed=target_speed_kmh, opt_dict={"distance_ratio": distance_ratio}
+    )
     agent.set_global_plan(list(route), stop_waypoint_creation=True, clean_queue=True)
     return agent

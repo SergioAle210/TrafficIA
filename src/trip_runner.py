@@ -25,6 +25,7 @@ from src.route_planner import (
     validate_route_start,
 )
 from src.run_logger import RunLogger
+from src.navigation_diagnostics import RouteTrace
 from src.vehicle_history import (
     DestinationDecision,
     VehicleHistory,
@@ -72,6 +73,8 @@ class TripSimulationConfig:
     host: str = "localhost"
     port: int = 2000
     client_timeout_seconds: float = 30.0
+    navigation_diagnostics_enabled: bool = False
+    controller_distance_ratio: float = 0.1
 
     @classmethod
     def from_json(
@@ -109,6 +112,8 @@ class TripSimulationConfig:
         return config
 
     def validate(self) -> None:
+        if not math.isfinite(self.controller_distance_ratio) or self.controller_distance_ratio < 0:
+            raise ValueError("controller_distance_ratio debe ser finito y no negativo.")
         spawn_point_indices = self.resolved_spawn_point_indices()
         if self.vehicle_count <= 0:
             raise ValueError("vehicle_count debe ser positivo.")
@@ -191,6 +196,7 @@ class ActiveTrip:
     collision_count: int = 0
     lane_invasion_count: int = 0
     last_trajectory_sample_time_s: Optional[float] = None
+    route_trace: Any = None
 
     @property
     def trip_id(self) -> str:
@@ -272,6 +278,18 @@ class VehicleState:
 
 def speed_mps(vector: Any) -> float:
     return math.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
+
+
+def is_at_destination(carla_map: Any, location: Any, destination: Any, threshold_m: float) -> bool:
+    """A nearby opposing/adjacent lane is not an arrival on the destination lane."""
+
+    if location.distance(destination) > threshold_m:
+        return False
+    current = carla_map.get_waypoint(location, project_to_road=True)
+    goal = carla_map.get_waypoint(destination, project_to_road=True)
+    return current is not None and goal is not None and (
+        current.road_id, current.lane_id
+    ) == (goal.road_id, goal.lane_id)
 
 
 def safe_vehicle_blueprints(world: Any, blueprint_filter: str) -> List[Any]:
@@ -547,6 +565,7 @@ class TripSimulation:
                 "meaning": "Wall-clock pacing target only; simulated time remains fixed_delta_seconds per tick.",
             },
             "arrival_threshold_m": self.config.arrival_threshold_m,
+            "arrival_policy": "within arrival_threshold_m and on the destination road_id/lane_id",
             "destination_dwell_time_seconds": self.config.destination_dwell_time_seconds,
             "destination_selection": {
                 "routine_probability": self.config.routine_probability,
@@ -579,9 +598,18 @@ class TripSimulation:
                 "controller": "one BasicAgent.set_global_plan per vehicle",
                 "controller_compatibility_fix": "CollinearSafeBasicAgent: include zero-degree obstacles",
                 "obstacle_lower_angle_epsilon_deg": 0.001,
+                "local_planner_options": {"distance_ratio": self.config.controller_distance_ratio},
+                "stock_base_min_distance_m": 3.0,
                 "sampling_resolution_m": self.config.route_sampling_resolution_m,
                 "origin_validation_tolerance_m": self.config.route_origin_validation_tolerance_m,
                 "optimality": "shortest route according to CARLA road-network graph cost; not traffic/time optimal",
+            },
+            "navigation_diagnostics": {
+                "enabled": self.config.navigation_diagnostics_enabled,
+                "schema_version": 1,
+                "control_sample": "every active control step, after run_step and before apply_control; command affects next tick",
+                "reference": "nearest segment of full planned route; positive lateral error is right; not curb clearance",
+                "route_log": "full plan before LocalPlanner consumes it, including duplicate junction waypoints",
             },
             "traffic_manager": {
                 "used_for_route_following": False,
@@ -744,7 +772,10 @@ class TripSimulation:
                 origin_location,
                 self.config.route_origin_validation_tolerance_m,
             )
-            agent = build_basic_agent(vehicle, route, self.config.target_speed_kmh)
+            agent = build_basic_agent(
+                vehicle, route, self.config.target_speed_kmh,
+                self.config.controller_distance_ratio,
+            )
         except (RuntimeError, ValueError) as error:
             failed = ActiveTrip(
                 trip_number=state.next_trip_number,
@@ -788,6 +819,13 @@ class TripSimulation:
             selection_candidate_count=decision.candidate_count,
         )
         state.next_trip_number += 1
+        if self.config.navigation_diagnostics_enabled:
+            state.active_trip.route_trace = RouteTrace(route)
+            for point in state.active_trip.route_trace.points:
+                self.logger.write_route(dict(
+                    point, run_id=self.run_id, vehicle_id=state.vehicle_id,
+                    trip_id=state.active_trip.trip_id,
+                ))
         print(
             "{0}/{1}: {2} -> {3} [{4}]; ruta planificada {5:.1f} m; "
             "inicio alineado {6:.2f} m".format(
@@ -974,7 +1012,7 @@ class TripSimulation:
         if current_speed > self.config.blocked_speed_threshold_mps:
             trip.last_moving_time_s = now_s
         self._sample_trajectory(carla_map, vehicle, frame, now_s, state)
-        if location.distance(trip.destination_location) <= self.config.arrival_threshold_m:
+        if is_at_destination(carla_map, location, trip.destination_location, self.config.arrival_threshold_m):
             self._finish_trip(now_s, "completed", state)
         elif now_s - trip.departure_time_s >= self.config.max_trip_time_seconds:
             self._finish_trip(now_s, "timeout", state)
@@ -1274,7 +1312,14 @@ class TripSimulation:
                                 state,
                             )
                     else:
-                        state.actor.apply_control(state.active_trip.agent.run_step())
+                        trip = state.active_trip
+                        control = trip.agent.run_step()
+                        if trip.route_trace is not None:
+                            row = trip.route_trace.sample(state.actor, trip.agent, control)
+                            row.update(run_id=self.run_id, vehicle_id=state.vehicle_id,
+                                       trip_id=trip.trip_id, frame=frame, simulation_time_s=now_s)
+                            self.logger.write_control(row)
+                        state.actor.apply_control(control)
                 # This only caps wall-clock pace; academic time remains simulated time.
                 target_wall_elapsed = elapsed_s / float(self.simulation_speed)
                 remaining = target_wall_elapsed - (time.monotonic() - wall_start)

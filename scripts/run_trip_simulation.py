@@ -54,6 +54,14 @@ def parse_args() -> argparse.Namespace:
         help="Desactiva el renderizado sin cambiar modo síncrono ni delta fijo.",
     )
     parser.add_argument(
+        "--controller-distance-ratio", type=float,
+        help="Factor de velocidad del descarte de waypoints; 0.5 reproduce el valor anterior de CARLA.",
+    )
+    parser.add_argument(
+        "--navigation-diagnostics", action="store_true",
+        help="Guarda el plan completo y el objetivo/control de cada frame en dos CSV adicionales.",
+    )
+    parser.add_argument(
         "--simulation-speed",
         type=int,
         choices=(1, 2, 3, 4, 5),
@@ -79,6 +87,10 @@ def configuration_from_args(args: argparse.Namespace) -> TripSimulationConfig:
         overrides["vehicle_history_config"] = str(args.history_in.resolve())
     if args.no_rendering:
         overrides["no_rendering_mode"] = True
+    if getattr(args, "navigation_diagnostics", False):
+        overrides["navigation_diagnostics_enabled"] = True
+    if getattr(args, "controller_distance_ratio", None) is not None:
+        overrides["controller_distance_ratio"] = args.controller_distance_ratio
     config = TripSimulationConfig.from_json(args.config, overrides=overrides)
     if config.destination_selection_mode == "random_baseline" and args.history_in is not None:
         raise ValueError("--history-in no se puede combinar con random_baseline; no utiliza historial de entrada.")
