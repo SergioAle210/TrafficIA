@@ -23,6 +23,11 @@ from src.route_planner import (
     validate_route_start,
 )
 from src.run_logger import RunLogger
+from src.vehicle_history import (
+    DestinationDecision,
+    VehicleHistory,
+    select_from_history,
+)
 
 
 EXCLUDED_BLUEPRINT_KEYWORDS = (
@@ -44,6 +49,9 @@ class TripSimulationConfig:
     output_root: str
     destination_selection_mode: str
     destination_cycle_order: List[str]
+    vehicle_history_config: str
+    routine_destination_count: int
+    required_destination_categories: List[str]
     routine_probability: float
     exploration_probability: float
     arrival_threshold_m: float
@@ -69,6 +77,8 @@ class TripSimulationConfig:
             "town", "seed", "duration_seconds", "fixed_delta_seconds", "no_rendering_mode",
             "initial_spawn_point_index", "initial_spawn_fallback_enabled", "destinations_config", "output_root",
             "destination_selection_mode", "destination_cycle_order",
+            "vehicle_history_config", "routine_destination_count",
+            "required_destination_categories",
             "routine_probability", "exploration_probability", "arrival_threshold_m",
             "destination_dwell_time_seconds", "max_trip_time_seconds",
             "blocked_speed_threshold_mps", "blocked_time_threshold_seconds",
@@ -103,8 +113,18 @@ class TripSimulationConfig:
             raise ValueError("Estos parámetros deben ser positivos: {0}".format(", ".join(invalid)))
         if self.destination_dwell_time_seconds < 0.0:
             raise ValueError("destination_dwell_time_seconds no puede ser negativo.")
-        if self.destination_selection_mode not in {"stochastic", "cyclic"}:
-            raise ValueError("destination_selection_mode debe ser 'stochastic' o 'cyclic'.")
+        if self.destination_selection_mode not in {"stochastic", "cyclic", "history_80_20"}:
+            raise ValueError(
+                "destination_selection_mode debe ser 'stochastic', 'cyclic' o 'history_80_20'."
+            )
+        if self.routine_destination_count <= 0:
+            raise ValueError("routine_destination_count debe ser positivo.")
+        if len(self.required_destination_categories) != 3 or (
+            len(set(self.required_destination_categories)) != 3
+        ):
+            raise ValueError("required_destination_categories debe contener exactamente tres categorías.")
+        if self.destination_selection_mode == "history_80_20" and not self.vehicle_history_config:
+            raise ValueError("vehicle_history_config es obligatorio para history_80_20.")
         if self.destination_selection_mode == "cyclic":
             if len(self.destination_cycle_order) < 2:
                 raise ValueError("destination_cycle_order debe contener al menos dos destinos.")
@@ -125,6 +145,9 @@ class ActiveTrip:
     last_moving_time_s: float
     agent: Any
     planned_route_distance_m: float
+    selection_class: str
+    history_visit_count_before: int
+    selection_candidate_count: int
     distance_traveled_m: float = 0.0
     collision_count: int = 0
     lane_invasion_count: int = 0
@@ -286,6 +309,20 @@ def resolve_destination_location(carla_module: Any, carla_map: Any, destination:
     return waypoint.transform.location
 
 
+def validate_destinations_on_map(
+    carla_module: Any, carla_map: Any, destinations: List[Destination]
+) -> None:
+    """Resolve every configured reference before actors or sensors are created."""
+
+    for destination in destinations:
+        try:
+            resolve_destination_location(carla_module, carla_map, destination)
+        except ValueError as error:
+            raise ValueError(
+                "Destino inválido {0}: {1}".format(destination.destination_id, error)
+            )
+
+
 class TripSimulation:
     """Orchestrates exactly one reusable vehicle and its successive trips."""
 
@@ -303,12 +340,14 @@ class TripSimulation:
         self.simulation_speed = simulation_speed
         self.carla_pythonapi = carla_pythonapi
         self.rng = random.Random(config.seed)
+        self.actor_rng = random.Random(config.seed + 1)
         self.run_id = "{0}_trip_seed_{1}_{2}".format(
             config.town.lower(), config.seed, datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         )
         self.vehicle_id = "vehicle_001"
         self.active_trip: Optional[ActiveTrip] = None
         self.current_destination_id: Optional[str] = None
+        self.current_location_id = "INITIAL_POSITION"
         self.current_location_name = "Initial spawn point"
         self.next_trip_number = 1
         self.dwell_started_time_s: Optional[float] = None
@@ -325,6 +364,8 @@ class TripSimulation:
         self.destinations: List[Destination] = []
         self.destinations_by_id: Dict[str, Destination] = {}
         self.destination_cycle_index = 0
+        self.vehicle_history = VehicleHistory(self.vehicle_id)
+        self.initial_history_counts: Dict[str, int] = {}
 
     def _output_directory(self) -> Path:
         return self.project_root / self.config.output_root / self.run_id
@@ -352,13 +393,19 @@ class TripSimulation:
             "destination_selection": {
                 "routine_probability": self.config.routine_probability,
                 "exploration_probability": self.config.exploration_probability,
-                "method": (
-                    "configured fixed cycle"
-                    if self.config.destination_selection_mode == "cyclic"
-                    else "seeded class draw, then weighted destination draw"
-                ),
+                "method": {
+                    "cyclic": "configured fixed cycle",
+                    "stochastic": "legacy seeded static-class selection",
+                    "history_80_20": (
+                        "seeded 80/20 draw from per-vehicle visit counts; "
+                        "no user-authored destination weights"
+                    ),
+                }[self.config.destination_selection_mode],
                 "mode": self.config.destination_selection_mode,
                 "cycle_order": self.config.destination_cycle_order,
+                "routine_destination_count": self.config.routine_destination_count,
+                "history_input": self.config.vehicle_history_config,
+                "initial_visit_counts": self.initial_history_counts,
             },
             "route_planning": {
                 "planner": "GlobalRoutePlanner",
@@ -400,20 +447,52 @@ class TripSimulation:
                 )
             )
 
-    def _select_next_destination(self) -> Destination:
+    def _validate_destination_categories(self) -> None:
+        configured = set(self.config.required_destination_categories)
+        observed = {destination.category for destination in self.destinations}
+        if observed != configured:
+            raise ValueError(
+                "Las categorías de destinos deben ser exactamente {0}; se encontraron {1}.".format(
+                    sorted(configured), sorted(observed)
+                )
+            )
+
+    def _select_next_destination(self) -> DestinationDecision:
         if self.config.destination_selection_mode == "cyclic":
             destination_id = self.config.destination_cycle_order[
                 self.destination_cycle_index % len(self.config.destination_cycle_order)
             ]
             self.destination_cycle_index += 1
-            return self.destinations_by_id[destination_id]
-        return select_destination(
-            self.destinations, self.current_destination_id, self.config.routine_probability, self.rng
+            destination = self.destinations_by_id[destination_id]
+            return DestinationDecision(
+                destination, "cyclic", self.vehicle_history.counts[destination_id], 1
+            )
+        if self.config.destination_selection_mode == "history_80_20":
+            return select_from_history(
+                self.destinations,
+                self.vehicle_history,
+                self.current_destination_id,
+                self.config.routine_probability,
+                self.config.routine_destination_count,
+                self.rng,
+            )
+        destination = select_destination(
+            self.destinations,
+            self.current_destination_id,
+            self.config.routine_probability,
+            self.rng,
+        )
+        return DestinationDecision(
+            destination,
+            destination.frequency_class or "legacy_stochastic",
+            self.vehicle_history.counts[destination.destination_id],
+            1,
         )
 
     def _start_trip(self, carla_module: Any, carla_map: Any, planner: Any, vehicle: Any, now_s: float) -> None:
         origin_location = vehicle.get_location()
-        destination = self._select_next_destination()
+        decision = self._select_next_destination()
+        destination = decision.destination
         self.trips_started += 1
         try:
             origin_waypoint = carla_map.get_waypoint(
@@ -441,10 +520,20 @@ class TripSimulation:
             agent = build_basic_agent(vehicle, route, self.config.target_speed_kmh)
         except (RuntimeError, ValueError) as error:
             failed = ActiveTrip(
-                self.next_trip_number, self.current_destination_id or "ORIGIN_SPAWN_{0:03d}".format(
-                    self.actual_initial_spawn_point_index
-                ), self.current_location_name, origin_location, destination, origin_location, now_s,
-                origin_location, now_s, None, 0.0,
+                trip_number=self.next_trip_number,
+                origin_id=self.current_location_id,
+                origin_name=self.current_location_name,
+                origin_location=origin_location,
+                destination=destination,
+                destination_location=origin_location,
+                departure_time_s=now_s,
+                last_location=origin_location,
+                last_moving_time_s=now_s,
+                agent=None,
+                planned_route_distance_m=0.0,
+                selection_class=decision.selection_class,
+                history_visit_count_before=decision.visit_count_before,
+                selection_candidate_count=decision.candidate_count,
             )
             self.next_trip_number += 1
             self._write_trip(self.logger, failed, now_s, "route_failed")
@@ -453,9 +542,7 @@ class TripSimulation:
             return
         self.active_trip = ActiveTrip(
             trip_number=self.next_trip_number,
-            origin_id=self.current_destination_id or "ORIGIN_SPAWN_{0:03d}".format(
-                self.actual_initial_spawn_point_index
-            ),
+            origin_id=self.current_location_id,
             origin_name=self.current_location_name,
             origin_location=origin_location,
             destination=destination,
@@ -465,11 +552,14 @@ class TripSimulation:
             last_moving_time_s=now_s,
             agent=agent,
             planned_route_distance_m=route_distance_m(route),
+            selection_class=decision.selection_class,
+            history_visit_count_before=decision.visit_count_before,
+            selection_candidate_count=decision.candidate_count,
         )
         self.next_trip_number += 1
-        print("{0}: {1} -> {2}; ruta planificada {3:.1f} m; inicio alineado {4:.2f} m".format(
+        print("{0}: {1} -> {2} [{3}]; ruta planificada {4:.1f} m; inicio alineado {5:.2f} m".format(
             self.active_trip.trip_id, self.active_trip.origin_id, destination.destination_id,
-            self.active_trip.planned_route_distance_m, route_start_offset_m
+            decision.selection_class, self.active_trip.planned_route_distance_m, route_start_offset_m
         ))
 
     def _write_trip(self, logger: RunLogger, trip: ActiveTrip, now_s: float, status: str) -> None:
@@ -482,7 +572,10 @@ class TripSimulation:
             "origin_z": trip.origin_location.z, "destination_id": trip.destination.destination_id,
             "destination_name": trip.destination.destination_name,
             "destination_category": trip.destination.category,
-            "frequency_class": trip.destination.frequency_class,
+            "frequency_class": trip.selection_class,
+            "selection_class": trip.selection_class,
+            "history_visit_count_before": trip.history_visit_count_before,
+            "selection_candidate_count": trip.selection_candidate_count,
             "departure_sim_time_s": trip.departure_time_s,
             "arrival_sim_time_s": now_s if status == "completed" else "",
             "travel_time_s": duration, "distance_traveled_m": trip.distance_traveled_m,
@@ -501,8 +594,25 @@ class TripSimulation:
         if status == "completed":
             self.completed_trips += 1
             self.destination_counts[trip.destination.destination_id] += 1
+            history_event = self.vehicle_history.record(trip.destination.destination_id)
+            self.logger.write_history({
+                "run_id": self.run_id,
+                "vehicle_id": history_event.vehicle_id,
+                "sequence": history_event.sequence,
+                "destination_id": history_event.destination_id,
+                "source": history_event.source,
+                "trip_id": trip.trip_id,
+                "completed_sim_time_s": now_s,
+            })
             self.current_destination_id = trip.destination.destination_id
+            self.current_location_id = trip.destination.destination_id
             self.current_location_name = trip.destination.destination_name
+        else:
+            self.current_destination_id = None
+            self.current_location_id = "POSITION_AFTER_{0}".format(trip.trip_id.upper())
+            self.current_location_name = "Position after {0} ({1})".format(
+                trip.trip_id, status
+            )
         self.active_trip = None
         self.dwell_started_time_s = now_s
         print("{0}: {1} ({2:.1f} m)".format(trip.trip_id, status, trip.distance_traveled_m))
@@ -613,19 +723,27 @@ class TripSimulation:
             self.destinations_by_id = {
                 destination.destination_id: destination for destination in self.destinations
             }
+            self._validate_destination_categories()
             self._validate_destination_cycle()
+            validate_destinations_on_map(carla, active_map, self.destinations)
+            self.vehicle_history = VehicleHistory.from_csv(
+                self.project_root / self.config.vehicle_history_config,
+                self.vehicle_id,
+                set(self.destinations_by_id),
+            )
+            self.initial_history_counts = dict(sorted(self.vehicle_history.counts.items()))
             original_settings = world.get_settings()
             self._apply_world_settings(world, self.config)
             world.tick()
             spawn_points = active_map.get_spawn_points()
             blueprints = safe_vehicle_blueprints(world, self.config.vehicle_blueprint_filter)
-            blueprint = self.rng.choice(blueprints)
+            blueprint = self.actor_rng.choice(blueprints)
             if blueprint.has_attribute("role_name"):
                 blueprint.set_attribute("role_name", "hero")
             if blueprint.has_attribute("color"):
                 colors = blueprint.get_attribute("color").recommended_values
                 if colors:
-                    blueprint.set_attribute("color", self.rng.choice(colors))
+                    blueprint.set_attribute("color", self.actor_rng.choice(colors))
             vehicle, self.actual_initial_spawn_point_index = spawn_vehicle_at_first_available_point(
                 world,
                 blueprint,
@@ -638,6 +756,19 @@ class TripSimulation:
             self.current_location_name = "Initial spawn point {0}".format(
                 self.actual_initial_spawn_point_index
             )
+            self.current_location_id = "ORIGIN_SPAWN_{0:03d}".format(
+                self.actual_initial_spawn_point_index
+            )
+            matching_origins = [
+                destination
+                for destination in self.destinations
+                if destination.reference_type == "spawn_point"
+                and destination.spawn_point_index == self.actual_initial_spawn_point_index
+            ]
+            if matching_origins:
+                self.current_destination_id = matching_origins[0].destination_id
+                self.current_location_id = matching_origins[0].destination_id
+                self.current_location_name = matching_origins[0].destination_name
             if self.actual_initial_spawn_point_index != self.config.initial_spawn_point_index:
                 print(
                     "Spawn point {0} ocupado/no disponible; se usará {1}.".format(
@@ -686,6 +817,16 @@ class TripSimulation:
             start_sim_time_s = snapshot.timestamp.elapsed_seconds
             output_directory = self._output_directory()
             self.logger = RunLogger(output_directory)
+            for history_event in self.vehicle_history.events:
+                self.logger.write_history({
+                    "run_id": self.run_id,
+                    "vehicle_id": history_event.vehicle_id,
+                    "sequence": history_event.sequence,
+                    "destination_id": history_event.destination_id,
+                    "source": history_event.source,
+                    "trip_id": "",
+                    "completed_sim_time_s": "",
+                })
             self._write_run_config(output_directory, client.get_server_version(), self.destinations)
             planner = build_global_route_planner(active_map, self.config.route_sampling_resolution_m)
             self._start_trip(carla, active_map, planner, vehicle, start_sim_time_s)
