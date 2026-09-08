@@ -10,10 +10,15 @@ from typing import Dict, Iterable, List
 TRIP_FIELDS = [
     "run_id", "vehicle_id", "trip_id", "seed", "origin_id", "origin_name",
     "origin_x", "origin_y", "origin_z", "destination_id", "destination_name",
-    "destination_category", "frequency_class", "departure_sim_time_s",
+    "destination_category", "frequency_class", "selection_class",
+    "history_visit_count_before", "selection_candidate_count", "departure_sim_time_s",
     "arrival_sim_time_s", "travel_time_s", "distance_traveled_m",
     "average_speed_mps", "average_speed_kmh", "collision_count",
     "lane_invasion_count", "status",
+]
+HISTORY_FIELDS = [
+    "run_id", "vehicle_id", "sequence", "destination_id", "source", "trip_id",
+    "completed_sim_time_s",
 ]
 TRAJECTORY_FIELDS = [
     "run_id", "vehicle_id", "trip_id", "frame", "simulation_time_s", "x", "y",
@@ -43,6 +48,7 @@ class RunLogger:
         self._trajectory_writer = self._create_writer("trajectory_log.csv", TRAJECTORY_FIELDS)
         self._event_writer = self._create_writer("events_log.csv", EVENT_FIELDS)
         self._metrics_writer = self._create_writer("metrics_summary.csv", METRICS_FIELDS)
+        self._history_writer = self._create_writer("vehicle_history.csv", HISTORY_FIELDS)
 
     def _create_writer(self, file_name: str, fieldnames: Iterable[str]) -> csv.DictWriter:
         csv_file = (self.output_directory / file_name).open("w", newline="", encoding="utf-8")
@@ -62,6 +68,9 @@ class RunLogger:
 
     def write_metrics(self, row: Dict[str, object]) -> None:
         self._metrics_writer.writerow(row)
+
+    def write_history(self, row: Dict[str, object]) -> None:
+        self._history_writer.writerow(row)
 
     def close(self) -> None:
         for csv_file in self._files:
