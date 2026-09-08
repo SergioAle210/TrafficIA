@@ -175,11 +175,12 @@ data/input/Town01/vehicle_history_dummy.csv
 ```
 
 El catálogo Town01 no contiene pesos ni etiquetas permanentes de frecuencia. El
-historial dummy contiene 30 destinos previos de `vehicle_001`; sus conteos son
-los pesos derivados por el modelo. Para preparar dos carros futuros:
+historial dummy contiene visitas previas independientes; sus conteos son los
+pesos derivados por el modelo. Para preparar cinco carros con 30 visitas cada
+uno:
 
 ```powershell
-python .\scripts\generate_dummy_data.py --seed 42 --vehicles 2 --history-length 30
+python .\scripts\generate_dummy_data.py --seed 42 --vehicles 5 --history-length 30
 ```
 
 La misma semilla genera los mismos historiales, pero cada `vehicle_id` recibe un
@@ -192,14 +193,18 @@ Para continuar explícitamente desde el estado de una corrida anterior:
 python .\scripts\run_trip_simulation.py --town Town01 --seed 42 --history-in .\data\output\<run_id>\vehicle_history.csv --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
+Para continuar una corrida de tres carros, añade también
+`--config .\config\multi_vehicle_trip.json`; el historial debe contener filas
+para los tres `vehicle_id` configurados.
+
 Sin `--history-in`, cada corrida vuelve al mismo dummy inicial, requisito útil
 para comparar experimentos bajo condiciones equivalentes.
 
 ## Ejecutar viajes sucesivos en Town01
 
-La iteración continúa limitada a **un vehículo**, pero el catálogo contiene 42
-destinos Town01 tomados de `rutas.md`. Cada destino referencia un spawn point
-válido sobre la red vial.
+El catálogo contiene 42 destinos Town01 tomados de `rutas.md`. Cada destino
+referencia un spawn point válido sobre la red vial. La configuración
+predeterminada conserva la prueba compatible de un vehículo.
 
 Con Town01 ya cargado, ejecuta:
 
@@ -217,6 +222,19 @@ directorio de la distribución de CARLA que contiene la carpeta `agents`:
 ```powershell
 python .\scripts\run_trip_simulation.py --town Town01 --seed 42 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
+
+Para ejecutar simultáneamente `vehicle_001`, `vehicle_002` y `vehicle_003` en
+los spawn points 133, 6 y 101 respectivamente, usa:
+
+```powershell
+python .\scripts\run_trip_simulation.py --config .\config\multi_vehicle_trip.json --town Town01 --seed 42 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+Los tres actores se crean antes del mismo frame de sincronización y cada uno
+mantiene su propio historial, selección 80/20, `BasicAgent`, ruta, espera,
+sensores y contador de viajes. El archivo dummy actual puede contener cinco
+vehículos: esta configuración usa los tres primeros y deja `vehicle_004` y
+`vehicle_005` disponibles para una ampliación posterior.
 
 También puede definirse una vez por sesión de PowerShell:
 
@@ -241,9 +259,9 @@ Las rutas se crean antes de circular con `GlobalRoutePlanner.trace_route()` y
 se entregan como pares `[Waypoint, RoadOption]` a
 `BasicAgent.set_global_plan()`. Es una ruta corta según el costo de la red vial
 de CARLA, no una ruta óptima respecto a tráfico, congestión o tiempo real.
-`BasicAgent` controla este vehículo porque puede seguir el plan completo; por
-ello no se activa Traffic Manager para este actor concreto. `stable_traffic.py`
-sigue utilizando Traffic Manager sin cambios.
+Cada `BasicAgent` controla un vehículo y sigue su plan completo; por ello no se
+activa Traffic Manager para estos actores. `stable_traffic.py` sigue utilizando
+Traffic Manager sin cambios.
 
 La llegada se detecta con `arrival_threshold_m`; al llegar, el actor frena,
 espera `destination_dwell_time_seconds` de **tiempo simulado**, y recibe un
@@ -252,9 +270,9 @@ nuevo plan. `travel_time`, espera y duración se obtienen de
 
 ### Sincronización segura antes de calcular la ruta
 
-En modo síncrono, el runner avanza ahora un frame después de crear el vehículo
-y solo entonces consulta su posición física. Antes de iniciar el primer viaje
-comprueba que esa posición esté a no más de
+En modo síncrono, el runner crea todos los vehículos y avanza un único frame
+antes de consultar sus posiciones físicas. Antes de iniciar los primeros viajes
+comprueba que cada posición esté a no más de
 `initial_spawn_validation_tolerance_m` del spawn esperado. También proyecta el
 origen actual al carril de conducción y verifica que el primer waypoint de
 `GlobalRoutePlanner` esté dentro de `route_origin_validation_tolerance_m`.
@@ -262,8 +280,8 @@ origen actual al carril de conducción y verifica que el primer waypoint de
 Una inicialización correcta muestra algo similar a:
 
 ```text
-Spawn 133 sincronizado: x=..., y=..., z=...; error=0.02 m
-trip_001: T01_133 -> T01_... [routine]; ruta planificada ... m; inicio alineado 0.10 m
+vehicle_001: spawn 133 sincronizado: x=..., y=..., z=...; error=0.02 m
+vehicle_001/trip_001: T01_133 -> T01_... [routine]; ruta planificada ... m; inicio alineado 0.10 m
 ```
 
 Si CARLA devuelve temporalmente `(0,0,0)` u otra posición desactualizada, la
@@ -317,19 +335,22 @@ los IDs 24 y 49 permanecen fuera por representar puentes.
 
 Cada corrida guarda `run_config.json`, `trips_log.csv`, `trajectory_log.csv`,
 `events_log.csv`, `metrics_summary.csv` y `vehicle_history.csv` en
-`data/output/<run_id>/`. Este último copia el dummy inicial y agrega las llegadas
-completadas. La configuración de entrada nunca se modifica con resultados.
+`data/output/<run_id>/`. Todos los registros incluyen `vehicle_id`; la pareja
+`vehicle_id` + `trip_id` identifica un viaje. El historial de salida copia los
+eventos iniciales de cada carro y agrega sus llegadas completadas. La
+configuración de entrada nunca se modifica con resultados.
 
 ### Ajustar el origen inicial fijo
 
-Edita [config/single_vehicle_trip.json](config/single_vehicle_trip.json). Para
-esta prueba, `initial_spawn_point_index: 133` mantiene el mismo origen en cada
-corrida y `initial_spawn_fallback_enabled: false` impide que cambie solo. Si el
-punto está ocupado, la corrida falla con un mensaje claro en vez de aparecer en
-otro sitio. Para elegir otro punto de carretera, ubica el spectator sobre el
-carril, ejecuta `inspect_location.py` y copia el `spawn_point_index más cercano`
-en `initial_spawn_point_index`. El programa proyecta ese punto al waypoint de
-conducción antes de crear el vehículo.
+Edita [config/single_vehicle_trip.json](config/single_vehicle_trip.json) para un
+carro o [config/multi_vehicle_trip.json](config/multi_vehicle_trip.json) para
+varios. En la configuración múltiple, `vehicle_count` debe coincidir con la
+cantidad de elementos únicos de `initial_spawn_point_indices`.
+`initial_spawn_fallback_enabled: false` impide que un actor cambie de origen por
+su cuenta: si algún punto está ocupado, la corrida completa falla con un mensaje
+claro. Para elegir otro punto de carretera, ubica el spectator sobre el carril,
+ejecuta `inspect_location.py` y copia el índice mostrado. El programa proyecta
+cada punto al waypoint de conducción antes de crear el vehículo.
 
 ## Configuración base
 
@@ -341,10 +362,11 @@ separar la lógica común hacia `src/`.
 
 ## Próximos pasos
 
-Validar visualmente una muestra de los 42 destinos, implementar posteriormente
-el escenario aleatorio equivalente y escalar el mismo historial individual a
-múltiples vehículos. Todavía no se implementan comparación estadística final,
-visualizaciones avanzadas ni Google Maps API.
+Validar visualmente la corrida simultánea en 133, 6 y 101, implementar
+posteriormente el escenario aleatorio equivalente y escalar gradualmente a 5,
+10, 20 y 30 vehículos. Todavía no se calculan densidad o flujo para diagramas
+fundamentales, ni se implementan comparación estadística final, visualizaciones
+avanzadas o Google Maps API.
 
 ## Extra: errores de dependencias de rutas
 
@@ -363,19 +385,24 @@ visualizaciones avanzadas ni Google Maps API.
 - **`No module named 'shapely'`**: `BasicAgent` necesita esta librería. Ejecuta
   el mismo comando de instalación anterior. El runner comprueba ahora todos los
   módulos de navegación antes de crear el vehículo o los sensores.
-- **`No se pudo crear vehicle_001 en el spawn inicial`**: el punto elegido está
-  ocupado o no está disponible. Con
+- **`No se pudo crear vehicle_XXX en el spawn point fijo`**: el punto elegido
+  para ese actor está ocupado o no está disponible. Con
   `initial_spawn_fallback_enabled: false` el runner se detiene para conservar
-  el origen fijo; cambia el índice o activa el fallback si prefieres otra cosa.
+  todos los orígenes fijos; cambia el índice correspondiente en
+  `initial_spawn_point_indices` o activa el fallback si prefieres otra cosa.
 - **Vehículo fuera de la carretera o dentro de una casa**: detén la corrida con
   `Ctrl+C`. El runner proyecta ahora cada spawn point al waypoint de conducción
   más cercano antes de crear el vehículo, para colocarlo sobre el carril.
+- **Detener una corrida multivehículo**: usa `Ctrl+C`. El bloque de limpieza
+  detiene y destruye los sensores de cada carro, destruye todos los vehículos y
+  restaura la configuración anterior del mundo antes de terminar.
 - **El vehículo nace bien pero gira de inmediato hacia una pared**: el problema
   observado era una ruta calculada antes de sincronizar el actor recién creado;
   el origen quedaba temporalmente en `(0,0,0)`. El runner ejecuta ahora un tick
   posterior al spawn, valida la posición real y rechaza cualquier ruta cuyo
   primer waypoint no esté alineado con el vehículo. Los valores de tolerancia
-  están en `config/single_vehicle_trip.json`.
+  están en `config/single_vehicle_trip.json` y
+  `config/multi_vehicle_trip.json`.
 - **Cambiar el origen fijo**: modifica `initial_spawn_point_index` en
   `config/single_vehicle_trip.json`. Usa `inspect_location.py` con el spectator
   situado sobre la carretera para conocer un índice cercano y válido.
