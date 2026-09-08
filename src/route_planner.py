@@ -71,12 +71,25 @@ def build_global_route_planner(carla_map: Any, sampling_resolution: float) -> An
     return GlobalRoutePlanner(carla_map, sampling_resolution)
 
 
-def plan_route(planner: Any, origin_location: Any, destination_location: Any) -> List[Any]:
-    """Return the ordered ``[Waypoint, RoadOption]`` route from CARLA."""
+def plan_route(
+    planner: Any,
+    origin_location: Any,
+    destination_location: Any,
+    endpoint_tolerance_m: float = 5.0,
+) -> List[Any]:
+    """Return a route whose first and last waypoints cover both requested ends."""
 
     route = list(planner.trace_route(origin_location, destination_location))
     if not route:
         raise RuntimeError("GlobalRoutePlanner no encontró una ruta entre origen y destino.")
+    route_end = route[-1][0].transform.location
+    endpoint_error_m = route_end.distance(destination_location)
+    if endpoint_error_m > endpoint_tolerance_m:
+        raise RuntimeError(
+            "GlobalRoutePlanner terminó a {0:.2f} m del destino; máximo permitido: {1:.2f} m.".format(
+                endpoint_error_m, endpoint_tolerance_m
+            )
+        )
     return route
 
 
