@@ -3012,3 +3012,36 @@ documentado antes que implícito
 ```
 
 Cuando exista una decisión no definida por este documento o por `instrucciones.md`, Codex debe preferir una implementación mínima, configurable y fácilmente reversible, evitando ampliar el alcance académico sin autorización.
+
+---
+
+# 101. Decisión de diseño: frecuencia derivada del historial individual
+
+La evolución autorizada para Town01 reemplaza los pesos manuales por recurrencia
+observada en un historial sintético individual. El catálogo compartido describe
+únicamente lugares, referencias viales y una de las tres categorías; no declara
+que un destino sea intrínsecamente frecuente.
+
+```text
+catálogo general de destinos
+        ↓
+historial dummy reproducible por vehicle_id
+        ↓
+conteos personales de visitas
+        ↓
+80 % rutina / 20 % exploración
+        ↓
+viaje completado
+        ↓
+actualización del historial de ese vehículo
+```
+
+El 80 % selecciona dentro de los destinos más visitados por el vehículo y usa
+sus conteos como pesos derivados. El 20 % selecciona entre los restantes y
+prioriza destinos nunca visitados. Solo un viaje completado modifica el estado.
+
+La entrada dummy permanece inmutable durante una corrida. Cada ejecución guarda
+una copia evolucionada bajo su propio `data/output/<run_id>/`; reutilizarla en una
+corrida posterior debe ser una acción explícita. Así se conserva la
+reproducibilidad y se evita que un experimento anterior cambie silenciosamente
+las condiciones del siguiente.
