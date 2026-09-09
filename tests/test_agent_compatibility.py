@@ -89,6 +89,18 @@ class CollinearObstacleTests(unittest.TestCase):
         self.assertEqual(control.brake, 0.5)
         self.assertAlmostEqual(control.steer, 0.1)
 
+    def test_arrival_horizon_tracks_speed_and_restores_cruise_without_changing_pid(self):
+        fixed, _ = self.agent_and_target(self.fixed_type)
+        local = fixed._local_planner
+        local._base_min_distance = 3.0
+        local._distance_ratio = 0.1
+        local.set_speed = Mock()
+        for speed, distance in [(20,3.0),(10,1.5),(0,1.0),(20,3.0)]:
+            fixed.set_arrival_speed(speed,20)
+            self.assertEqual(local._base_min_distance,distance)
+            self.assertEqual(local._distance_ratio,0.1)
+            local.set_speed.assert_called_with(speed)
+
 
 if __name__ == "__main__":
     unittest.main()

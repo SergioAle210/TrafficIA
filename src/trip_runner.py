@@ -17,15 +17,22 @@ from src.destinations import (
     Destination, load_destinations, select_destination, select_uniform_destination,
 )
 from src.route_planner import (
+    arrival_route,
     build_basic_agent,
     build_global_route_planner,
     configure_carla_agents,
     plan_route,
     route_distance_m,
+    steering_continuation,
     validate_route_start,
 )
 from src.run_logger import RunLogger
 from src.navigation_diagnostics import RouteTrace
+from src.arrival import (
+    ArrivalApproach, approach_control, stopped_and_aligned, alignment_errors, is_aligned,
+    APPROACH_DECELERATION_MPS2, STOP_MARGIN_M, STOPPED_SPEED_MPS,
+    ALIGNMENT_TOLERANCE_DEG, CENTER_TOLERANCE_M, STEERING_CONTINUATION_M, ALIGNMENT_SPEED_KMH,
+)
 from src.vehicle_history import (
     DestinationDecision,
     VehicleHistory,
@@ -197,6 +204,7 @@ class ActiveTrip:
     lane_invasion_count: int = 0
     last_trajectory_sample_time_s: Optional[float] = None
     route_trace: Any = None
+    approach: Any = None
 
     @property
     def trip_id(self) -> str:
@@ -565,7 +573,21 @@ class TripSimulation:
                 "meaning": "Wall-clock pacing target only; simulated time remains fixed_delta_seconds per tick.",
             },
             "arrival_threshold_m": self.config.arrival_threshold_m,
-            "arrival_policy": "within arrival_threshold_m and on the destination road_id/lane_id",
+            "arrival_policy": "route end reached, within arrival_threshold_m on destination road/lane, stopped and aligned",
+            "arrival_policy_version": 2,
+            "arrival_control": {
+                "deceleration_mps2": APPROACH_DECELERATION_MPS2,
+                "stop_margin_m": STOP_MARGIN_M,
+                "stopped_speed_mps": STOPPED_SPEED_MPS,
+                "alignment_tolerance_deg": ALIGNMENT_TOLERANCE_DEG,
+                "center_tolerance_m": CENTER_TOLERANCE_M,
+                "steering_continuation_m": STEERING_CONTINUATION_M,
+                "alignment_speed_kmh": ALIGNMENT_SPEED_KMH,
+                "approach_base_purge_distance_m": "max(1, stock_base * target_speed/cruise_speed); cruise retains stock base",
+                "speed_envelope": "min(cruise, sqrt(2*a*max(route_remaining-stop_margin, 0)))",
+                "dwell_starts": "at completed: after stopping and alignment, not at entry into arrival radius",
+                "planned_distance": "through exact destination; excludes steering continuation",
+            },
             "destination_dwell_time_seconds": self.config.destination_dwell_time_seconds,
             "destination_selection": {
                 "routine_probability": self.config.routine_probability,
@@ -606,10 +628,11 @@ class TripSimulation:
             },
             "navigation_diagnostics": {
                 "enabled": self.config.navigation_diagnostics_enabled,
-                "schema_version": 1,
+                "schema_version": 2,
                 "control_sample": "every active control step, after run_step and before apply_control; command affects next tick",
                 "reference": "nearest segment of full planned route; positive lateral error is right; not curb clearance",
-                "route_log": "full plan before LocalPlanner consumes it, including duplicate junction waypoints",
+                "route_log": "full control plan including 6 m steering continuation beyond exact destination",
+                "arrival_log": "one snapshot per completed trip, at stopped/aligned arrival before dwell",
             },
             "traffic_manager": {
                 "used_for_route_following": False,
@@ -767,13 +790,16 @@ class TripSimulation:
                 carla_module, carla_map, destination
             )
             route = plan_route(planner, route_origin_location, destination_location)
+            route = arrival_route(route, carla_map.get_waypoint(destination_location))
+            approach = ArrivalApproach(route)
+            control_route = steering_continuation(route, STEERING_CONTINUATION_M)
             route_start_offset_m = validate_route_start(
                 route,
                 origin_location,
                 self.config.route_origin_validation_tolerance_m,
             )
             agent = build_basic_agent(
-                vehicle, route, self.config.target_speed_kmh,
+                vehicle, control_route, self.config.target_speed_kmh,
                 self.config.controller_distance_ratio,
             )
         except (RuntimeError, ValueError) as error:
@@ -817,10 +843,11 @@ class TripSimulation:
             selection_class=decision.selection_class,
             history_visit_count_before=decision.visit_count_before,
             selection_candidate_count=decision.candidate_count,
+            approach=approach,
         )
         state.next_trip_number += 1
         if self.config.navigation_diagnostics_enabled:
-            state.active_trip.route_trace = RouteTrace(route)
+            state.active_trip.route_trace = RouteTrace(control_route)
             for point in state.active_trip.route_trace.points:
                 self.logger.write_route(dict(
                     point, run_id=self.run_id, vehicle_id=state.vehicle_id,
@@ -1009,10 +1036,31 @@ class TripSimulation:
         trip.distance_traveled_m += trip.last_location.distance(location)
         trip.last_location = location
         current_speed = speed_mps(vehicle.get_velocity())
+        trip.approach.update(location)
+        at_destination = (trip.approach.remaining_m <= STOP_MARGIN_M
+                          and is_at_destination(carla_map, location, trip.destination_location,
+                                                self.config.arrival_threshold_m))
+        # Steering cannot align a stationary car. Complete the final orientation
+        # at walking speed, only while still in the destination radius and lane.
+        trip.approach.settling = at_destination and not is_aligned(
+            vehicle, carla_map.get_waypoint(location))
         if current_speed > self.config.blocked_speed_threshold_mps:
             trip.last_moving_time_s = now_s
         self._sample_trajectory(carla_map, vehicle, frame, now_s, state)
-        if is_at_destination(carla_map, location, trip.destination_location, self.config.arrival_threshold_m):
+        if (at_destination
+                and stopped_and_aligned(vehicle, carla_map.get_waypoint(location), current_speed)):
+            if self.config.navigation_diagnostics_enabled:
+                waypoint = carla_map.get_waypoint(location)
+                heading, lateral = alignment_errors(vehicle.get_transform(), waypoint)
+                self.logger.write_arrival(dict(
+                    run_id=self.run_id, vehicle_id=state.vehicle_id, trip_id=trip.trip_id,
+                    destination_id=trip.destination.destination_id, frame=frame,
+                    simulation_time_s=now_s, x=location.x, y=location.y, z=location.z,
+                    speed_mps=current_speed, heading_error_deg=heading, lateral_error_m=lateral,
+                    distance_to_destination_m=location.distance(trip.destination_location),
+                    road_id=waypoint.road_id, lane_id=waypoint.lane_id,
+                    route_remaining_m=trip.approach.remaining_m,
+                ))
             self._finish_trip(now_s, "completed", state)
         elif now_s - trip.departure_time_s >= self.config.max_trip_time_seconds:
             self._finish_trip(now_s, "timeout", state)
@@ -1313,11 +1361,13 @@ class TripSimulation:
                             )
                     else:
                         trip = state.active_trip
-                        control = trip.agent.run_step()
+                        control = approach_control(trip.agent, trip.approach, self.config.target_speed_kmh)
                         if trip.route_trace is not None:
                             row = trip.route_trace.sample(state.actor, trip.agent, control)
                             row.update(run_id=self.run_id, vehicle_id=state.vehicle_id,
-                                       trip_id=trip.trip_id, frame=frame, simulation_time_s=now_s)
+                                       trip_id=trip.trip_id, frame=frame, simulation_time_s=now_s,
+                                       arrival_remaining_m=trip.approach.remaining_m,
+                                       target_speed_kmh=trip.approach.target_speed_kmh(self.config.target_speed_kmh))
                             self.logger.write_control(row)
                         state.actor.apply_control(control)
                 # This only caps wall-clock pace; academic time remains simulated time.

@@ -14,6 +14,13 @@ CONTROL_FIELDS = [
     "target_distance_m", "purge_distance_m", "route_segment_index",
     "route_x", "route_y", "route_yaw_deg", "route_road_id", "route_lane_id",
     "route_distance_m", "lateral_error_m", "heading_error_deg", "lane_width_m",
+    "arrival_remaining_m", "target_speed_kmh",
+]
+
+ARRIVAL_FIELDS = [
+    "run_id", "vehicle_id", "trip_id", "destination_id", "frame", "simulation_time_s",
+    "x", "y", "z", "speed_mps", "heading_error_deg", "lateral_error_m",
+    "distance_to_destination_m", "road_id", "lane_id", "route_remaining_m",
 ]
 
 

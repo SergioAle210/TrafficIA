@@ -123,6 +123,12 @@ class RunnerScenarioTests(unittest.TestCase):
             "resolve_destination_location": Mock(return_value=Location(51.0, 2.0, 0.0)),
             "build_global_route_planner": Mock(),
             "plan_route": Mock(return_value=["fake road route"]),
+            "arrival_route": Mock(side_effect=lambda route, goal: route),
+            "steering_continuation": Mock(side_effect=lambda route, distance: route),
+            "ArrivalApproach": Mock(side_effect=lambda route: SimpleNamespace(
+                update=lambda location: 50.0, remaining_m=50.0,
+                target_speed_kmh=lambda cruise: cruise,
+            )),
             "validate_route_start": Mock(return_value=0.0),
             "route_distance_m": Mock(return_value=50.0),
             "build_basic_agent": Mock(side_effect=build_agent),

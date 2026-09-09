@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from typing import Dict, Iterable, List
 
-from src.navigation_diagnostics import CONTROL_FIELDS, ROUTE_FIELDS
+from src.navigation_diagnostics import ARRIVAL_FIELDS, CONTROL_FIELDS, ROUTE_FIELDS
 
 
 TRIP_FIELDS = [
@@ -53,6 +53,7 @@ class RunLogger:
         self._history_writer = self._create_writer("vehicle_history.csv", HISTORY_FIELDS)
         self._route_writer = None
         self._control_writer = None
+        self._arrival_writer = None
 
     def _create_writer(self, file_name: str, fieldnames: Iterable[str]) -> csv.DictWriter:
         csv_file = (self.output_directory / file_name).open("w", newline="", encoding="utf-8")
@@ -90,3 +91,8 @@ class RunLogger:
         for csv_file in self._files:
             csv_file.close()
         self._files = []
+
+    def write_arrival(self, row: Dict[str, object]) -> None:
+        if self._arrival_writer is None:
+            self._arrival_writer = self._create_writer("arrival_log.csv", ARRIVAL_FIELDS)
+        self._arrival_writer.writerow(row)

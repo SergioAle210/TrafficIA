@@ -125,6 +125,67 @@ def route_distance_m(route: Sequence[Any]) -> float:
     return total_distance
 
 
+def arrival_route(route: Sequence[Any], goal: Any) -> List[Any]:
+    """Replace an early/overshooting terminal tail with the exact lane goal.
+
+    OpenDRIVE negative lanes travel toward increasing s, positive lanes toward
+    decreasing s. Keep the last preceding waypoint on the goal's lane, then
+    sample that lane every 0.5 m through the requested stopping point.
+    """
+    direction = 1 if goal.lane_id < 0 else -1
+    anchors = [i for i, (wp, _) in enumerate(route)
+               if (wp.road_id, wp.section_id, wp.lane_id) ==
+               (goal.road_id, goal.section_id, goal.lane_id)
+               and (goal.s-wp.s)*direction >= -0.01]
+    if not anchors:
+        raise RuntimeError("La ruta no alcanza un tramo anterior al destino en su carril.")
+    index = anchors[-1]
+    result = list(route[:index+1])
+    current, option = result[-1]
+    remaining = (goal.s-current.s)*direction
+    if remaining > 10.0:
+        raise RuntimeError("El tramo final sin cubrir supera 10 m; se rechaza la ruta.")
+    while remaining > 0.5:
+        candidates = [wp for wp in current.next(0.5)
+                      if (wp.road_id, wp.section_id, wp.lane_id) ==
+                      (goal.road_id, goal.section_id, goal.lane_id)]
+        if len(candidates) != 1:
+            raise RuntimeError("No hay una continuación única al punto de parada.")
+        current = candidates[0]
+        next_remaining = (goal.s-current.s)*direction
+        if next_remaining >= remaining:
+            raise RuntimeError("La continuación no progresa hacia el destino.")
+        result.append((current, option))
+        remaining = next_remaining
+    if result[-1][0].transform.location.distance(goal.transform.location) < 0.01:
+        result[-1] = (goal, option)
+    else:
+        result.append((goal, option))
+    return result
+
+
+def steering_continuation(route: Sequence[Any], distance_m: float) -> List[Any]:
+    """Keep lateral targets ahead while stopping; not part of trip distance.
+
+    Do not invent a turn at a branching junction. Reject ambiguous support
+    before spawning a trip instead of driving beyond its planned lane.
+    """
+    from agents.navigation.local_planner import RoadOption
+
+    result = list(route)
+    current = result[-1][0]
+    covered = 0.0
+    while covered < distance_m:
+        step = min(0.5, distance_m-covered)
+        candidates = current.next(step)
+        if len(candidates) != 1:
+            raise RuntimeError("No hay guía lateral única después del punto de parada.")
+        current = candidates[0]
+        result.append((current, RoadOption.LANEFOLLOW))
+        covered += step
+    return result
+
+
 def build_basic_agent(
     vehicle: Any, route: Sequence[Any], target_speed_kmh: float,
     distance_ratio: float = 0.1,
