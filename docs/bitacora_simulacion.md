@@ -435,3 +435,752 @@ crearon automatizaciones ni se aumentó la flota.
 - No se midieron contactos perdidos por un posible cierre abrupto ni se
   establecieron garantías generales de conducción. Se conservan los límites
   de contabilidad y física descritos en las entradas anteriores.
+
+## 2026-09-08 — Diagnóstico de las dos invasiones durante llegada y arranque
+
+**Alcance autorizado:** reproducir y medir antes de modificar la conducción.
+No se hicieron commits. La corrección propuesta al final de esta entrada
+todavía no está implementada. Se conservaron los CSV anteriores y los cambios
+ajenos de `i-marco_teorico.tex`.
+
+### Instrumentación y condiciones
+
+Se comprobó CARLA 0.9.15 en `localhost:2000`, Town01, sin vehículos ni sensores.
+El clima coincidía exactamente con la última validación. Se mantuvieron tres
+vehículos, spawns `[133, 6, 101]`, semilla 42, modelos/colores, delta 0.05 s,
+objetivo 20 km/h, `controller_distance_ratio=0.1`, llegada a 4 m y espera de
+5 s. Se ejecutaron secuencialmente ambos escenarios durante 600 s simulados,
+con `--simulation-speed 5 --no-rendering`. Se mantuvo no-rendering entre
+corridas y al terminar se restauró el renderizado que estaba activo al inicio.
+
+Se añadió `scripts/diagnose_destination_dwell.py`: subclase de observación
+que delega en el runner existente, sin sobrescribir frenado, inicio del viaje,
+contabilidad ni controles. Captura cada frame dentro de 25 m de T01_067,
+incluyendo la espera y el frame en que se cierra el viaje. No se modificaron
+`src/trip_runner.py`, `src/route_planner.py`, `src/carla_agent.py` ni sus parámetros.
+Los hashes SHA-256 de esos archivos se guardaron por corrida y se verificaron
+después del análisis.
+
+Archivos adicionales por corrida:
+
+- `dwell_log.csv`: fases antes/después de actualizar el viaje, contexto de
+  viaje durante espera, pose, velocidad, dirección/freno ya aplicados, carril,
+  orientación y huellas del vehículo. El control observado corresponde al
+  frame recibido; `control_log.csv` conserva la orden para el siguiente tick.
+- `dwell_geometry.json`: carriles/marcas cada 0.25 m, waypoint proyectado de
+  T01_067 y cajas de los tres modelos. El destino proyectado es
+  `(2.0284, 318.6042)`, road 20/lane -1, ancho de carril 4 m.
+- `dwell_diagnostic_config.json`: semántica, alcance y hashes del código.
+
+Se añadieron seis pruebas del observador: huella usada por el sensor,
+delegación de conducción/contabilidad, registro de transición a espera,
+observación sin viaje activo, actualización fuera de la zona y cierre del
+archivo ante interrupción. **70 pruebas correctas, sin skips**, con
+`carla-env` y `CARLA_PYTHONAPI`. Los comandos completos están en README.
+
+### Reproducción real
+
+| Medida | random_baseline | history_80_20 |
+|---|---:|---:|
+| Iniciados / completados / aborted | 14 / 11 / 3 | 14 / 11 / 3 |
+| Colisiones | 0 | 0 |
+| Invasiones | 0 | 2 |
+| Distancia total (m) | 5559.38 | 5673.43 |
+| Velocidad media agregada (km/h) | 11.47 | 11.70 |
+| Muestras de diagnóstico cerca de T01_067 | 196 | 534 |
+| Muestras durante espera en esa zona | 0 | 100 |
+| Historial final por vehículo | 5, 4, 2 | 34, 34, 33 |
+
+Resultados:
+
+- `data/output/town01_random_baseline_seed_42_20260908T204535976323Z/`
+- `data/output/town01_history_80_20_seed_42_20260908T205635754649Z/`
+
+Ambos escenarios conservaron la secuencia de orígenes/destinos y los estados
+de la última validación; coincidieron clima, semáforos y atributos de los
+vehículos. No hubo `blocked`, `timeout`, `route_failed` ni crash. Los totales
+coinciden con los callbacks y los historiales con las llegadas. En baseline
+solo el vehículo 002 pasó por el radio de diagnóstico, sin detenerse allí:
+las 196 filas no representan el total de frames de los tres vehículos.
+
+### Secuencia medida de vehicle_002, trip_003 → espera → trip_004
+
+Se toma como t=0 el cierre de `trip_003` en T01_067. Los errores de rumbo de
+esta tabla son relativos a la tangente del carril en la posición del vehículo,
+no al rumbo final del destino.
+
+| Momento | Frame | t relativo | Velocidad | Error de rumbo | Control observado |
+|---|---:|---:|---:|---:|---|
+| Llegada registrada | 2103673 | 0.00 s | 19.21 km/h | -16.63° | acelerador 0.75, dirección 0.0617, freno 0 |
+| Primer evento | 2103680 | 0.35 s | 14.06 km/h | -25.77° | acelerador 0, dirección 0, freno 1 |
+| Detenido (<0.05 m/s) | 2103695 | 1.10 s | ≈0 km/h | -33.08° | acelerador 0, dirección 0, freno 1 |
+| Primera muestra del nuevo viaje | 2103774 | 5.05 s | 0 km/h | -33.09° | todavía se observa el freno anterior |
+| Segundo evento | 2103810 | 6.85 s | 8.71 km/h | -8.22° | acelerador 0.75, dirección 0.6247, freno 0 |
+
+En t=0, el centro está en `(3.3414, 322.2326)`, a **3.954 m** del destino.
+Cumple el umbral de 4 m y el carril correcto, pero sigue girando y circula
+a 19.21 km/h. `_finish_trip()` elimina el agente activo; ese mismo frame
+el bucle aplica `_brake()`, que fija dirección cero y freno completo. Las
+100 muestras posteriores de espera confirman dirección 0/acelerador 0/freno 1.
+
+Durante el frenado recorre **3.116 m**. Su rumbo apenas cambia, de -134.44°
+a -134.12°, mientras la carretera continúa curvándose. Se detiene cerca de
+`(1.1752, 319.9933)`, con el centro desplazado **1.022 m a la izquierda** del
+carril y un error de rumbo de 33.08°. El temporizador ya estaba corriendo:
+aproximadamente 1.1 s de los 5 s de espera se emplean en frenar; quedan unos
+3.9 s de espera programada desde que se detiene.
+
+El nuevo viaje se crea a t=5.00 s desde la posición detenida. Su primer
+waypoint está a 1.03 m del vehículo, por lo que pasa la validación de origen,
+pero eso no exige alineación angular. En el primer control, t=5.05 s, el nuevo
+agente ordena dirección 0.1 hacia `(2.0103, 315.6003)`; aumenta hasta 0.8 a
+t=5.40 s para recuperar la trayectoria. No se observan opciones
+`CHANGELANELEFT`/`CHANGELANERIGHT` en los planes de esos viajes.
+
+### Qué significan los dos callbacks
+
+El [sensor oficial 0.9.15](https://github.com/carla-simulator/carla/blob/0.9.15/LibCarla/source/carla/client/LaneInvasionSensor.cpp)
+evalúa el cruce de cuatro esquinas entre frames. Su aproximación usa yaw y
+añade el desplazamiento de la caja en ejes globales, sin rotarlo. Por eso el
+observador conserva por separado esa aproximación y los vértices físicos
+transformados de la caja. No se interpretan como posiciones de los neumáticos.
+
+1. **Salida durante frenado**, t=0.35 s: la esquina delantera izquierda del
+   sensor cambia de road 20/lane -1 a road 20/lane 1. La marca izquierda es
+   `Broken`. El centro permanece en su carril; es la huella la que invade el
+   contrario. El evento tiene `trip_id` vacío porque el viaje ya se cerró.
+2. **Regreso durante la corrección de arranque**, t=6.85 s (1.85 s después de
+   iniciar `trip_004`): la misma esquina vuelve al carril de la ruta. En ese
+   punto delantero, la continuación vial es road 15/lane 1; la esquina pasa
+   desde road 15/lane -1 a lane 1. Este callback corresponde a `trip_004`.
+
+Se contrastaron también los ocho vértices físicos con la polilínea de road
+20/lane -1 y su continuación road 15/lane 1. La caja física comienza a superar
+el borde izquierdo aproximadamente a t=0.25 s y regresa completa a t=6.95 s;
+la aproximación del sensor cruza a t=0.35 y 6.85 s. Las diferencias son
+consistentes con sus geometrías distintas y el muestreo de 0.25 m. Por tanto
+**no se atribuye el problema solo a un falso positivo del sensor**.
+
+El centro nunca necesita cambiar al carril contrario y el plan no solicita
+una maniobra de cambio de carril. La evidencia identifica un desvío de la
+huella al interrumpir el seguimiento lateral durante la llegada y su posterior
+recuperación. Esto no equivale a dos accidentes, ni determina por sí solo la
+legalidad de atravesar una marca discontinua.
+
+### Propuesta de corrección para la siguiente etapa, todavía no aplicada
+
+Corregir la transición de llegada del runner, conservando los PID y
+`distance_ratio=0.1` como referencia inicial:
+
+1. Introducir una aproximación con desaceleración antes de cerrar el viaje,
+   manteniendo el seguimiento lateral de la ruta mientras el vehículo frena.
+   No reemplazarlo inmediatamente por dirección cero al entrar en el radio.
+2. Revisar la cobertura del tramo final: el plan actual termina en
+   `(2.6607, 321.4829)`, aproximadamente **2.95 m antes** del destino proyectado,
+   todavía en curva. La guía lateral debe alcanzar el lugar donde se desea
+   detener el vehículo; conservar el agente por sí solo no garantiza esto.
+3. Cerrar el viaje e iniciar la espera cuando el vehículo esté detenido dentro
+   del umbral, en el carril y alineado. Este cambio alteraría deliberadamente
+   el instante de llegada y el inicio de los cinco segundos de espera, por lo
+   que deberá documentarse su semántica antes de comparar tiempos e historiales.
+4. Validar la llegada en curva y en recta, la continuidad de control, el inicio
+   de espera después de detenerse y la ausencia de visitas duplicadas mediante
+   pruebas unitarias. Repetir baseline e histórico con tres vehículos y semilla
+   42, conservando los callbacks y verificando cero colisiones y llegadas correctas.
+
+No se probó una intervención sobre el frenado en esta etapa. Las medidas
+explican el mecanismo observado; no demuestran todavía que la propuesta elimine
+las invasiones. No se ajustó velocidad, ganancias, umbral, duración de espera,
+destinos o geometría, ni se aumentó la flota.
+
+### Artefactos y cierre
+
+`data/output/dwell_investigation_20260908/` contiene `preflight.json`,
+`unit_tests.txt`, logs de consola, `summary.json`, `analysis_console.txt`,
+`cleanup.json`, el analizador local `analyze.py` y
+[el gráfico del diagnóstico](../data/output/dwell_investigation_20260908/dwell_diagnosis.png).
+El gráfico se revisó visualmente. Para regenerar el resumen y la figura:
+
+```powershell
+.\carla-env\Scripts\python.exe data/output/dwell_investigation_20260908/analyze.py data/output/town01_random_baseline_seed_42_20260908T204535976323Z data/output/town01_history_80_20_seed_42_20260908T205635754649Z
+```
+
+El analizador usa Matplotlib de `carla-env` con caché local bajo la carpeta
+de resultados, y no modifica logs de corrida. Al finalizar, CARLA seguía
+disponible en Town01, sin vehículos ni sensores, modo asíncrono y renderizado
+restaurado (`no_rendering_mode=False`). El siguiente paso queda pendiente de
+revisar la propuesta con el usuario; no se creó ningún commit.
+
+## 2026-09-08 — Corrección de la aproximación, parada y espera en destino
+
+### Autorización y condiciones conservadas
+
+El usuario autorizó implementar la propuesta de la investigación anterior y
+pidió indicar el siguiente paso. Se mantiene la instrucción de **no hacer
+commits**. Antes de modificar se comprobó con `carla-env`: CARLA 0.9.15 en
+`localhost:2000`, Town01, cero vehículos y sensores, modo asíncrono y
+renderizado activo. No se cambió mapa, clima, catálogo, CSV de entrada ni flota.
+
+Todas las corridas de esta etapa usaron tres vehículos, semilla 42, 600 s
+simulados, timestep 0.05 s, velocidad de crucero 20 km/h, `distance_ratio=0.1`,
+espera 5 s, `--simulation-speed 5` y `--no-rendering`. Se preservaron los
+modelos, atributos y spawns 133/6/101. El runner restauró las opciones del
+mundo al finalizar cada corrida.
+
+### Cambio implementado
+
+- `src/arrival.py`: progreso ordenado a lo largo de la ruta y límite de
+  velocidad `min(crucero, sqrt(2 * 1.5 * max(restante - 0.5, 0)))` en m/s.
+  El objetivo comienza a reducirse unos 10.8 m antes del destino a 20 km/h.
+  La búsqueda local del progreso evita saltar a una rama posterior cercana
+  del recorrido. Al final se conserva la dirección mientras se frena.
+- `src/route_planner.py`: reconstruye el tramo final sobre el carril cada
+  0.5 m hasta el waypoint exacto de parada. Elimina un eventual extremo pasado
+  y completa uno anticipado. Añade 6 m de continuación única para mantener
+  objetivos laterales durante el frenado, sin sumarlos a la distancia
+  planificada. Rechaza anclas incompatibles y continuaciones ambiguas.
+- `src/carla_agent.py`: el radio base de descarte baja gradualmente desde 3 m
+  a 1 m según la velocidad objetivo de aproximación. Se conserva el término
+  `0.1 * velocidad_mps`, las ganancias PID oficiales, el límite de variación
+  de dirección y las detecciones de obstáculos/semáforos. A velocidad de
+  crucero recupera el radio base de 3 m.
+- `src/trip_runner.py`: el viaje sigue activo durante la aproximación. Exige
+  avance hasta el margen final, distancia ≤4 m, mismo road/lane del destino,
+  velocidad ≤0.05 m/s, error de rumbo ≤10° y error lateral del centro ≤0.5 m.
+  Si falta orientación o centrado al alcanzar el margen, permite un objetivo
+  de 1 km/h mientras el actor permanezca en el radio y carril correctos; frena
+  al cumplir ambos límites. No desactiva frenadas por obstáculos o semáforos.
+- `src/navigation_diagnostics.py` y `src/run_logger.py`: diagnóstico versión 2;
+  el control incluye velocidad objetivo y distancia restante, y el nuevo
+  `arrival_log.csv` guarda cada llegada completa. La cola de `route_log.csv`
+  incluye la continuación lateral, cuya semántica queda registrada.
+- El observador de `scripts/diagnose_destination_dwell.py` sigue delegando la
+  conducción y ahora incluye `src/arrival.py` entre los hashes de procedencia.
+
+`arrival_policy_version=2` y `arrival_control` en `run_config.json` permiten
+identificar la nueva política. El tiempo de viaje incluye desaceleración,
+alineación y parada; los cinco segundos de espera empiezan después. Una visita
+se agrega al historial una sola vez, al completar. No se reescribieron las
+métricas antiguas ni se cambiaron sus callbacks. La corrección afecta a todos
+los destinos, sin condiciones especiales por coordenadas de T01_067.
+
+### Dos intentos intermedios que no se aceptaron como solución
+
+Se preservaron dos corridas históricas completas de 600 s:
+
+| Variante | Carpeta bajo `data/output/` | Resultado |
+|---|---|---|
+| Aproximación y guía completa con radio base fijo 3 m | `town01_history_80_20_seed_42_20260908T213300409794Z` | 9 completed, 1 blocked, 3 aborted; 0 colisiones, 0 invasiones |
+| Radio base reducido con la velocidad, sin avance final de alineación | `town01_history_80_20_seed_42_20260908T213714649261Z` | 9 completed, 1 blocked, 3 aborted; 0 colisiones, 0 invasiones |
+
+La primera variante detuvo al vehículo 002 con desplazamiento lateral de
+0.569 m. No cumplía el centrado de 0.5 m y quedó `blocked`; no se relajó el
+criterio para declarar éxito. La segunda redujo ese desplazamiento a 0.142 m,
+pero se detuvo con 11.15° de error de rumbo, también fuera del límite de 10°.
+La dirección aplicada a un actor inmóvil no puede corregir su orientación.
+Esto motivó el avance final limitado a 1 km/h, manteniendo los límites de
+llegada y las detecciones oficiales. Cero callbacks por sí solo no bastó
+para aceptar esos intentos.
+
+### Pruebas unitarias y comprobación del mapa
+
+**80 pruebas correctas, sin skips**, ejecutadas con `carla-env` y
+`CARLA_PYTHONAPI=C:\CARLA\WindowsNoEditor\PythonAPI\carla`. Se añadieron
+regresiones en `tests/test_arrival_control.py`, `tests/test_agent_compatibility.py`
+y se adaptó el doble del runner en `tests/test_scenario_runner.py`:
+
+- extremo exacto en curva, ambos sentidos de s y recorte de extremos pasados;
+- rechazo de carril final incompatible y progreso sin saltar a una rama cercana;
+- desaceleración por distancia de ruta, frenado con dirección y prioridad de
+  frenos por obstáculos;
+- reducción/restauración del horizonte lateral sin modificar `distance_ratio`;
+- parada, centrado, orientación y avance lento acotado al radio/carril;
+- inicio de espera después de detenerse, sin duplicar visitas.
+
+Se comprobó la nueva cobertura de las 28 rutas de referencia, y las 41 rutas
+del catálogo desde T01_133: todas permitieron completar el extremo y añadir
+guía lateral única. Esto comprueba geometría planificada; no es una prueba
+de conducción de todos los pares posibles de destinos.
+
+```powershell
+$env:CARLA_PYTHONAPI = 'C:\CARLA\WindowsNoEditor\PythonAPI\carla'
+.\carla-env\Scripts\python.exe -m unittest discover -s tests -v
+.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/multi_vehicle_trip.json --scenario history_80_20 --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+### Validación real final
+
+| Medida | random_baseline | history_80_20 |
+|---|---:|---:|
+| Iniciados / completados / aborted al límite de duración | 14 / 11 / 3 | 14 / 11 / 3 |
+| blocked / timeout / route_failed | 0 / 0 / 0 | 0 / 0 / 0 |
+| Colisiones / invasiones | 0 / 0 | 0 / 0 |
+| Distancia total (m) | 5784.41 | 5665.75 |
+| Velocidad media agregada (km/h) | 11.93 | 11.69 |
+| Máxima velocidad al completar (m/s) | 0.000925 | 0.008274 |
+| Máximo error de rumbo al completar (°) | 0.463 | 9.965 |
+| Máximo error lateral al completar (m) | 0.0054 | 0.0867 |
+| Máxima distancia al destino al completar (m) | 0.500 | 0.692 |
+| Historial final por vehículo 001/002/003 | 5 / 4 / 2 | 34 / 34 / 33 |
+
+Resultados finales:
+
+- `data/output/town01_random_baseline_seed_42_20260908T214348287830Z/`
+- `data/output/town01_history_80_20_seed_42_20260908T214121761147Z/`
+
+Las 22 llegadas coinciden con `trips_log.csv` y con las visitas añadidas a
+historial. Todas cumplen los límites de llegada; las salidas posteriores
+respetan los cinco segundos completos de espera. Coinciden entre ambos casos
+clima, semáforos y atributos de actores. También coinciden con el diagnóstico
+anterior el entorno, los modelos y la secuencia de orígenes, destinos y estados
+por vehículo. Las distancias y tiempos pueden variar por las nuevas paradas
+y su interacción con semáforos; no deben interpretarse como un efecto aislado
+de la selección 80/20. No hubo crash ni contactos en las curvas estáticas
+investigadas anteriormente, ni se eliminaron callbacks del registro.
+
+### Llegada y huella en T01_067 después de corregir
+
+`vehicle_002/trip_003` se completa en frame **2379470**, tiempo simulado
+**6813.008466 s**, cerca de `(2.0966, 317.8168)`, road 20/lane -1:
+
+- velocidad **0.000821 m/s**, aproximadamente **0.003 km/h**;
+- error lateral **+0.08665 m** y error de rumbo **-9.965°**;
+- distancia **0.692 m** al destino usado por el runner;
+- cien muestras de espera (5 s), desplazamiento residual **0.000185 m**;
+- nuevo `trip_004` desde T01_067 sin invasiones ni recuperación desde el carril
+  contrario.
+
+Al entrar en el radio de 4 m ya circula a **10.96 km/h**, frente a 19.21 km/h
+antes. Ahora tarda **8.5 s** desde esa entrada hasta completar la parada y
+alineación; después inicia los cinco segundos de espera. Antes cerraba el
+viaje inmediatamente y empleaba los primeros 1.1 s de la espera en frenar.
+La caja física permanece entre **-1.422 y +1.593 m** respecto al centro del
+carril en la ventana de 15 s anteriores y 10 posteriores a la llegada;
+los límites son ±2 m. La comparación usa la polilínea muestreada cada 0.25 m,
+incluida la continuación road 15/lane 1; no representa posiciones de neumáticos.
+
+### Artefactos, límites y siguiente paso
+
+`data/output/arrival_correction_20260908/` conserva consolas, resultados de
+pruebas unitarias, `route_preflight.json`, `catalog_route_validation.json`,
+`summary.json`, `final_audit.txt`, `reference_comparison.json`, `cleanup.json`,
+el analizador y la [figura antes/después](../data/output/arrival_correction_20260908/arrival_comparison.png)
+con su script `plot_comparison.py`. La figura se revisó visualmente.
+
+La limpieza final confirmó CARLA 0.9.15 disponible en Town01, cero vehículos
+y sensores, modo asíncrono y renderizado restaurado. No se hicieron commits
+ni se tocaron los CSV genéricos, `i-marco_teorico.tex` o `image.png`.
+
+Sigue comprobar repetibilidad y corridas más largas conservando tres vehículos;
+después, ampliar a otras semillas con ambos escenarios y los mismos criterios
+de llegada, eventos e historial. Una vez estable esa base, probar cinco
+vehículos antes de aumentar más la carga. Esta etapa no ejecutó esas pruebas
+adicionales ni amplió la flota. Una pareja de 600 s con semilla 42 no demuestra
+ausencia de fallos en cualquier ruta, modelo o densidad.
+
+## 2026-09-08 — Repetición con semilla 42 y campaña larga preparada
+
+### Alcance actualizado por el usuario
+
+Se solicitó comprobar repetibilidad, mayor duración y otras semillas. Tras
+proponer dos repeticiones de 600 s y seis corridas de 1.800 s con semillas
+42/7/123, el usuario pidió limitar la ejecución actual a semilla 42 y dejar
+las corridas largas para ejecutarlas después. Se realizaron **solo dos
+repeticiones de 600 s**, una por escenario, siempre con tres vehículos.
+Las pruebas de 1.800 s y las semillas 7/123 **no se ejecutaron**.
+
+Preflight con `carla-env`: CARLA 0.9.15, `localhost:2000`, Town01, cero actores
+de vehículo/sensor, modo asíncrono y renderizado activo. Las **80 pruebas
+unitarias pasaron**, sin skips. No se modificó la conducción, la configuración
+ni los datos de entrada; se guardaron y comprobaron sus hashes SHA-256.
+Se respetó la prohibición de hacer commits.
+
+### Resultados de las repeticiones
+
+| Medida | random_baseline | history_80_20 |
+|---|---:|---:|
+| Iniciados / completados / aborted al finalizar 600 s | 14 / 11 / 3 | 14 / 11 / 3 |
+| Colisiones / invasiones | 0 / 0 | 0 / 0 |
+| blocked / timeout / route_failed | 0 / 0 / 0 | 0 / 0 / 0 |
+| Llegadas auditadas | 11 | 11 |
+| Distancia total (m) | 5784.023 | 5665.849 |
+| Velocidad media agregada (km/h) | 11.9327 | 11.6889 |
+| Máxima velocidad al completar (m/s) | 0.042504 | 0.049980 |
+| Máximo error de rumbo al completar (°) | 0.4631 | 9.9652 |
+| Máximo error lateral al completar (m) | 0.0054 | 0.0867 |
+
+Carpetas:
+
+- `data/output/town01_random_baseline_seed_42_20260908T220730234302Z/`
+- `data/output/town01_history_80_20_seed_42_20260908T220937759845Z/`
+
+Todas las llegadas cumplen velocidad ≤0.05 m/s, rumbo ≤10°, error lateral
+≤0.5 m, radio ≤4 m y road/lane del destino. Las salidas siguientes respetan
+cinco segundos completos de espera. Coinciden las claves y conteos entre
+viajes, llegadas, visitas del historial y eventos; no se encontraron duplicados
+ni errores de integridad. Los tres `aborted` de cada corrida corresponden a
+los viajes todavía activos cuando finalizan los 600 s, no a un bloqueo.
+
+### Qué se repite y qué varía
+
+Se comparó cada escenario con la validación anterior:
+
+- baseline: `town01_random_baseline_seed_42_20260908T214348287830Z`;
+- histórico: `town01_history_80_20_seed_42_20260908T214121761147Z`.
+
+Coinciden exactamente el entorno registrado, los modelos/atributos/spawns,
+las semillas de actores y destinos, y la secuencia de origen, destino, clase
+de selección y estado de cada viaje. También se repiten los resultados de
+seguridad y las llegadas correctas. La física presenta diferencias:
+
+| Diferencia máxima frente a referencia | baseline | histórico |
+|---|---:|---:|
+| Tiempo por viaje (s) | 0.5000 | 0.1500 |
+| Distancia por viaje (m) | 0.3796 | 0.1373 |
+| Pose al mismo frame relativo (m) | 3.1215 | 1.4110 |
+| Velocidad al mismo frame relativo (m/s) | 5.7217 | 5.1586 |
+| Control normalizado al mismo frame relativo | 1.0 | 1.0 |
+
+Se normalizó el frame inicial para no confundir IDs o tiempos absolutos del
+servidor con diferencias físicas. En baseline se compararon 34.876 muestras
+comunes de control y quedaron diez exclusivas por ejecución; en histórico,
+34.882 comunes y cuatro exclusivas por ejecución. Los controles no se
+registran durante la espera, por lo que un cambio de instante de llegada
+también cambia qué frames tienen fila de control.
+
+Las distancias de la tabla comparan ejecuciones, **no miden invasión ni error
+lateral respecto al carril**. En baseline el vehículo 001 no supera 1 mm de
+diferencia de pose en los frames comparados; las primeras diferencias mayores
+de 1 mm aparecen en el vehículo 003 a unos 247.2 s y en el 002 a 251.2 s,
+cerca del tramo y≈326 durante frenadas/arranques. Se guardó
+`baseline_divergence.json` con esas muestras. Estos registros no identifican
+por sí solos un mecanismo único para la variación. No se ajustó el controlador
+para forzar identidad numérica. Si el experimento exige determinismo exacto
+por frame, queda pendiente investigarlo específicamente.
+
+### Campaña larga lista para ejecución manual
+
+Con CARLA y Town01 preparados, desde `C:\CARLA\TrafficIA`:
+
+```powershell
+.\carla-env\Scripts\python.exe -u .\data\output\reliability_campaign_20260908\run_campaign.py --long
+```
+
+Ejecutará secuencialmente 1.800 s con `random_baseline` e `history_80_20` para
+cada semilla 42, 7 y 123: seis corridas, aproximadamente 36 minutos reales a
+5× más inicialización. Mantiene tres vehículos y el historial dummy de entrada.
+La semilla del runner afecta tanto a destinos como a los modelos sorteados.
+Cada par de escenarios con la misma semilla conserva los mismos actores.
+
+El script comprueba CARLA antes y después de cada corrida, conserva consolas
+y hashes y ejecuta la auditoría al terminar. Los logs de cada corrida se
+guardan en su carpeta habitual; manifiesto, consolas y `audit.json` se guardan
+en `data/output/reliability_campaign_20260908/long/`. Si encuentra una campaña
+ya existente, la preserva y rechaza sobrescribirla. La auditoría informa de
+eventos o resultados incompletos; un callback de marca `Broken` requiere
+interpretación de la maniobra y no se convierte automáticamente en accidente.
+
+### Artefactos y cierre actual
+
+`data/output/reliability_campaign_20260908/` conserva `campaign.json`,
+`audit.json`, `audit_console.txt`, las dos consolas de corrida, `unit_tests.txt`,
+`baseline_divergence.json`, una copia del código/datos usados y los scripts
+`run_campaign.py` / `analyze_campaign.py`. Para regenerar la auditoría actual:
+
+```powershell
+.\carla-env\Scripts\python.exe .\data\output\reliability_campaign_20260908\analyze_campaign.py
+```
+
+El manifiesto confirma código/datos sin cambios y limpieza final: cero
+vehículos/sensores, modo asíncrono y renderizado restaurado. No se hicieron
+commits ni se tocaron los CSV genéricos, `i-marco_teorico.tex` o `image.png`.
+Sigue ejecutar y revisar la campaña larga antes de aumentar a cinco vehículos.
+
+## 2026-09-09 — Revisión de la campaña larga ejecutada por el usuario
+
+### Alcance y consistencia
+
+El usuario ejecutó `run_campaign.py --long` y pidió revisar los archivos.
+Se analizaron las seis corridas existentes; no se volvió a ejecutar la campaña
+ni se modificó la lógica de conducción. Continúa la instrucción de **no hacer
+commits**. Se comprobó CARLA 0.9.15 en `localhost:2000`, Town01, sin vehículos
+ni sensores. Las consultas posteriores al mapa no crearon actores ni aplicaron
+controles.
+
+La campaña abarcó 15:39:03–16:15:49 UTC, aproximadamente 36 min 46 s reales.
+Cada caso contiene 1.800 s simulados, tres vehículos, velocidad objetivo de
+20 km/h, paso fijo de 0.05 s y `controller_distance_ratio=0.1`. Se conservan
+la configuración, el historial dummy y el clima de la validación anterior.
+El entorno registrado, incluidos los semáforos reiniciados, coincide en las
+seis corridas. Los modelos cambian con la semilla; cada par baseline/histórico
+conserva exactamente modelos, atributos, spawns y semillas de actor/destino:
+
+| Semilla | vehicle_001 | vehicle_002 | vehicle_003 |
+|---|---|---|---|
+| 42 | audi.etron | volkswagen.t2_2021 | audi.tt |
+| 7 | dodge.charger_police | mini.cooper_s | mercedes.coupe |
+| 123 | dodge.charger_police_2020 | lincoln.mkz_2017 | tesla.cybertruck |
+
+Se recalculó la auditoría en `long/review/recomputed_audit.json`, sin
+sobrescribir `long/audit.json`: coincide con las seis entradas originales.
+Además se comprobaron hashes actuales de código/datos y archivos protegidos,
+configuraciones entre escenarios, fin de los `aborted`, planes de los viajes
+con eventos, controles durante las paradas y cobertura de las zonas originales.
+
+### Resultados y carpetas
+
+| Escenario | Semilla | completed | timeout | route_failed | blocked | aborted | Colisiones | Invasiones |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| random_baseline | 42 | 34 | 1 | 1 | 0 | 2 | 0 | 0 |
+| history_80_20 | 42 | 31 | 1 | 1 | 0 | 3 | 0 | 0 |
+| random_baseline | 7 | 25 | 2 | 1 | 0 | 3 | 0 | 0 |
+| history_80_20 | 7 | 31 | 1 | 2 | 0 | 3 | 0 | 0 |
+| random_baseline | 123 | 26 | 3 | 2 | 1 | 3 | 0 | 8 |
+| history_80_20 | 123 | 27 | 2 | 2 | 0 | 3 | 0 | 2 |
+
+Carpetas, todas bajo `data/output/`, en el orden de la tabla:
+
+- `town01_random_baseline_seed_42_20260909T153906001597Z/`
+- `town01_history_80_20_seed_42_20260909T154514290754Z/`
+- `town01_random_baseline_seed_7_20260909T155121892849Z/`
+- `town01_history_80_20_seed_7_20260909T155729474918Z/`
+- `town01_random_baseline_seed_123_20260909T160337039179Z/`
+- `town01_history_80_20_seed_123_20260909T160944644590Z/`
+
+Son 211 registros de viaje: 174 completados, 20 terminaciones por
+`timeout`/`route_failed`/`blocked` y 17 activos al finalizar la duración
+(`aborted`). Los 174 completados tienen una llegada y una visita nueva al
+historial, sin duplicados ni errores de integridad. Máximos al completar:
+velocidad **0.046718 m/s**, error de rumbo **9.996391°**, error lateral
+**0.114617 m**. Todos cumplen radio ≤4 m, carril del destino y distancia
+restante de ruta ≤0.5 m; las salidas posteriores respetan cinco segundos de
+espera. Los 17 `aborted` coinciden con el corte temporal, no con un fallo.
+
+`exit=0` acredita fin normal del proceso, no ausencia de incidencias de
+comportamiento. La advertencia final de la auditoría es correcta.
+
+### Nueve route_failed: destino detrás del origen en el mismo tramo
+
+Los mensajes de consola rechazan planes cuyo punto final queda entre 23.20 y
+175.06 m del destino. Se reprodujeron los nueve casos con el mapa real y la
+SDK instalada, sin circular: `_localize` asigna origen y destino a la misma
+arista dirigida del grafo y el destino está detrás en el sentido de marcha.
+`_path_search` devuelve esa única arista. En `GlobalRoutePlanner.trace_route`,
+la condición `closest_index > destination_index` termina el recorrido tras
+añadir un solo waypoint próximo al origen.
+
+| Escenario / semilla | Vehículo / viaje | Origen → destino | Error final (m) |
+|---|---|---|---:|
+| baseline / 42 | 002 / 009 | POSITION_AFTER_TRIP_008 → T01_027 | 175.06 |
+| histórico / 42 | 002 / 010 | T01_045 → T01_084 | 87.85 |
+| baseline / 7 | 002 / 002 | T01_032 → T01_041 | 142.88 |
+| histórico / 7 | 002 / 005 | T01_020 → T01_084 | 151.85 |
+| histórico / 7 | 003 / 007 | T01_030 → T01_037 | 56.23 |
+| baseline / 123 | 003 / 007 | T01_032 → T01_039 | 112.48 |
+| baseline / 123 | 003 / 010 | POSITION_AFTER_TRIP_009 → T01_037 | 26.23 |
+| histórico / 123 | 001 / 004 | T01_010 → T01_006 | 69.13 |
+| histórico / 123 | 003 / 007 | T01_032 → T01_030 | 23.20 |
+
+El rechazo ocurre en `src/route_planner.py:plan_route`, antes de la cola de
+llegada y de su continuación para orientar el vehículo. No lo causa el
+frenado. El grafo contiene un camino dirigido de vuelta desde la salida del
+tramo a su entrada en los nueve casos; no basta con declarar esos destinos
+inaccesibles.
+
+Se amplió la comprobación a **42 × 41 = 1.722 pares** distintos del catálogo,
+con `plan_route`, `arrival_route` y `steering_continuation`: 1.662 válidos y
+60 fallidos en el mismo tramo. La comprobación anterior desde un solo origen
+no cubría este caso. Propuesta pendiente: construir el circuito hacia delante
+cuando el destino queda detrás, conservando el rechazo de planes truncados y
+la dirección legal del carril. No se relajó el umbral ni se quitaron destinos.
+
+### Diez timeout: presupuesto de 300 s con esperas de tráfico
+
+Los diez viajes duran 300.000004 s, el límite configurado. Sus controles
+acumulan **82.70–167.25 s con velocidad <0.2 m/s**, pero ninguna parada
+continua supera **32.35 s**; todos avanzaron en los últimos 30 s del viaje
+(entre 12.96 y 160.52 m). En esos viajes no aparece velocidad objetivo cero
+ni la fase de alineación a 1 km/h.
+
+Entre el 97.96 % y el 98.80 % de las muestras casi detenidas coinciden con
+`brake=0.5`, el freno de seguridad del BasicAgent instalado. Entre el 99.56 %
+y el 100 % están a menos de 12 m de un punto de parada de semáforo. Es evidencia
+consistente con esperas de tráfico repetidas que consumen el presupuesto; los
+logs no registran el motivo de frenado ni el estado del semáforo en cada frame,
+por lo que no se atribuye cada parada de manera concluyente a una luz roja.
+
+El caso más próximo a llegar es baseline/123, vehículo 003, viaje 009 hacia
+T01_035: termina con 1.75 m de ruta restante y 1.98 m/s. Los otros nueve
+conservan entre 107.12 y 328.97 m de ruta. Aumentar indiscriminadamente el
+límite podría ocultar otro fallo: queda distinguir tiempo total, espera por
+tráfico y falta de progreso, y evaluar un presupuesto relacionado con la ruta.
+
+### Un blocked: discontinuidad de IDs durante la alineación de llegada
+
+Baseline/123, vehículo 003 (Cybertruck), viaje 004 de T01_068 a T01_067.
+Tras 11.1 s con objetivo de alineación de 1 km/h, el centro cruza la unión
+`road/lane=20/-1 → 15/+1`. Es la continuación dirigida del carril seguida por
+el plan, aunque cambien los IDs y el signo de `lane_id`.
+
+En el frame **161516**, a t=7999.271093 s del servidor, la consulta del mapa
+pasa a `15/+1`, a unos 0.91 m del destino. El rumbo aún difiere 12.48° del
+carril. `is_at_destination` exige igualdad exacta con `20/-1`, por lo que
+`trip.approach.settling` pasa a falso. La distancia restante ya es cero y
+`approach_control` ordena freno completo. Sin avance no puede terminar de
+orientarse; aproximadamente 60 s después finaliza como `blocked`.
+
+Pose final: `(2.071657, 317.599640)`, rumbo `-102.47199°`, error lateral
+aproximado `+0.0617 m`, distancia al destino `0.906538 m`. No hay visita falsa
+al historial. **Esta es una limitación de la corrección de llegada anterior**,
+que no apareció con los modelos de semilla 42.
+
+Propuesta pendiente: representar un corredor de llegada acotado sobre el
+carril y su continuación dirigida verificada, manteniendo rechazo de carril
+contrario/adyacente, parada, radio, centrado y orientación. También hay que
+comprobar el límite de avance de alineación para impedir deriva indefinida.
+
+### Diez invasiones del Cybertruck: dos maniobras distintas
+
+Todas corresponden a `vehicle_003` con semilla 123. Su caja mide aproximadamente
+**6.274 × 2.390 m**. Los planes implicados no contienen `CHANGELANELEFT` ni
+`CHANGELANERIGHT`. No hay callbacks de colisión.
+
+Ocho eventos de marca **NONE** se agrupan en cuatro pasos por la curva cerca
+de `(8, 2)`, de `road/lane=13/-1` a `3/+1`:
+
+| Escenario | Viaje | Frames de los callbacks |
+|---|---|---|
+| baseline | 004 | 158416, 158427 |
+| baseline | 005 | 163986, 163996 |
+| baseline | 009 | 172947, 172955 |
+| histórico | 009 | 201115, 201128 |
+
+Ocurren a unos 19.4–19.9 km/h, con objetivo 20 km/h y cientos de metros de
+ruta restante: no son el frenado de llegada. La reconstrucción de las cuatro
+esquinas XY del sensor, usando pose y caja registradas, coloca la esquina
+trasera derecha fuera del borde exterior durante esos pasos. Frente a una
+referencia del mapa muestreada cada 0.25 m, los máximos por paso exceden el
+semiancho de 2 m en aproximadamente **2.3–6.5 cm**. La consulta puntual del
+mapa ubica esa esquina en `Shoulder` o fuera de las superficies reconocidas
+en parte de la ventana. `NONE` indica ausencia de marca pintada y no demuestra
+una colisión; tampoco basta para descartar el cruce. Aquí se reconstruyó la
+huella del sensor con yaw: no se guardaron los ocho vértices físicos en esta
+zona y no se afirma esa precisión centimétrica para toda la carrocería real.
+
+Los otros dos eventos son **Broken**, baseline/123, viaje 004 al llegar a
+T01_067: frame **161256**, cerca de `(3.16, 321.79)`, a 10.72 km/h durante
+desaceleración; frame **161369**, cerca de `(2.14, 318.58)`, a 1.20 km/h
+durante alineación. La esquina delantera izquierda cruza al carril contrario
+y regresa. En esta zona sí están registrados los ocho vértices físicos:
+entre frames 161230–161420, su proyección lateral mínima es **-2.175118 m**,
+frente a borde izquierdo de -2 m; máxima derecha +1.893712 m. La caja invade
+transitoriamente unos **0.175 m** el carril contrario. Ambos callbacks son
+durante viaje activo; no reaparece el mecanismo antiguo de terminar a
+19 km/h y poner dirección cero durante la espera.
+
+La evidencia identifica un problema de seguimiento/holgura para este modelo,
+pero aún no establece qué ajuste lo resuelve. Antes de cambiar ganancias o
+descartar el vehículo, se debe contrastar curvatura, puntos objetivo, velocidad
+y dimensiones, y validar una aproximación que mantenga la huella en el carril.
+No se filtraron callbacks ni se modificó el controlador en esta revisión.
+
+### Zonas originales, pruebas y próximos pasos
+
+Las seis corridas recorren ambas zonas originalmente investigadas, sin
+contactos. Como medida de cobertura se contaron secuencias consecutivas de
+frames de control dentro de un radio de 12 m por vehículo/viaje: 14–20 por
+corrida cerca de `(96, 202)` y 10–13 cerca de `(98, 325)`. Es cobertura de zona,
+no un conteo de giros idénticos.
+
+Se ejecutó con `carla-env` y `CARLA_PYTHONAPI` la suite existente:
+**80 pruebas, OK**, sin omisiones. Ese resultado no cubre todavía las nuevas
+regresiones identificadas ni sustituye las seis corridas reales analizadas.
+La revisión dejó CARLA disponible, Town01, cero vehículos/sensores, modo
+asíncrono y renderizado activo. No se tocaron los CSV genéricos ni
+`i-marco_teorico.tex` o `image.png`; sus hashes coinciden con los preservados.
+
+Mantener **tres vehículos**. Orden propuesto para la siguiente corrección:
+
+1. Resolver rutas de retorno en el mismo tramo y comprobar los 1.722 pares,
+   también orígenes de recuperación tras un viaje fallido.
+2. Corregir la continuidad de llegada en uniones de tramos, con regresión
+   específica del Cybertruck en T01_067 y rechazo del carril contrario.
+3. Validar el seguimiento y la huella del Cybertruck en las dos curvas con
+   observación física ampliada; modificar la conducción solo con esa evidencia.
+4. Distinguir y revisar los límites temporales para rutas largas con esperas.
+5. Pasar pruebas unitarias y corridas reales focalizadas; después repetir ambos
+   escenarios, semillas 42/7/123 y 1.800 s. No aumentar la flota todavía.
+
+### Artefactos de esta revisión
+
+Todo el diagnóstico adicional está bajo
+`data/output/reliability_campaign_20260908/long/review/`:
+
+- `review_summary.json`, `recomputed_audit.json`: consistencia, llegadas,
+  configuraciones, paradas, cobertura y hashes de auditoría/manifiesto originales.
+- `log_review.json` y dos CSV de aproximación: estados fallidos y ventanas de
+  control alrededor de los eventos.
+- `map_review.json`: reproducción de los nueve fallos, 1.722 pares del
+  catálogo, semáforos y referencias geométricas.
+- `geometry_review.json`, `northwest_footprint_review.json`: esquinas,
+  transición de IDs y proyección de vértices físicos/huella reconstruida.
+- [invasion_geometry.png](../data/output/reliability_campaign_20260908/long/review/invasion_geometry.png): vista de las dos maniobras.
+- `unit_tests.txt`, `server_at_review_end.json`, scripts de inspección y
+  consolas: permiten reproducir la revisión sin sobrescribir los logs originales.
+
+Se actualizaron README y esta bitácora. No se hicieron commits ni cambios
+adicionales en `src/`, `tests/`, `config/` o datos de entrada.
+
+## 2026-09-09 — Alineación con los objetivos de graduación
+
+Después de revisar la campaña, el estudiante aclaró que las invasiones de
+carril son una métrica prevista y que la conducción no necesita ser perfecta.
+Se consultaron `protocolo-final.tex` (objetivos y metodología) y
+`i-marco_teorico.tex` (métricas, cobertura y comparación). El objetivo
+específico 3 incluye expresamente distribución de destinos, tiempo promedio
+de viaje, velocidad media y tasa de incidentes o invasiones de carril.
+
+Se creó [project-graduation-context.md](../project-graduation-context.md) con
+los objetivos transcritos literalmente, alcance, fuentes, estado comprobado,
+criterios de medición y propuestas pendientes. Se añadió su enlace al README
+y se actualizaron las prioridades para futuras sesiones.
+
+**Se sustituye la recomendación anterior de eliminar las invasiones del
+Cybertruck como requisito previo para avanzar.** Se conservarán como
+observaciones, con unidad de evento y exposición explícitas. No se ajustará
+el controlador solo para lograr cero invasiones ni se excluirán corridas
+por tener resultados desfavorables. Si un comportamiento impide los viajes
+o incumple el ODD declarado, se investigará por esa razón.
+
+Siguen siendo prioritarios los errores de rutas truncadas y de reconocimiento
+de llegada: pueden alterar las distribuciones observadas y la finalización
+de viajes. El límite de 300 s necesita una política común entre tratamientos;
+las esperas seguirán contando en el tiempo de viaje, aunque se use otro
+contador para detectar falta de progreso. Los viajes incompletos se informan
+por separado y no se convierten en tiempos completos.
+
+Tras esas correcciones y la definición/verificación de las métricas, queda
+concretar el ODD experimental y **dos niveles de demanda**, exigidos por el
+objetivo 1. Los selectores baseline/histórico no son esos dos niveles. No se
+han fijado cantidades finales ni se da por acordado que sean tres y cinco
+vehículos. La comparación deberá cruzar selector y demanda con condiciones
+controladas y repeticiones documentadas.
+
+En esta actualización solo se editó documentación. No se ejecutaron
+simulaciones ni se modificaron el protocolo, el marco teórico, el controlador
+o los datos de entrada. No se hicieron commits.
+
+### Aclaración posterior y autorización de commits
+
+El estudiante confirmó que los dos niveles de demanda corresponden a
+distintas cantidades de vehículos simultáneos. Se pospone la elección de
+esas cantidades hasta completar los puntos 1–3: correcciones de rutas y
+llegadas, política temporal y cálculo de métricas.
+
+Autorizó crear Conventional Commits del estado acumulado antes de continuar.
+Se revisó el diff y se ejecutó la suite existente: 80 pruebas aprobadas con
+`carla-env`. Se separan navegación/llegada, instrumentación de diagnóstico y
+documentación; se excluyen los CSV genéricos, `i-marco_teorico.tex`,
+`protocolo-final.tex`, `image.png` y resultados generados. Los cambios nuevos
+de los puntos 1–3 quedarán sin commit hasta otra indicación.
