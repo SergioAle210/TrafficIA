@@ -19,7 +19,7 @@
   "exploration_probability": 0.2,
   "arrival_threshold_m": 4.0,
   "destination_dwell_time_seconds": 5.0,
-  "max_trip_time_seconds": 300.0,
+  "max_trip_time_seconds": null,
   "blocked_speed_threshold_mps": 0.2,
   "blocked_time_threshold_seconds": 60.0,
   "trajectory_sampling_interval_seconds": 0.5,

@@ -124,6 +124,7 @@ class RunnerScenarioTests(unittest.TestCase):
             "build_global_route_planner": Mock(),
             "plan_route": Mock(return_value=["fake road route"]),
             "arrival_route": Mock(side_effect=lambda route, goal: route),
+            "ArrivalLaneCorridor": Mock(),
             "steering_continuation": Mock(side_effect=lambda route, distance: route),
             "ArrivalApproach": Mock(side_effect=lambda route: SimpleNamespace(
                 update=lambda location: 50.0, remaining_m=50.0,
@@ -217,7 +218,7 @@ class RunnerScenarioTests(unittest.TestCase):
                 with (output / "run_config.json").open(encoding="utf-8") as file:
                     metadata = json.load(file)
                 self.assertEqual(metadata["scenario"], mode)
-                self.assertEqual(metadata["metrics_semantics_version"], 2)
+                self.assertEqual(metadata["metrics_semantics_version"], 3)
                 self.assertEqual([v["carla_actor_id"] for v in metadata["vehicles"]], [101, 102, 103])
                 self.assertIn("CollinearSafeBasicAgent", metadata["route_planning"]["controller_compatibility_fix"])
                 self.assertEqual(metadata["environment"]["weather"]["sun_altitude_angle"], 70.0)

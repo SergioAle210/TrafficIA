@@ -29,9 +29,10 @@ from src.route_planner import (
 from src.run_logger import RunLogger
 from src.navigation_diagnostics import RouteTrace
 from src.arrival import (
-    ArrivalApproach, approach_control, stopped_and_aligned, alignment_errors, is_aligned,
+    ArrivalApproach, ArrivalLaneCorridor, approach_control, stopped_and_aligned, alignment_errors, is_aligned,
     APPROACH_DECELERATION_MPS2, STOP_MARGIN_M, STOPPED_SPEED_MPS,
     ALIGNMENT_TOLERANCE_DEG, CENTER_TOLERANCE_M, STEERING_CONTINUATION_M, ALIGNMENT_SPEED_KMH,
+    ARRIVAL_CONTINUATION_LIMIT_M,
 )
 from src.vehicle_history import (
     DestinationDecision,
@@ -66,7 +67,7 @@ class TripSimulationConfig:
     exploration_probability: float
     arrival_threshold_m: float
     destination_dwell_time_seconds: float
-    max_trip_time_seconds: float
+    max_trip_time_seconds: Optional[float]
     blocked_speed_threshold_mps: float
     blocked_time_threshold_seconds: float
     trajectory_sampling_interval_seconds: float
@@ -119,6 +120,10 @@ class TripSimulationConfig:
         return config
 
     def validate(self) -> None:
+        if self.max_trip_time_seconds is not None and (
+            not math.isfinite(self.max_trip_time_seconds) or self.max_trip_time_seconds <= 0
+        ):
+            raise ValueError("max_trip_time_seconds debe ser null o un número finito positivo.")
         if not math.isfinite(self.controller_distance_ratio) or self.controller_distance_ratio < 0:
             raise ValueError("controller_distance_ratio debe ser finito y no negativo.")
         spawn_point_indices = self.resolved_spawn_point_indices()
@@ -143,7 +148,6 @@ class TripSimulationConfig:
             "duration_seconds": self.duration_seconds,
             "fixed_delta_seconds": self.fixed_delta_seconds,
             "arrival_threshold_m": self.arrival_threshold_m,
-            "max_trip_time_seconds": self.max_trip_time_seconds,
             "blocked_time_threshold_seconds": self.blocked_time_threshold_seconds,
             "trajectory_sampling_interval_seconds": self.trajectory_sampling_interval_seconds,
             "route_sampling_resolution_m": self.route_sampling_resolution_m,
@@ -205,6 +209,9 @@ class ActiveTrip:
     last_trajectory_sample_time_s: Optional[float] = None
     route_trace: Any = None
     approach: Any = None
+    arrival_corridor: Any = None
+    last_update_time_s: Optional[float] = None
+    stopped_time_s: float = 0.0
 
     @property
     def trip_id(self) -> str:
@@ -277,6 +284,10 @@ class VehicleState:
     total_lane_invasions: int = 0
     total_distance_traveled_m: float = 0.0
     total_trip_duration_s: float = 0.0
+    observed_distance_m: float = 0.0
+    observed_time_s: float = 0.0
+    exposure_last_location: Any = None
+    exposure_last_time_s: Optional[float] = None
     actual_initial_spawn_point_index: Optional[int] = None
     actual_initial_spawn_location: Optional[Dict[str, float]] = None
     initial_spawn_position_error_m: Optional[float] = None
@@ -288,16 +299,19 @@ def speed_mps(vector: Any) -> float:
     return math.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
 
 
-def is_at_destination(carla_map: Any, location: Any, destination: Any, threshold_m: float) -> bool:
+def is_at_destination(carla_map: Any, location: Any, destination: Any, threshold_m: float,
+                      continuation: Any = None) -> bool:
     """A nearby opposing/adjacent lane is not an arrival on the destination lane."""
 
     if location.distance(destination) > threshold_m:
         return False
     current = carla_map.get_waypoint(location, project_to_road=True)
     goal = carla_map.get_waypoint(destination, project_to_road=True)
-    return current is not None and goal is not None and (
-        current.road_id, current.lane_id
-    ) == (goal.road_id, goal.lane_id)
+    if current is None or goal is None:
+        return False
+    if (current.road_id, current.lane_id) == (goal.road_id, goal.lane_id):
+        return True
+    return continuation is not None and continuation.contains(current, location)
 
 
 def safe_vehicle_blueprints(world: Any, blueprint_filter: str) -> List[Any]:
@@ -547,7 +561,19 @@ class TripSimulation:
             "map": self.config.town,
             "seed": self.config.seed,
             "scenario": self.config.destination_selection_mode,
-            "metrics_semantics_version": 2,
+            "metrics_semantics_version": 3,
+            "measurement_scope": {
+                "fleet": "every vehicle from common start to end, including dwell and failed-trip waits; per-tick distance",
+                "legacy_trip_fields": "total_distance_traveled_m and aggregate_average_speed_* retain active-trip intervals only",
+                "stopped_time_s": "active-trip right-endpoint tick integration at speed below blocked_speed_threshold_mps",
+            },
+            "trip_time_policy": {
+                "max_trip_time_seconds": self.config.max_trip_time_seconds,
+                "null_meaning": "no independent trip deadline; active trips are aborted at simulation end",
+                "blocked_time_threshold_seconds": self.config.blocked_time_threshold_seconds,
+                "blocked_meaning": "continuous speed below threshold; does not classify traffic-light versus physical blockage",
+                "travel_time": "all simulated time since departure, including stops",
+            },
             "event_counting": {
                 "totals_scope": "all drained sensor callbacks, including destination dwell",
                 "collision_unit": "raw sensor callback, not unique accident",
@@ -573,8 +599,8 @@ class TripSimulation:
                 "meaning": "Wall-clock pacing target only; simulated time remains fixed_delta_seconds per tick.",
             },
             "arrival_threshold_m": self.config.arrival_threshold_m,
-            "arrival_policy": "route end reached, within arrival_threshold_m on destination road/lane, stopped and aligned",
-            "arrival_policy_version": 2,
+            "arrival_policy": "route end reached, within radius on destination lane or bounded verified forward continuation, stopped and aligned",
+            "arrival_policy_version": 3,
             "arrival_control": {
                 "deceleration_mps2": APPROACH_DECELERATION_MPS2,
                 "stop_margin_m": STOP_MARGIN_M,
@@ -582,6 +608,7 @@ class TripSimulation:
                 "alignment_tolerance_deg": ALIGNMENT_TOLERANCE_DEG,
                 "center_tolerance_m": CENTER_TOLERANCE_M,
                 "steering_continuation_m": STEERING_CONTINUATION_M,
+                "arrival_continuation_limit_m": ARRIVAL_CONTINUATION_LIMIT_M,
                 "alignment_speed_kmh": ALIGNMENT_SPEED_KMH,
                 "approach_base_purge_distance_m": "max(1, stock_base * target_speed/cruise_speed); cruise retains stock base",
                 "speed_envelope": "min(cruise, sqrt(2*a*max(route_remaining-stop_margin, 0)))",
@@ -793,6 +820,7 @@ class TripSimulation:
             route = arrival_route(route, carla_map.get_waypoint(destination_location))
             approach = ArrivalApproach(route)
             control_route = steering_continuation(route, STEERING_CONTINUATION_M)
+            arrival_corridor = ArrivalLaneCorridor(control_route[len(route)-1:])
             route_start_offset_m = validate_route_start(
                 route,
                 origin_location,
@@ -844,6 +872,7 @@ class TripSimulation:
             history_visit_count_before=decision.visit_count_before,
             selection_candidate_count=decision.candidate_count,
             approach=approach,
+            arrival_corridor=arrival_corridor,
         )
         state.next_trip_number += 1
         if self.config.navigation_diagnostics_enabled:
@@ -904,6 +933,14 @@ class TripSimulation:
                 "collision_count": trip.collision_count,
                 "lane_invasion_count": trip.lane_invasion_count,
                 "status": status,
+                "end_sim_time_s": now_s,
+                "stopped_time_s": trip.stopped_time_s,
+                "max_trip_time_seconds": self.config.max_trip_time_seconds,
+                "termination_reason": {
+                    "completed": "stopped_aligned_arrival", "timeout": "trip_time_limit",
+                    "blocked": "continuous_low_speed", "aborted": "simulation_end",
+                    "route_failed": "route_planning_rejected",
+                }[status],
             }
         )
 
@@ -1036,10 +1073,15 @@ class TripSimulation:
         trip.distance_traveled_m += trip.last_location.distance(location)
         trip.last_location = location
         current_speed = speed_mps(vehicle.get_velocity())
+        interval_s = max(0.0, now_s - (trip.last_update_time_s if trip.last_update_time_s is not None
+                                      else trip.departure_time_s))
+        if current_speed < self.config.blocked_speed_threshold_mps:
+            trip.stopped_time_s += interval_s
+        trip.last_update_time_s = now_s
         trip.approach.update(location)
         at_destination = (trip.approach.remaining_m <= STOP_MARGIN_M
                           and is_at_destination(carla_map, location, trip.destination_location,
-                                                self.config.arrival_threshold_m))
+                                                self.config.arrival_threshold_m, trip.arrival_corridor))
         # Steering cannot align a stationary car. Complete the final orientation
         # at walking speed, only while still in the destination radius and lane.
         trip.approach.settling = at_destination and not is_aligned(
@@ -1062,7 +1104,8 @@ class TripSimulation:
                     route_remaining_m=trip.approach.remaining_m,
                 ))
             self._finish_trip(now_s, "completed", state)
-        elif now_s - trip.departure_time_s >= self.config.max_trip_time_seconds:
+        elif (self.config.max_trip_time_seconds is not None
+              and now_s - trip.departure_time_s >= self.config.max_trip_time_seconds):
             self._finish_trip(now_s, "timeout", state)
         elif now_s - trip.last_moving_time_s >= self.config.blocked_time_threshold_seconds:
             self._finish_trip(now_s, "blocked", state)
@@ -1118,8 +1161,20 @@ class TripSimulation:
                 "observed_destination_distribution": json.dumps(
                     distribution, ensure_ascii=False, sort_keys=True
                 ),
+                "total_observed_distance_m": sum(s.observed_distance_m for s in self.vehicle_states),
+                "total_vehicle_time_s": sum(s.observed_time_s for s in self.vehicle_states),
             }
         )
+
+    @staticmethod
+    def _sample_vehicle_exposure(state: VehicleState, now_s: float) -> None:
+        """Measure the same full observation interval as the event counters."""
+        location = state.actor.get_location()
+        if state.exposure_last_time_s is not None:
+            state.observed_time_s += max(0.0, now_s - state.exposure_last_time_s)
+            state.observed_distance_m += location.distance(state.exposure_last_location)
+        state.exposure_last_time_s = now_s
+        state.exposure_last_location = location
 
     def _load_vehicle_histories(self) -> None:
         if self.config.destination_selection_mode == "random_baseline":
@@ -1322,6 +1377,7 @@ class TripSimulation:
                 active_map, self.config.route_sampling_resolution_m
             )
             for state in self.vehicle_states:
+                self._sample_vehicle_exposure(state, start_sim_time_s)
                 self._start_trip(
                     carla,
                     active_map,
@@ -1338,6 +1394,7 @@ class TripSimulation:
                 now_s = snapshot.timestamp.elapsed_seconds
                 elapsed_s = now_s - start_sim_time_s
                 for state in self.vehicle_states:
+                    self._sample_vehicle_exposure(state, now_s)
                     self._drain_events(now_s, state)
                     self._update_active_trip(
                         active_map, state.actor, frame, now_s, state

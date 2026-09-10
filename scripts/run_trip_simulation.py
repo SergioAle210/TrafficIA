@@ -27,6 +27,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--town", help="Sobrescribe el mapa esperado del JSON.")
     parser.add_argument("--seed", type=int, help="Sobrescribe la semilla del JSON.")
     parser.add_argument("--seconds", type=float, help="Sobrescribe la duración simulada.")
+    parser.add_argument("--max-trip-seconds", type=float,
+                        help="Límite por viaje en segundos simulados; 0 lo desactiva hasta el fin de corrida.")
     parser.add_argument(
         "--scenario",
         choices=("random_baseline", "history_80_20"),
@@ -81,6 +83,8 @@ def configuration_from_args(args: argparse.Namespace) -> TripSimulationConfig:
         overrides["seed"] = args.seed
     if args.seconds is not None:
         overrides["duration_seconds"] = args.seconds
+    if getattr(args, "max_trip_seconds", None) is not None:
+        overrides["max_trip_time_seconds"] = args.max_trip_seconds if args.max_trip_seconds != 0 else None
     if args.scenario is not None:
         overrides["destination_selection_mode"] = args.scenario
     if args.history_in is not None:

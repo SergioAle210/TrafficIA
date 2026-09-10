@@ -16,6 +16,39 @@ ALIGNMENT_TOLERANCE_DEG = 10.0
 CENTER_TOLERANCE_M = 0.5
 STEERING_CONTINUATION_M = 6.0
 ALIGNMENT_SPEED_KMH = 1.0
+ARRIVAL_CONTINUATION_LIMIT_M = 3.0
+
+
+class ArrivalLaneCorridor:
+    """A bounded part of the already verified, unique forward continuation.
+
+    CARLA changes road/lane IDs at seams in a continuous driving lane. Accept
+    only IDs and longitudinal intervals actually traversed by that support;
+    retaining the 3 m goal radius bounds alignment beyond the stopping point.
+    This does not add new steering targets or relax stopped/aligned checks.
+    """
+
+    def __init__(self, continuation):
+        self.goal = continuation[0][0].transform.location
+        self.intervals = {}
+        distance = 0.0
+        previous = self.goal
+        for wp, _ in continuation:
+            distance += previous.distance(wp.transform.location)
+            previous = wp.transform.location
+            if distance > ARRIVAL_CONTINUATION_LIMIT_M + 1e-6:
+                break
+            key = (wp.road_id, wp.section_id, wp.lane_id)
+            low, high = self.intervals.get(key, (wp.s, wp.s))
+            self.intervals[key] = (min(low, wp.s), max(high, wp.s))
+
+    def contains(self, waypoint, location):
+        if location.distance(self.goal) > ARRIVAL_CONTINUATION_LIMIT_M:
+            return False
+        interval = self.intervals.get((waypoint.road_id, waypoint.section_id, waypoint.lane_id))
+        # Support is sampled at 0.5 m. Include the seam before the first sample
+        # of a new road, while the physical goal radius still bounds extension.
+        return interval is not None and interval[0] - 0.5 <= waypoint.s <= interval[1] + 0.5
 
 
 class ArrivalApproach:

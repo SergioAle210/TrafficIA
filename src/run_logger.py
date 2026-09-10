@@ -16,7 +16,8 @@ TRIP_FIELDS = [
     "history_visit_count_before", "selection_candidate_count", "departure_sim_time_s",
     "arrival_sim_time_s", "travel_time_s", "distance_traveled_m",
     "average_speed_mps", "average_speed_kmh", "collision_count",
-    "lane_invasion_count", "status",
+    "lane_invasion_count", "status", "end_sim_time_s", "stopped_time_s",
+    "max_trip_time_seconds", "termination_reason",
 ]
 HISTORY_FIELDS = [
     "run_id", "vehicle_id", "sequence", "destination_id", "source", "trip_id",
@@ -35,7 +36,7 @@ METRICS_FIELDS = [
     "run_id", "vehicle_count", "trips_started", "trips_completed", "trips_incomplete",
     "simulation_duration_s", "total_distance_traveled_m", "aggregate_average_speed_mps",
     "aggregate_average_speed_kmh", "total_collisions", "total_lane_invasions",
-    "observed_destination_distribution",
+    "observed_destination_distribution", "total_observed_distance_m", "total_vehicle_time_s",
 ]
 
 
