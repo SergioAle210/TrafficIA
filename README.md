@@ -6,8 +6,8 @@ antes de proponer cambios a la simulación o requisitos de aceptación.
 
 Base técnica para crear tráfico urbano controlado y reproducible en **CARLA
 0.9.15**. Conserva la primera iteración de tráfico estable y añade una prueba
-acotada de un vehículo reutilizado que ejecuta viajes sucesivos con selección de
-destino, ruta explícita, sensores y registros por corrida.
+de vehículos simultáneos reutilizados que ejecutan viajes sucesivos con selección
+de destino, ruta explícita, sensores y registros por corrida.
 
 ## Requisitos
 
@@ -439,7 +439,10 @@ en m/s. A 20 km/h, la reducción empieza aproximadamente 10.8 m antes del
 destino. Al alcanzar el margen final de 0.5 m, frena completamente conservando
 la dirección calculada por el agente si está centrado y alineado. Si todavía
 necesita orientarse, avanza con objetivo de 1 km/h mientras permanezca dentro
-del radio y del carril del destino, y frena al cumplir ambos límites. Los
+del radio y del carril del destino, y frena al cumplir ambos límites. Desde
+`arrival_policy_version=3`, también reconoce cambios de IDs sobre la
+continuación dirigida y única de ese carril, limitada a 3 m del destino.
+Se conservan la parada, el centrado y la orientación requeridos. Los
 obstáculos y semáforos pueden frenar
 antes; la aproximación no anula esas decisiones.
 
@@ -456,7 +459,7 @@ oficial: `max(1, 3 * velocidad_objetivo / velocidad_crucero)`. El término
 `distance_ratio=0.1`, las ganancias PID y el límite de cambio de dirección se
 conservan. El radio base vuelve a 3 m al circular a velocidad de crucero.
 
-`arrival_policy_version=2` identifica esta semántica en `run_config.json`;
+`arrival_policy_version=3` identifica la semántica actual en `run_config.json`;
 `arrival_control` registra sus límites. Los tiempos de viaje ahora incluyen el
 frenado y la espera contiene cinco segundos completos después de la parada.
 Por ello los tiempos y la cantidad de viajes en 600 s no son directamente
@@ -591,7 +594,7 @@ Los modos anteriores `cyclic` y `stochastic` siguen disponibles mediante JSON.
 | `seed`, `target_speed_kmh` | `42`, `20` |
 | `duration_seconds`, `fixed_delta_seconds` | `600`, `0.05` s simulados |
 | `arrival_threshold_m`, `destination_dwell_time_seconds` | `4` m, `5` s |
-| `max_trip_time_seconds` | `300` s por viaje |
+| `max_trip_time_seconds` | `null`: sin límite independiente; corte al terminar la corrida |
 | `blocked_speed_threshold_mps`, `blocked_time_threshold_seconds` | `0.2` m/s durante `60` s |
 | `trajectory_sampling_interval_seconds` | `0.5` s |
 | `routine_destination_count`, `routine_probability`, `exploration_probability` | `3`, `0.8`, `0.2`; no intervienen en baseline |
@@ -600,6 +603,12 @@ Los modos anteriores `cyclic` y `stochastic` siguen disponibles mediante JSON.
 valores correspondientes. `--simulation-speed` controla el objetivo de ritmo
 real, no la física: 600 segundos son tiempo simulado y pueden tardar más en un
 equipo lento. Si usas `--no-rendering`, úsalo en ambas corridas.
+
+`--max-trip-seconds 300` reproduce el límite anterior por viaje y
+`--max-trip-seconds 0` lo desactiva. La configuración multivehículo usa ahora
+`null`; el detector de velocidad baja durante 60 s se mantiene. Esto permite
+viajes de más de 300 s sin convertirlos en llegadas: si siguen activos al corte
+global se registran como `aborted`. Las esperas permanecen en el tiempo de viaje.
 
 Para el carro de índice `i` (empezando en cero), la semilla de destinos es
 `seed + i * 1000003`; la de modelo/color vehicular suma uno más. Los sorteos
@@ -644,6 +653,16 @@ data/output/town01_history_80_20_seed_42_<fechaUTC>/
   Desde `metrics_semantics_version=2`, los totales de eventos incluyen las
   esperas, por lo que pueden superar la suma de los eventos por viaje.
   `total_collisions` cuenta callbacks, no accidentes independientes.
+  La versión 3 añade `total_observed_distance_m` y `total_vehicle_time_s`,
+  medidos cada tick para toda la presencia de los vehículos, incluidas esperas.
+  Los campos previos de distancia y velocidad conservan su ámbito de viajes
+  activos para no cambiar retroactivamente su significado.
+
+Los viajes nuevos incluyen `end_sim_time_s`, `termination_reason`,
+`max_trip_time_seconds` y `stopped_time_s`. Este último integra los intervalos
+de tick cuya velocidad final es menor de 0.2 m/s; no identifica por sí solo
+el motivo de parada. `blocked` sigue significando velocidad baja sostenida,
+no una clasificación automática de la causa física.
 
 | Estado | Significado |
 |---|---|
@@ -661,7 +680,50 @@ que reiniciar el servidor. Para comparar 600 segundos, deja finalizar cada coman
 
 ### Verificación realizada y pendiente
 
-Las 80 pruebas automatizadas pasan con `carla-env` y agents disponible: incluyen selector uniforme,
+La corrección de retorno dentro del mismo tramo mantiene el trazado y las
+decisiones de giro de CARLA, pero añade un circuito dirigido cuando el destino
+queda detrás del origen. Conserva la validación de extremos. Para comprobar
+todos los pares del catálogo sin crear vehículos:
+
+```powershell
+.\carla-env\Scripts\python.exe scripts/validate_route_catalog.py --report data/output/catalog_check_nuevo.json
+```
+
+### Análisis de las cuatro métricas académicas
+
+`scripts/analyze_mobility.py` procesa corridas preservadas sin conectar con
+CARLA ni modificar los logs. Por ejemplo, para la campaña diagnóstica anterior:
+
+```powershell
+.\carla-env\Scripts\python.exe scripts/analyze_mobility.py --campaign data/output/reliability_campaign_20260908/long/campaign.json --output data/output/analisis_largo_nuevo
+```
+
+También acepta directorios de corrida como argumentos. El directorio de salida
+debe ser nuevo. Genera `analysis.json`, `summary.csv`, `destinations.csv` y
+`report.md`, con comprobaciones de integridad y comparabilidad por escenario.
+
+- Destinos: distribuciones de asignados y alcanzados, por ID y categoría.
+- Tiempo: media, mediana y dispersión de completados, incluidas sus detenciones;
+  todos los incompletos conservan estado y duración parcial por separado.
+- Velocidad: suma de distancias / suma de tiempos de presencia vehicular en
+  registros versión 3; incluye las esperas y no es media de velocidades individuales.
+- Eventos: callbacks de invasión y colisión separados, con conteos y tasas por
+  vehículo-km y vehículo-hora. Las invasiones no hacen fallar la auditoría.
+
+Para registros versión 2, la exposición disponible abarca viajes activos:
+la velocidad usa ese ámbito y las tasas incluyen solo eventos asignados a un
+viaje. Se conservan aparte todos los eventos observados, incluidos los de
+espera, y se advierte esa limitación. No mezclar las velocidades de ambos
+ámbitos sin recalcular una definición común. Las tasas con exposición cero
+son no definidas; no se sustituyen por cero.
+
+Las comparaciones son descriptivas. El programa comprueba condiciones
+registradas y denuncia pares ausentes, ambiguos o incompatibles; no establece
+causalidad, significancia estadística ni cumplimiento integral del ODD.
+
+### Antecedentes de validación
+
+Las 97 pruebas automatizadas pasan con `carla-env` y agents disponible: incluyen selector uniforme,
 exclusión, reproducibilidad, independencia de pesos/historial, validación CLI,
 aislamiento por carro y actualización solo por llegadas. Las pruebas con un
 doble de CARLA también cubren ambos modos, CSV reales en directorios temporales,
@@ -840,12 +902,32 @@ carril**: se conservan como métrica de comparación. La recomendación previa
 de eliminar las invasiones del Cybertruck como requisito para avanzar queda
 actualizada por [el contexto académico](project-graduation-context.md).
 
-Mantener tres vehículos para corregir las rutas con destino detrás del origen
-y la llegada a través de una unión de tramos, con regresiones unitarias y
-corridas reales focalizadas. Revisar el límite de 300 s por viaje y el
-tratamiento de incompletos, conservando las esperas en el tiempo de viaje.
-Después verificar el cálculo de las cuatro métricas y definir la comparación
-de ambos selectores bajo **dos niveles de demanda**, como exige el objetivo 1.
+Los puntos 1–3 ya tienen implementación y validación focalizada: rutas de
+retorno, continuidad de llegada, límite temporal opcional y análisis de las
+cuatro métricas. Pasaron 97 pruebas, 1.722 pares del catálogo y los nueve casos
+de ruta fallidos anteriores. Cuatro corridas reales con tres vehículos
+(600 s por escenario con semilla 42; 900 s con semilla 123) completaron 48
+viajes, sin `route_failed`, `blocked`, `timeout` ni colisiones. Se conservaron
+nueve invasiones del Cybertruck en baseline/123. Los doce `aborted` son viajes
+activos al terminar. Esto valida los casos investigados, no toda la matriz final.
+
+Resultados y comparación descriptiva:
+[informe](data/output/mobility_fixes_20260909/metrics/report.md),
+[distribuciones](data/output/mobility_fixes_20260909/metrics/destinations.csv)
+y [bitácora](docs/bitacora_simulacion.md#2026-09-09--correcciones-de-movilidad-y-análisis-de-métricas).
+La comprobación sobre el mapa también validó el carril de las 48 llegadas.
+CARLA quedó sin actores vehiculares ni sensores, asíncrono y con renderizado.
+
+Al 2026-09-10 sigue pendiente la **prueba manual del estudiante**. Antes de
+aumentar la flota, observar ambos escenarios con tres vehículos, semilla 42,
+600 s y renderizado activo, conservando sus logs. Revisar salidas, curvas,
+paradas, llegadas y reinicios; registrar el vehículo, momento y carpeta de
+cualquier comportamiento dudoso. Las invasiones siguen siendo una métrica,
+no un requisito de cero eventos. La estabilidad comprobada hasta ahora
+corresponde a las condiciones ensayadas, no a una validación académica final.
+
+Después queda definir la comparación de ambos selectores bajo **dos niveles de
+demanda**, como exige el objetivo 1, y ejecutar su matriz experimental.
 El estudiante confirmó que los niveles de demanda serán distintas cantidades
 de vehículos simultáneos. Elegir esas cantidades y la matriz de repeticiones
 queda para después de corregir rutas/llegadas, definir límites temporales y

@@ -1184,3 +1184,195 @@ Se revisó el diff y se ejecutó la suite existente: 80 pruebas aprobadas con
 documentación; se excluyen los CSV genéricos, `i-marco_teorico.tex`,
 `protocolo-final.tex`, `image.png` y resultados generados. Los cambios nuevos
 de los puntos 1–3 quedarán sin commit hasta otra indicación.
+
+## 2026-09-09 — Correcciones de movilidad y análisis de métricas
+
+### Commits del estado previo y alcance nuevo
+
+Se crearon los Conventional Commits autorizados antes de iniciar este trabajo:
+
+- `a8e1d7b` — `fix(navigation): stop and align vehicles before completing trips`.
+- `5915499` — `feat(diagnostics): trace vehicle footprints across destination dwell`.
+- `760c1b1` — `docs(simulation): record validation and graduation criteria`.
+
+Se excluyeron los CSV genéricos, marco teórico, protocolo, imagen y resultados
+generados. Los cambios descritos a continuación **quedan sin commit**.
+Se mantuvieron tres vehículos; el punto 4, elegir dos cantidades de vehículos
+como niveles de demanda, permanece para el final. No se exigió cero invasiones.
+Antes de circular se comprobó CARLA 0.9.15 en localhost:2000, Town01, sin
+vehículos/sensores, modo asíncrono y renderizado activo.
+
+### Punto 1: rutas de retorno y continuidad de llegada
+
+`src/route_planner.py` construye ahora una subclase de `GlobalRoutePlanner`
+que adapta `_path_search` para el caso confirmado: origen y destino sobre
+la misma arista, con destino detrás según el sentido del carril. Recorre la
+arista actual, busca el retorno dirigido desde su salida a su entrada y vuelve
+a recorrer el tramo hasta el destino. Se conservan `trace_route`, decisiones
+de giro, validación de extremos y cola final de CARLA. No se permite marcha
+atrás ni se descartan destinos. La adaptación usa internals de la SDK 0.9.15;
+debe revalidarse al actualizar CARLA.
+
+`scripts/validate_route_catalog.py` comprueba todos los pares del catálogo
+sobre el mapa real sin crear actores. Resultado: **1.722/1.722 válidos**, más
+**9/9 orígenes de los route_failed anteriores**, incluidos los dos de
+recuperación. Antes fallaban 60 pares del catálogo. La comprobación incluye
+cola de llegada, continuación y proximidad de ambos extremos, no prueba la
+circulación física de todas las rutas.
+
+`ArrivalLaneCorridor` usa la continuación dirigida ya verificada, acotada a
+3 m del destino y a los tramos/intervalos longitudinales muestreados. Permite
+reconocer la unión `20/-1 → 15/+1` de T01_067, conservando progreso ordenado,
+radio, parada, centrado y orientación. No cambia las ganancias PID ni el
+objetivo de 20 km/h. `arrival_policy_version=3` identifica esta semántica.
+
+El Cybertruck de baseline/123, viaje 004, **completó T01_067** en la
+continuación `15/+1`, a 1.38956 m del destino, con velocidad 0.000746 m/s,
+error de rumbo -9.97489° y error lateral +0.04035 m. Antes quedaba detenido
+con 12.48° y terminaba bloqueado. La consulta posterior del mapa validó
+las 48 llegadas de las cuatro corridas; esta fue la única en una continuación
+con IDs distintos de los del destino.
+
+### Punto 2: límite temporal y viajes incompletos
+
+La configuración multivehículo cambia `max_trip_time_seconds` de 300 a
+`null`: no hay corte independiente por viaje y se mantiene el fin de corrida
+como límite global. El detector de velocidad baja durante 60 s se conserva;
+no equivale a una clasificación del motivo de parada. El límite fijo sigue
+disponible con `--max-trip-seconds 300`; `--max-trip-seconds 0` lo desactiva.
+Otras configuraciones que conserven 300 mantienen ese comportamiento.
+
+Todos los segundos desde salida hasta llegada, incluidas las esperas,
+continúan en el tiempo de viaje. Los activos al corte son `aborted`, con
+duración parcial y sin visita al historial. Se añaden al log de viajes
+`end_sim_time_s`, `termination_reason`, `max_trip_time_seconds` y
+`stopped_time_s`. La última variable integra cada intervalo de tick cuando
+su velocidad final es menor del umbral; no atribuye cada parada a un semáforo.
+
+Evidencia real: baseline/123, vehículo 002, viaje 002 a T01_037 completó
+en **374.500006 s**, mientras que el caso anterior se había cortado a 300 s.
+Es una comprobación de que el límite opcional permite acabar un viaje largo;
+no implica que todos los viajes deban llegar dentro de cualquier horizonte.
+
+### Punto 3: las cuatro métricas y sus denominadores
+
+Se añadieron `src/mobility_analysis.py` y `scripts/analyze_mobility.py`.
+Procesan corridas preservadas sin CARLA y escriben un directorio nuevo con
+`analysis.json`, `summary.csv`, `destinations.csv` y `report.md`:
+
+- Frecuencias de destinos asignados y alcanzados, por ID y categoría, con
+  denominadores distintos y categorías sin observaciones conservadas.
+- Media, mediana y desviación de tiempos completos, más estados y duraciones
+  parciales de todos los incompletos. No se mezclan estos con las llegadas.
+- Velocidad agregada como distancia total / tiempo total de la población
+  observada, incluidas sus detenciones.
+- Conteos y tasas de callbacks de invasión y colisión por separado, por
+  vehículo-km y vehículo-hora. Exposición cero produce una tasa no definida.
+
+`metrics_semantics_version=3` añade medición cada tick de distancia y tiempo
+de toda la presencia de los vehículos, incluidas esperas entre viajes y
+recuperaciones. Los campos nuevos son `total_observed_distance_m` y
+`total_vehicle_time_s`; los campos anteriores conservan su ámbito de viajes
+activos. La versión 3 alinea el denominador de tasas con los eventos de todas
+las fases.
+
+Para logs versión 2, el analizador utiliza distancia/tiempo de viajes activos
+y solamente sus eventos asignados en las tasas; informa aparte todos los
+callbacks observados, incluso los de espera. Advierte que ese ámbito no es
+el de presencia completa de versión 3. No se reescribieron los logs anteriores.
+El informe de la campaña larga previa se conservó en
+`mobility_fixes_20260909/previous_campaign_metrics/` como análisis diagnóstico.
+
+La auditoría revisa conteos, claves, tiempos, distancias, correspondencia de
+historial/llegadas, umbrales de llegada y exposición. La verificación topológica
+de carriles se hizo aparte sobre el mapa, porque un CSV de IDs no demuestra
+continuidad dirigida. Se comparan entorno, flota, parámetros, versiones y
+hashes de conducción disponibles entre ambos tratamientos; no se infiere
+significancia estadística ni se exige cero eventos para aprobar integridad.
+
+### Pruebas y resultados reales
+
+**97 pruebas unitarias aprobadas**, sin omisiones, con `carla-env` y la SDK
+de agents configurada. Cubren circuito dirigido, ambos sentidos de s,
+destinos próximos dentro de un intervalo de muestreo, retorno inexistente,
+continuación de llegada acotada, rechazo del carril contrario, deadline
+opcional/CLI, detección de bloqueo, exposición durante espera y poblaciones
+de las métricas. Registro: `mobility_fixes_20260909/unit_tests.txt`.
+
+Corridas reales focalizadas con tres vehículos, ambos escenarios, clima
+preservado, spawns `[133, 6, 101]`, 20 km/h, delta 0.05 s y ritmo 5×:
+
+| Escenario | Semilla | Duración (s) | completed | aborted | route_failed / blocked / timeout | Colisiones | Invasiones |
+|---|---:|---:|---:|---:|---|---:|---:|
+| random_baseline | 42 | 600 | 11 | 3 | 0 / 0 / 0 | 0 | 0 |
+| history_80_20 | 42 | 600 | 11 | 3 | 0 / 0 / 0 | 0 | 0 |
+| random_baseline | 123 | 900 | 11 | 3 | 0 / 0 / 0 | 0 | 9 |
+| history_80_20 | 123 | 900 | 15 | 3 | 0 / 0 / 0 | 0 | 0 |
+
+Son 48 llegadas y 12 viajes activos al corte. Las nueve invasiones son del
+Cybertruck de baseline/123, viajes 004/005: cinco callbacks `NONE` y cuatro
+`Broken`, cerca de las dos curvas ya diagnosticadas. Se preservaron todos;
+no se agruparon en accidentes ni se ajustó el seguimiento para eliminarlos.
+Las nuevas rutas, finalizaciones y política temporal cambian los viajes
+observados: no comparar sus conteos directamente con una corrida previa de
+1.800 s como si solo hubiera variado un parámetro del controlador.
+
+| Escenario / semilla | Tiempo medio de completados (s) | Velocidad de presencia (km/h) | Invasiones / vehículo-km |
+|---|---:|---:|---:|
+| baseline / 42 | 137.241 | 11.566 | 0.000 |
+| histórico / 42 | 142.173 | 11.332 | 0.000 |
+| baseline / 123 | 205.136 | 10.649 | 1.127 |
+| histórico / 123 | 149.280 | 11.060 | 0.000 |
+
+Las distribuciones por ID/categoría están en `metrics/destinations.csv`.
+Todos los controles de integridad y ambos pares de condiciones registradas
+pasaron. El código de conducción y los datos permanecieron idénticos durante
+las cuatro corridas; el análisis y sus pruebas se desarrollaron en paralelo
+sin modificar los módulos utilizados para circular.
+
+Carpetas bajo `data/output/`:
+
+- `town01_random_baseline_seed_42_20260909T182939437792Z/`
+- `town01_history_80_20_seed_42_20260909T183146958730Z/`
+- `town01_random_baseline_seed_123_20260909T183354436607Z/`
+- `town01_history_80_20_seed_123_20260909T183701912794Z/`
+
+`data/output/mobility_fixes_20260909/` conserva manifiesto, hashes y copia del
+código/datos usados, consolas, `catalog.json`, `arrival_audit.json`, pruebas,
+scripts de validación y `metrics/`. No se repitieron aquí seis corridas de
+1.800 s ni se cambió la cantidad de vehículos. La limpieza final dejó Town01
+disponible, cero vehículos/sensores, modo asíncrono y renderizado activo.
+
+### Qué sigue
+
+Los puntos 1–3 tienen implementación, pruebas y evidencia focalizada. El
+siguiente punto es elegir las dos cantidades de vehículos y preparar la
+matriz comparativa de ambos selectores, con duración y repeticiones comunes.
+Las cantidades no se fijaron ni se aumentó la flota en esta etapa. La campaña
+final debe usar una versión congelada y mantener los incidentes como métrica,
+sin seleccionar únicamente resultados favorables.
+
+## 2026-09-10 — Guardado de cambios y revisión manual pendiente
+
+El estudiante autorizó Conventional Commits del estado acumulado, por conjuntos
+de archivos: rutas de retorno y su validador; llegadas, política temporal y
+registro de exposición; analizador de métricas; documentación. Se excluyen
+los CSV genéricos, resultados generados, `i-marco_teorico.tex` y
+`protocolo-final.tex`.
+
+Se repitió la suite offline con `carla-env` y la SDK de agents disponible:
+**97 pruebas aprobadas**, sin omisiones. Registro local en
+`data/output/precommit_20260910_unit_tests.txt`. No se inició CARLA, no se
+cambió el mapa ni se ejecutaron corridas reales en esta revisión.
+
+El estudiante aún no ha realizado una prueba manual. El siguiente paso es
+observar ambos escenarios con tres vehículos, semilla 42, 600 s, renderizado
+activo y ritmo 1× cuando prepare CARLA/Town01. Revisar arranques, curvas,
+esperas, llegadas y el siguiente viaje; conservar la carpeta de resultados y
+anotar vehículo/momento ante dudas. Las invasiones se mantienen como métrica.
+
+Después de contrastar esa revisión con los logs, elegir las dos cantidades
+de vehículos que representarán la demanda, fijar condiciones y repeticiones
+comunes y congelar la versión para la comparación final. La evidencia actual
+demuestra estabilidad en los casos ensayados; aún no completa la validación
+del modelo ni la comparación del tercer objetivo específico.

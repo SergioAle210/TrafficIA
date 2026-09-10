@@ -59,8 +59,8 @@ mapa o flota esté validado.
 | Objetivo | Evidencia actual | Trabajo pendiente |
 |---|---|---|
 | 1: ODD, categorías y demanda | Town01 y condiciones de corrida registradas; configuración con tres categorías de destinos | Consolidar el ODD experimental y operacionalizar/comparar dos niveles de demanda |
-| 2: agentes simultáneos | Tres vehículos realizan viajes sucesivos; existen rutas, sensores e historiales individuales | Corregir los fallos identificados de planificación y reconocimiento de llegada |
-| 3: comparación de cuatro métricas | Ambos escenarios generan logs; campaña de seis corridas largas revisada | Definir unidades y agregación, implementar el análisis comparable y presentar resultados descriptivos |
+| 2: agentes simultáneos | Tres vehículos realizan viajes sucesivos; correcciones de rutas de retorno y continuidad de llegada implementadas | Ampliar validación bajo los niveles de demanda elegidos |
+| 3: comparación de cuatro métricas | Análisis descriptivo implementado y probado sobre logs; se distinguen poblaciones y exposición | Ejecutar la comparación final de ambos selectores bajo los dos niveles de demanda |
 
 En `config/multi_vehicle_trip.json`, las categorías implementadas son
 `residential`, `work_education` y `services_leisure` (residencia,
@@ -121,14 +121,15 @@ cualquier cambio; las invasiones aisladas no son un veto automático al avance.
 ## Definición de las cuatro métricas
 
 El marco teórico proporciona las siguientes bases. Las decisiones operativas
-marcadas como propuestas deben fijarse antes de la campaña comparativa final.
+implementadas para esta etapa se describen abajo. Su uso en la campaña final
+debe conservar idéntica definición entre tratamientos.
 
 | Métrica | Base conceptual y criterio de análisis |
 |---|---|
 | Distribución de destinos | Frecuencia relativa `n_j / N`. Separar destinos asignados y alcanzados; no mezclar sus denominadores. Reportar por ID y, cuando proceda, por categoría. |
 | Tiempo promedio de viaje | Promedio de llegada menos salida para viajes completados, en segundos simulados, incluyendo detenciones durante el viaje. Acompañar con cantidad de completados, dispersión y proporción de incompletos. |
-| Velocidad media | Cociente entre distancia total y tiempo total del mismo conjunto/ámbito. Precisar si incluye todo el periodo de presencia o solo viajes; conservar las detenciones del ámbito escogido. No mezclarlo con velocidad media en movimiento. |
-| Tasa de incidentes o invasiones | Eventos de una clase divididos por exposición de esa población. Propuesta: callbacks de invasión por vehículo-kilómetro recorrido y colisiones por separado, conservando también conteos absolutos. |
+| Velocidad media | En registros versión 3, distancia total / tiempo total de presencia de los vehículos, incluyendo esperas. En versión 2 solo se dispone de intervalos de viajes activos y se informa ese ámbito diferente. No es velocidad media en movimiento. |
+| Tasa de incidentes o invasiones | Callbacks de invasión por vehículo-kilómetro y colisiones por separado, con conteos absolutos y tasa complementaria por vehículo-hora. En versión 3 se incluyen todas las fases; en versión 2 las tasas se limitan a los eventos asignados a viajes, preservando aparte los demás. |
 
 Para la tasa por distancia, el denominador es la suma de distancias de los
 vehículos, expresada en km, bajo el mismo intervalo de observación. Si es cero,
@@ -149,17 +150,20 @@ si el límite temporal corta los largos.
 
 ## Tiempo de corrida y límite por viaje
 
-En la campaña actual, 1.800 s es la duración total de cada corrida y 300 s es
-el máximo por viaje. «Presupuesto temporal» significa ese límite por viaje;
+En la campaña diagnóstica anterior, 1.800 s es la duración total de cada corrida
+y 300 s era el máximo por viaje. «Presupuesto temporal» significa ese límite;
 incluye movimiento y esperas. `timeout` no implica por sí mismo atasco.
 
-Pendiente: decidir y documentar una política uniforme que permita viajes
-largos con esperas razonables y distinga falta de progreso. No aumentar el
-límite hasta que desaparezcan los fallos sin evaluar su efecto. Aunque se use
-un contador separado para detectar estancamiento, **el tiempo de viaje usado
-en la métrica debe seguir incluyendo las esperas**, tal como define el marco.
+Para esta etapa, la configuración multivehículo usa
+`max_trip_time_seconds: null`: los viajes pueden continuar hasta el fin de la
+corrida. Un viaje activo al corte es `aborted`, no una llegada. Se conserva el
+detector de velocidad baja sostenida durante 60 s, que no identifica por sí
+solo la causa de la parada. `--max-trip-seconds 300` permite reproducir el
+límite anterior y `--max-trip-seconds 0` desactivarlo. **El tiempo de viaje de
+la métrica sigue incluyendo todas las esperas**. La política debe ser común
+a ambos tratamientos y quedar registrada antes de la comparación final.
 
-## Estado comprobado al 2026-09-09
+## Antecedente diagnóstico al 2026-09-09
 
 - CARLA 0.9.15, Town01; pruebas mediante `carla-env`.
 - Tres vehículos; seis corridas de 1.800 s: ambos escenarios y semillas
@@ -177,7 +181,29 @@ en la métrica debe seguir incluyendo las esperas**, tal como define el marco.
 - Evidencia detallada en la entrada del 2026-09-09 de la bitácora y en
   `data/output/reliability_campaign_20260908/long/review/`.
 
-## Próximo trabajo propuesto
+## Avance de los puntos 1–3 y trabajo restante
+
+Se implementaron el retorno dirigido para destinos detrás del origen, la
+llegada sobre continuación de carril, el límite temporal opcional y
+`scripts/analyze_mobility.py`. El validador `scripts/validate_route_catalog.py`
+pasa los 1.722 pares del catálogo y los nueve fallos registrados anteriormente.
+Las corridas y resultados posteriores se documentan en la bitácora bajo
+«Correcciones de movilidad y análisis de métricas», con fuente y versión.
+
+El analizador entrega `analysis.json`, `summary.csv`, `destinations.csv` y
+`report.md`; no sobrescribe logs ni permite reutilizar un directorio de salida.
+Conserva las invasiones sin considerarlas por sí solas errores de integridad.
+El informe de la campaña anterior sirve como diagnóstico de esa versión, no
+como resultado final de la versión corregida. La comparación con distinta
+definición de exposición requiere recalcular un ámbito común.
+
+Antes de ampliar la demanda queda pendiente la revisión manual del estudiante
+(confirmado el 2026-09-10): observar ambos escenarios con tres vehículos y
+semilla 42, conservar los logs y contrastar las observaciones con el análisis.
+Las pruebas automatizadas y focalizadas no sustituyen esta revisión ni la
+comparación académica final. No se iniciará CARLA durante el guardado de cambios.
+
+La secuencia acordada se conserva como referencia del alcance:
 
 1. Conservar tres vehículos para corregir las rutas de retorno y la llegada
    en uniones de tramos, con regresiones unitarias y pruebas reales focalizadas
@@ -201,9 +227,10 @@ en la métrica debe seguir incluyendo las esperas**, tal como define el marco.
 
 ## Restricciones de trabajo vigentes
 
-- El estudiante autorizó Conventional Commits del estado acumulado el
-  2026-09-09 antes de continuar los puntos 1–3. Los cambios posteriores
-  quedan sin commit hasta una nueva indicación.
+- El estudiante autorizó el 2026-09-10 Conventional Commits de los cambios
+  actualmente acumulados, agrupados por conjuntos de archivos. Esta indicación
+  sucede a la autorización del 2026-09-09; no autoriza commits automáticos
+  de trabajo futuro.
 - Conservar corridas y logs originales; crear nuevos directorios para versiones
   o diagnósticos. Documentar cambios de significado de las métricas.
 - No modificar los CSV genéricos ni `i-marco_teorico.tex` en tareas de simulación.
