@@ -68,7 +68,36 @@ def build_global_route_planner(carla_map: Any, sampling_resolution: float) -> An
 
     from agents.navigation.global_route_planner import GlobalRoutePlanner
 
-    return GlobalRoutePlanner(carla_map, sampling_resolution)
+    class ReturnAwareRoutePlanner(GlobalRoutePlanner):
+        def _path_search(self, origin, destination):
+            circuit = same_edge_return_path(self, origin, destination)
+            return circuit if circuit is not None else super()._path_search(origin, destination)
+
+    return ReturnAwareRoutePlanner(carla_map, sampling_resolution)
+
+
+def same_edge_return_path(planner: Any, origin: Any, destination: Any) -> Optional[List[Any]]:
+    """Repair the SDK's one-edge path when a goal is behind its origin.
+
+    Keep trace_route/turn decisions from CARLA 0.9.15. Traverse the current
+    edge, the shortest directed return to its entrance, then its final part.
+    OpenDRIVE lane s resolves ordering even inside one sampling interval.
+    """
+    start, end = planner._localize(origin), planner._localize(destination)
+    if start is None or end is None or start != end:
+        return None
+    a, b = planner._wmap.get_waypoint(origin), planner._wmap.get_waypoint(destination)
+    if (a.road_id, a.section_id, a.lane_id) != (b.road_id, b.section_id, b.lane_id):
+        return None
+    direction = 1 if a.lane_id < 0 else -1
+    if (b.s - a.s) * direction >= -0.01:
+        return None
+    import networkx as nx
+    try:
+        circuit = nx.shortest_path(planner._graph, start[1], start[0], weight="length")
+    except nx.NetworkXNoPath as error:
+        raise RuntimeError("No existe un circuito dirigido hacia el destino anterior del mismo tramo.") from error
+    return [start[0]] + circuit + [start[1]]
 
 
 def plan_route(
