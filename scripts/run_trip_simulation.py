@@ -14,8 +14,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.trip_runner import TripSimulation, TripSimulationConfig
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
+def parse_args(parser=None) -> argparse.Namespace:
+    parser = parser or argparse.ArgumentParser(
         description="Ejecuta viajes sucesivos de uno o más vehículos con rutas explícitas."
     )
     parser.add_argument(
