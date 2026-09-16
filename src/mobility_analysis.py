@@ -126,7 +126,9 @@ def analyze_run(path):
     destinations = config.get("destinations", [])
     destination_ids = [d["destination_id"] for d in destinations]
     categories = [d["category"] for d in destinations]
-    diagnostic_config = path / "dwell_diagnostic_config.json"
+    diagnostic_config = path / "visual_review_config.json"
+    if not diagnostic_config.exists():
+        diagnostic_config = path / "dwell_diagnostic_config.json"
     source_hashes = (json.loads(diagnostic_config.read_text(encoding="utf8")).get("source_sha256")
                      if diagnostic_config.exists() else None)
     if source_hashes is None:

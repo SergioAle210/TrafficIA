@@ -105,6 +105,16 @@ class MobilityAnalysisTests(unittest.TestCase):
         self.assertIn("trip_time_policy", check["differences"])
         self.assertIn("exposure_scope", check["differences"])
 
+    def test_visual_review_source_hashes_are_used_for_pair_comparison(self):
+        (self.path / 'visual_review_config.json').write_text(json.dumps(dict(source_sha256={'runner':'abc'})), encoding='utf8')
+        baseline = self.analyze()
+        history = copy.deepcopy(baseline)
+        history.update(run='history', scenario='history_80_20')
+        self.assertEqual(baseline['comparability']['source_sha256'], {'runner':'abc'})
+        self.assertTrue(paired_checks([baseline, history])[0]['comparable'])
+        history['comparability']['source_sha256']['runner'] = 'different'
+        self.assertIn('source_sha256', paired_checks([baseline, history])[0]['differences'])
+
 
 if __name__ == "__main__":
     unittest.main()
