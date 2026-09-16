@@ -1376,3 +1376,161 @@ de vehículos que representarán la demanda, fijar condiciones y repeticiones
 comunes y congelar la versión para la comparación final. La evidencia actual
 demuestra estabilidad en los casos ensayados; aún no completa la validación
 del modelo ni la comparación del tercer objetivo específico.
+
+## 2026-09-15 — Auditoría de la ejecución manual y propuesta de demanda
+
+Se revisó la corrida del estudiante del **2026-09-14**:
+`data/output/town01_random_baseline_seed_42_20260914T215949497576Z/`.
+El usuario confirmó que solo comprobó su finalización, aunque probó el script
+de seguimiento del spectator. No se considera realizada una revisión visual
+detallada; el spectator de ese ejemplo solo mueve la cámara y espera ticks.
+
+La configuración registra Town01, CARLA 0.9.15, tres vehículos, semilla 42,
+600 s, delta 0.05 s, renderizado y ritmo solicitado 1×. Hay 14 viajes iniciados:
+11 completados y tres `aborted`, todos con `simulation_end` exactamente al
+corte. Cero `route_failed`, `blocked`, `timeout`, colisiones o invasiones.
+El analizador no encontró errores de integridad.
+
+Tiempo medio de completados 137.209 s; velocidad de presencia completa
+11.565 km/h; distancia 5.782 km; exposición 0.500 vehículo-hora. Categorías
+alcanzadas: tres residencia, cuatro trabajo/educación y cuatro servicios/ocio.
+Los vehículos 001/002/003 completaron 5/4/2 viajes. El 003 es Audi TT para esta
+semilla; llegó a T01_030 y T01_050 y su viaje hacia T01_006 estaba activo al
+cierre. Mayor parada muestreada bajo 0.2 m/s: 31.90 s para ese vehículo.
+En la flota, 33.18 % del tiempo de viajes activos está bajo ese umbral;
+no se identifica por ello la causa de las paradas.
+
+Las once llegadas cumplen los umbrales; máximos absolutos: velocidad
+0.000925 m/s, orientación 0.613°, desplazamiento lateral 0.0054 m y distancia
+al destino 0.500 m. Las posiciones proyectadas en el OpenDRIVE instalado
+coinciden con los IDs de carril registrados. No se reprodujeron sensores.
+
+La comparación con baseline/42 del 2026-09-09 conserva las 14 combinaciones
+vehículo/viaje/destino/estado, ambiente y flota. Diferencia del tiempo medio
+−0.0318 s y distancia −0.582 m; máximo cambio de duración de un completado
+0.500 s. Es repetibilidad funcional cercana, no determinismo por frame:
+el día 9 se usaron 5× y no-rendering. La corrida manual no contiene hashes
+históricos de código. El clima de ambas incluye precipitación 40 y mojado 80;
+no documentarlo como seco.
+
+Se creó `data/output/manual_review_20260915/` con análisis, auditoría, hashes
+de los resultados revisados, comparación, contexto del mapa, figura de
+trayectorias/velocidades y script de revisión offline. Se comprobó que los
+archivos originales permanecieron idénticos. Se usó `carla-env`, sin cliente,
+servidor, cambio de mapa ni simulaciones nuevas. La figura se generó con
+Matplotlib y se revisó visualmente.
+
+Para justificar demanda se consultaron las guías primarias FHWA 2019 y la
+documentación CARLA 0.9.15, con enlaces y distinción entre fuentes y propuesta
+en [selección de niveles](seleccion_niveles_demanda.md). Los JSON 20/70 son
+de Town03, con 90/120 s y distinto renderizado: no constituyen respaldo
+experimental para Town01 ni configuraciones utilizables por este runner.
+
+El OpenDRIVE local da aproximadamente 4.9596 km de centros de carriles
+`driving` fuera de intersecciones, muestreados hasta cada metro. N dividido
+por esa longitud solo es un índice nominal de carga; no prueba capacidad,
+densidad observada, nivel de servicio ni congestión. Se excluyen conectores
+de giro superpuestos y se documentan las limitaciones del denominador.
+
+Propuesta pendiente de pilotos: **cinco y veinte como candidatos**, diez
+como escalón intermedio. La diferencia por factor cuatro es un contraste de
+diseño, no un umbral bibliográfico. Si se requieren regímenes de interacción
+distintos y veinte no los representa, explorar treinta/cuarenta antes de
+considerar cantidades mayores. No es obligatorio llegar a setenta ni obtener
+diferencias significativas. Conservar resultados adversos y las invasiones.
+
+Antes de escalar hay que completar N spawns e historiales: el archivo actual
+solo cubre cinco vehículos. El detector `blocked` termina viajes tras 60 s
+a baja velocidad sin distinguir semáforo/cola/obstáculo y luego puede iniciar
+otro desde la misma posición; estudiar este efecto y fijar su política común
+antes de comparar cargas. Registrar motivos de espera y rendimiento real,
+fijar clima, flota, duración y código, separar pilotos de evaluación final.
+La propuesta de réplicas iniciales con cuatro semillas estima variabilidad;
+no garantiza suficiencia estadística.
+
+Se actualizaron README y contexto académico. No se modificaron módulos de
+conducción, configuraciones, entradas originales, protocolo ni marco teórico.
+No se hicieron commits ni se ejecutaron las pruebas de 5/10/20 vehículos.
+
+## 2026-09-15 — Revisión instrumentada; continuación sin cámaras
+
+Se implementó `scripts/review_trip_simulation.py` con
+`src/visual_review.py`, heredando las decisiones de `TripSimulation`.
+Registra posición, orientación, velocidad y fases por tick, incluyendo
+esperas; añade semáforo y vehículos de la flota a menos de 30 m durante
+paradas bajo 0.2 m/s. El modo visual añade tres RGB cenitales de 640 × 360,
+18 m de altura y periodo 0.5 s, cola de guardado, índice exacto por
+vehículo/frame, hashes y resumen de pérdidas/cadencia. Los sensores quedan
+bajo la limpieza del runner. Solo un cliente avanza la simulación.
+
+El timestamp RGB puede diferir del tiempo del mundo del frame declarado.
+Se conservan ambos y no se asocia por proximidad temporal. Los intervalos
+ocasionales 11/9 frames no se reportan como pérdidas demostradas; los errores
+de cola/guardado se distinguen de esa alerta de cadencia. El primer smoke
+permitió corregir esa interpretación y se conservaron sus originales.
+
+Las pruebas técnicas con cámaras de 15 s produjeron 90 imágenes cada una,
+con vistas legibles de los tres vehículos y limpieza comprobada. Sin embargo,
+dos intentos largos de baseline fallaron por `GPUCrash` de Unreal:
+`0x887A0020 INTERNAL_ERROR`, pérdida de dispositivo D3D, Intel UHD 770.
+El primero guardó 1,179 imágenes y 196.20 s de observación; el segundo,
+con RenderOffScreen confirmado en el crash context, dejó 89 PNG y unos
+14.15 s de registros parciales, sin índice ni resumen final de captura.
+No se consideran corridas completas ni se inventan cierres de sus viajes.
+
+El estudiante preparó CARLA/Town01 y solicitó **continuar sin cámaras**.
+Se añadió `--no-cameras`, conservando todos los diagnósticos de fases/paradas
+y los sensores de colisión/invasión. La API de argumentos compartida acepta
+el parser del script de revisión; el analizador reconoce los hashes de
+`visual_review_config.json`. No se cambiaron rutas, controlador, política de
+llegada, umbral `blocked`, flota, semilla, clima ni parámetros de conducción.
+
+**107 pruebas aprobadas** con `carla-env` y la SDK de agents. La comprobación
+real sin cámaras de 15 s produjo 300 observaciones por vehículo y limpieza
+correcta. Después se completaron los dos escenarios a 1×, con renderizado,
+semilla 42, tres vehículos y 600 s cada uno:
+
+| Escenario | Completados 001 / 002 / 003 | aborted | blocked / route_failed / timeout | Colisiones / invasiones | Integridad |
+|---|---|---:|---|---|---|
+| random_baseline | 5 / 4 / 2 | 3 | 0 / 0 / 0 | 0 / 0 | sin errores |
+| history_80_20 | 4 / 4 / 3 | 3 | 0 / 0 / 0 | 0 / 0 | sin errores |
+
+Son **22 llegadas, 22 ciclos de llegada/espera/nuevo viaje y 72,000
+observaciones**. Los seis `aborted` llevan motivo `simulation_end` y se
+registran antes de destruir actores; no son `blocked`. Todas las llegadas
+cumplen los umbrales y proyectan sobre los carriles registrados en el
+OpenDRIVE local. Máxima parada por escenario: 32.20 y 32.15 s; el umbral
+`blocked` permaneció en 60 s. Se revisaron los gráficos de trayectorias y
+velocidades de los seis casos vehículo/escenario.
+
+Tiempo medio de completados: 137.209 / 142.205 s; velocidad de presencia
+completa: 11.565 / 11.332 km/h (baseline / histórico). La comparación de
+condiciones y hashes pasó. Baseline coincide con el manual del 14 de
+septiembre en los 14 pares vehículo/viaje, destinos, estados, duraciones y
+distancias registradas; no se certifica por ello determinismo por frame.
+
+Ejemplo de interacción: en baseline t≈265 s, el 002 espera 7.225 m detrás
+del 003, medidos entre centros, sin colisión. La proximidad y el estado
+semafórico aportan contexto, no una clasificación automática de congestión.
+`is_at_traffic_light()` puede ser falso mientras BasicAgent frena antes del
+trigger; los estados vacíos no descartan una espera semafórica. Esta
+limitación está detallada en el informe.
+
+Corridas completas bajo `data/output/`:
+
+- `town01_random_baseline_seed_42_20260916T011215560060Z/`
+- `town01_history_80_20_seed_42_20260916T012237341817Z/`
+
+Los nombres usan UTC; fecha local 15 de septiembre. La carpeta
+`data/output/visual_review_20260915/` conserva intentos, crash contexts
+resumidos, consolas, pruebas, manifiesto, snapshots de código/entradas,
+auditorías, hashes de salidas, comparación y figuras. El detalle está en
+[el informe](revision_visual_tres_vehiculos.md). CARLA quedó en Town01,
+cero vehículos/sensores, modo asíncrono y renderizado activo.
+
+La revisión visual completa queda **pendiente**, por el cambio de alcance
+autorizado. Se puede pasar al piloto de cinco vehículos con la evidencia de
+integridad de logs, después a diez y veinte. Aún no se fijan los dos niveles
+definitivos ni se afirma superioridad de un selector con una sola semilla.
+No se exigen cero invasiones. No se aumentó la flota, no se alteraron CSV
+genéricos ni documentos TeX y no se hicieron commits.

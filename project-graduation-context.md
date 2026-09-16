@@ -1,6 +1,6 @@
 # Contexto del trabajo de graduación
 
-Actualizado: 2026-09-09. Este documento orienta las decisiones de desarrollo,
+Actualizado: 2026-09-15. Este documento orienta las decisiones de desarrollo,
 validación y análisis de TrafficIA. Distingue los objetivos del protocolo,
 las decisiones del estudiante y las propuestas pendientes. No sustituye el
 protocolo ni acredita objetivos como cumplidos sin evidencia.
@@ -70,9 +70,14 @@ el objetivo específico solo exige tres categorías.
 Los dos niveles de demanda no equivalen a los dos selectores de destinos:
 `random_baseline` e `history_80_20` son tratamientos que deben compararse bajo
 cada nivel de demanda. El estudiante confirmó que los niveles serán
-**distintas cantidades de vehículos simultáneos**. Sus dos valores y su
-justificación quedan para después de los puntos 1–3 (correcciones, límites
-temporales y métricas). No se da por decidido que sean tres y cinco vehículos.
+**distintas cantidades de vehículos simultáneos**. Sus dos valores finales
+siguen pendientes. El 2026-09-15 se propusieron cinco y veinte como candidatos,
+con pilotos de cinco, diez y veinte; la selección se justificará por el ODD,
+la respuesta observada y la viabilidad técnica. No son cantidades ya validadas.
+Los 20/70 de las configuraciones antiguas corresponden a Town03 y no justifican
+directamente los niveles del runner actual en Town01. La definición de demanda
+por población simultánea no equivale a flujo de entrada en vehículos/hora.
+Procedimiento y fuentes: [selección de demanda](docs/seleccion_niveles_demanda.md).
 
 ## Modelo y comparación
 
@@ -197,11 +202,22 @@ El informe de la campaña anterior sirve como diagnóstico de esa versión, no
 como resultado final de la versión corregida. La comparación con distinta
 definición de exposición requiere recalcular un ámbito común.
 
-Antes de ampliar la demanda queda pendiente la revisión manual del estudiante
-(confirmado el 2026-09-10): observar ambos escenarios con tres vehículos y
-semilla 42, conservar los logs y contrastar las observaciones con el análisis.
-Las pruebas automatizadas y focalizadas no sustituyen esta revisión ni la
-comparación académica final. No se iniciará CARLA durante el guardado de cambios.
+El estudiante ejecutó manualmente baseline/42 el 2026-09-14: 600 s, tres
+vehículos, renderizado y ritmo 1×. La auditoría offline del día 15 encontró
+11 llegadas, tres viajes activos al corte, cero errores de integridad y cero
+colisiones/invasiones/fallos de ruta/bloqueos. Los resultados son muy cercanos
+a la corrida del día 9, con diferencias físicas pequeñas. Confirmó que solo
+comprobó la finalización: quedan pendientes la observación detallada y el
+histórico manual. No tratar esa ejecución como aprobación visual de toda la
+conducción ni como validación de mayor demanda.
+
+Antes de escalar, preparar spawns e historiales por vehículo y revisar cómo
+se distinguirán colas normales de paradas anómalas: el umbral `blocked` de
+60 s termina viajes a baja velocidad sin clasificar la causa. La configuración
+actual preserva el clima del servidor; los logs revisados incluyen lluvia.
+Fijar explícitamente el clima del ODD y la política de espera antes de la
+campaña final. No elegir cantidades por favorecer un selector ni por lograr
+cero eventos. Pilotos y resultados finales deben quedar identificados aparte.
 
 La secuencia acordada se conserva como referencia del alcance:
 
@@ -224,6 +240,36 @@ La secuencia acordada se conserva como referencia del alcance:
    la matriz con tablas, distribuciones y tasas. Si se cambia el controlador,
    versionar y repetir ambos tratamientos afectados. Informar resultados
    favorables, desfavorables y limitaciones sin seleccionar solo corridas limpias.
+
+## Revisión instrumentada del 2026-09-15
+
+Se acordó revisar ambos escenarios con tres vehículos, semilla 42, 600 s,
+renderizado y ritmo 1× antes de los pilotos de escalamiento. La observación
+con tres cámaras RGB pasó pruebas breves, pero dos intentos de baseline
+terminaron por pérdida del dispositivo D3D de Unreal en Intel UHD 770,
+incluido un intento con RenderOffScreen. Son resultados incompletos del
+entorno de ejecución, no viajes `blocked` ni validaciones completas.
+
+El estudiante autorizó continuar **sin cámaras**. El script de revisión
+conserva las decisiones de conducción y registra fases, esperas, semáforos y
+vehículos cercanos. Los registros permiten auditar las transiciones, pero no
+sustituyen la revisión visual originalmente prevista, que queda pendiente.
+No se cambió el detector `blocked`, no se aumentó la flota y no se hicieron
+commits. Evidencia y resultados en el
+[informe de revisión](docs/revision_visual_tres_vehiculos.md).
+
+Las dos corridas sin cámaras completaron 600 s cada una: once llegadas y
+tres viajes activos al corte por escenario, cero `blocked`, fallos de ruta,
+colisiones, invasiones o errores de integridad. Se validaron 22 ciclos de
+llegada/espera/reinicio en 72,000 observaciones y 107 pruebas unitarias.
+Esto permite pasar a pilotos según la integridad de los registros, sin
+afirmar que se completó la cobertura visual ni la comparación académica final.
+
+Los pilotos de 5 → 10 → 20 siguen siendo pruebas de escalamiento, no los dos
+niveles definitivos del objetivo 1. Los incidentes se conservan como métricas
+y las paradas necesitan contexto antes de interpretarse como congestión.
+La estabilidad gráfica del equipo también limita qué instrumentación puede
+usarse durante la campaña; no debe confundirse con estabilidad del modelo.
 
 ## Restricciones de trabajo vigentes
 

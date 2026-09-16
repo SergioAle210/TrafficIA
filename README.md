@@ -894,6 +894,42 @@ Traffic Manager. En esta fase `stable_traffic.py` expone sus valores operativos
 por argumentos y constantes; la carga automática de escenarios se incorporará al
 separar la lógica común hacia `src/`.
 
+## Revisión instrumentada de tres vehículos
+
+`scripts/review_trip_simulation.py` conserva la conducción del runner y
+registra fases, posición y velocidad por tick. Durante las paradas añade
+semáforo y proximidad de otros vehículos; ese contexto no clasifica por sí
+solo una parada como congestión. Para ejecutarlo **sin cámaras RGB**:
+
+```powershell
+.\carla-env\Scripts\python.exe -u scripts/review_trip_simulation.py `
+  --no-cameras --config config/multi_vehicle_trip.json `
+  --scenario random_baseline --seed 42 --seconds 600 --simulation-speed 1 `
+  --navigation-diagnostics `
+  --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+```
+
+Cambiar a `--scenario history_80_20` ejecuta el otro tratamiento. CARLA debe
+estar en Town01; el script valida el mapa y es el único cliente que avanza
+los ticks. Cada ejecución crea una carpeta nueva y conserva hashes de
+código/entradas, `observation_log.csv` y `capture_summary.json`.
+
+Sin `--no-cameras`, añade tres cámaras cenitales de 640 × 360, altura 18 m
+y captura cada 0.5 s, con imágenes e índice por vehículo/frame. Este modo
+falló dos veces por pérdida del dispositivo D3D en la Intel UHD 770,
+incluso usando RenderOffScreen. El estudiante autorizó continuar sin cámaras;
+los intentos incompletos se conservaron y no cuentan como corridas válidas.
+La evidencia visual completa queda pendiente. Véase el
+[informe de revisión](docs/revision_visual_tres_vehiculos.md).
+
+La revisión del **2026-09-15** completó ambos escenarios sin cámaras:
+600 s cada uno, tres vehículos, semilla 42 y ritmo 1×. Cada escenario registró
+11 llegadas y tres `aborted` por fin de simulación; cero `blocked`, fallos de
+ruta, colisiones, invasiones o errores de integridad. Se auditaron 22 ciclos
+de llegada/espera/reinicio y 72,000 observaciones. Pasaron **107 pruebas**.
+Se puede preparar el piloto de cinco vehículos sobre esta evidencia de logs;
+la validación visual y los niveles definitivos de demanda siguen pendientes.
+
 ## Próximos pasos
 
 La campaña larga ya está ejecutada y revisada. Según la aclaración posterior
@@ -918,13 +954,24 @@ y [bitácora](docs/bitacora_simulacion.md#2026-09-09--correcciones-de-movilidad-
 La comprobación sobre el mapa también validó el carril de las 48 llegadas.
 CARLA quedó sin actores vehiculares ni sensores, asíncrono y con renderizado.
 
-Al 2026-09-10 sigue pendiente la **prueba manual del estudiante**. Antes de
-aumentar la flota, observar ambos escenarios con tres vehículos, semilla 42,
-600 s y renderizado activo, conservando sus logs. Revisar salidas, curvas,
-paradas, llegadas y reinicios; registrar el vehículo, momento y carpeta de
-cualquier comportamiento dudoso. Las invasiones siguen siendo una métrica,
-no un requisito de cero eventos. La estabilidad comprobada hasta ahora
-corresponde a las condiciones ensayadas, no a una validación académica final.
+El estudiante completó una **ejecución manual de baseline/42 el 2026-09-14**:
+tres vehículos, 600 s, renderizado y ritmo 1×. La auditoría offline del día 15
+confirmó 11 llegadas, tres viajes activos al corte y cero errores de integridad,
+colisiones, invasiones, fallos de ruta o bloqueos. Tiempo medio de completados:
+137.209 s; velocidad de presencia completa: 11.565 km/h. Solo comprobó que
+terminara: siguen pendientes la observación detallada y el histórico manual.
+Revisar salidas, curvas, paradas, llegadas y reinicios; conservar los logs y
+anotar vehículo/momento ante dudas. Las invasiones siguen siendo una métrica,
+no un requisito de cero eventos.
+
+La [revisión y propuesta de demanda](docs/seleccion_niveles_demanda.md) documenta
+los resultados, su comparación con el día 9 y el respaldo metodológico.
+Se proponen pilotos de **5 → 10 → 20 vehículos** y candidatos iniciales de
+cinco y veinte para los dos niveles; aún no están validados. Los 20/70 de
+los JSON antiguos corresponden a Town03, con distintas duraciones, y no se
+pueden trasladar directamente a este experimento. Antes de escalar hay que
+preparar spawns, ampliar historiales y revisar la interpretación de `blocked`
+en presencia de colas. No se aumentó la flota ni se modificó la conducción.
 
 Después queda definir la comparación de ambos selectores bajo **dos niveles de
 demanda**, como exige el objetivo 1, y ejecutar su matriz experimental.
