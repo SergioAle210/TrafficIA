@@ -43,6 +43,7 @@ def minute_edges(seconds):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data',type=Path,required=True)
+    parser.add_argument('--compare-data',type=Path,help='Previous figure folder; requires re-audit in data/previous_review.')
     args=parser.parse_args();out=args.data
     derived=read(out/'derivation_manifest.json');review=read(out/'chart_input_review.json')
     if review['errors'] or any(not p['comparable'] for p in review['pairs']):raise ValueError('Unvalidated inputs')
@@ -288,6 +289,9 @@ def main():
         axis.legend(fontsize=8,ncol=2,loc='upper right');axis.grid(axis='y');axis.set_axisbelow(True)
     figs.save(fig,'12_comparacion_mitades','Primera y segunda mitad de las mismas corridas',
               'Velocidad y baja velocidad: ponderadas por exposición en ventanas de 60 s, asignadas por su centro (desfase de 0,05 s).\nLlegadas y blocked: tiempo exacto de terminación. Son mitades de una corrida, no réplicas independientes ni continuación de la campaña anterior.')
+    if args.compare_data:
+        from scripts.campaign_comparison import append_comparison
+        append_comparison(out,args.compare_data,figs,base,review)
     figs.pdf.close()
     export(out,figs.items,runs,extra,derived,review,occupied,context)
 
@@ -354,9 +358,15 @@ def export(out,items,runs,extra,derived,review,occupied,context):
     for item in items:report+=['### '+item['title'],'',item['note'],'','!['+item['title']+']('+item['name']+'.png)','']
     (out/'informe_graficas.md').write_text('\n'.join(report),encoding='utf8')
     sources=['scripts/plot_demand_campaign.py','scripts/plot_mobility_campaign.py','scripts/review_demand_chart_inputs.py','src/incident_analysis.py','src/traffic_flow_analysis.py']
+    if (out/'repeat_comparison.json').exists():
+        sources.append('scripts/campaign_comparison.py')
+        with (out/'informe_graficas.md').open('a',encoding='utf8') as stream:
+            stream.write('\n\n[Comparación detallada con la primera campaña](comparacion_repeticiones.md).\n')
     manifest=dict(figures=items,campaign=derived['campaign'],source_sha256={name:sha(ROOT/name) for name in sources},
                   input_sha256={name:sha(out/name) for name in ('derivation_manifest.json','chart_input_review.json','flow_cells.csv','time_series.csv')},
                   guide_sha256={name:sha(out/name) for name in ('flow_guides.csv','guide_method.json')})
+    if (out/'repeat_comparison.json').exists():
+        manifest['comparison_sha256']={name:sha(out/name) for name in ('repeat_comparison.json','repeat_comparison.csv','comparacion_repeticiones.md')}
     (out/'figures_manifest.json').write_text(json.dumps(manifest,indent=2,ensure_ascii=False),encoding='utf8')
     print('EXPORTED',len(items),'figures PNG/SVG, PDF and HTML:',out.resolve())
 
