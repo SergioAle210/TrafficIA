@@ -1,0 +1,266 @@
+{
+  "map": "Carla/Maps/Town01",
+  "seed": 42,
+  "counts": [
+    5,
+    10,
+    20
+  ],
+  "selection": "Preserve [133,6,101]; extend among catalog driving/nonjunction spawns by max-min XY center distance, lower-index ties. Spatial dispersion is not a network-capacity estimate.",
+  "history": "30 synthetic visits per vehicle, shared existing generator; nested identical prefixes; first five unchanged.",
+  "base_config_sha256": "299d694ebed18a0c7eddb4121ac165596170777bd56f2713e096aedca253d198",
+  "destinations_sha256": "17f2afcb0b52fc8f13d3aca6956fe97b404ad19007a3fd6bc67f89d4433fe7f0",
+  "original_history_sha256": "72d326a958156422a246a30b7ca7970334e45986ae133fdcd61f6af5fdbac62d",
+  "xodr_sha256": "97a7f6ac67812567e5c8ee0599cd823b23f80f30f3f97c502212e38b72e2b709",
+  "ordered_spawns": [
+    {
+      "spawn_index": 133,
+      "destination_id": "T01_133",
+      "x": 259.5985412597656,
+      "y": 129.48558044433594,
+      "z": 0.0,
+      "yaw_deg": 180.02560424804688,
+      "road_id": 4,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 6,
+      "destination_id": "T01_006",
+      "x": 272.2899475097656,
+      "y": 55.47783660888672,
+      "z": 0.0,
+      "yaw_deg": 179.99301147460938,
+      "road_id": 10,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 101,
+      "destination_id": "T01_101",
+      "x": 88.38185119628906,
+      "y": 77.93556213378906,
+      "z": 0.0,
+      "yaw_deg": 89.99127960205078,
+      "road_id": 22,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 67,
+      "destination_id": "T01_067",
+      "x": 2.022737503051758,
+      "y": 318.5048522949219,
+      "z": 0.0,
+      "yaw_deg": 267.04107666015625,
+      "road_id": 20,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 43,
+      "destination_id": "T01_043",
+      "x": 301.3399963378906,
+      "y": 326.6099853515625,
+      "z": 0.0,
+      "yaw_deg": 180.0,
+      "road_id": 6,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 30,
+      "destination_id": "T01_030",
+      "x": 142.92001342773438,
+      "y": 326.5942077636719,
+      "z": 0.0,
+      "yaw_deg": 180.00611877441406,
+      "road_id": 6,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 91,
+      "destination_id": "T01_091",
+      "x": 88.40203094482422,
+      "y": 210.67027282714844,
+      "z": 0.0,
+      "yaw_deg": 89.99127960205078,
+      "road_id": 24,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 45,
+      "destination_id": "T01_045",
+      "x": 194.4622802734375,
+      "y": 199.1484375,
+      "z": 0.0,
+      "yaw_deg": 0.004655823577195406,
+      "road_id": 12,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 69,
+      "destination_id": "T01_069",
+      "x": 1.9459599256515503,
+      "y": 99.25035858154297,
+      "z": 0.0,
+      "yaw_deg": 269.9700622558594,
+      "road_id": 15,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 68,
+      "destination_id": "T01_068",
+      "x": 2.003073215484619,
+      "y": 208.6011962890625,
+      "z": 0.0,
+      "yaw_deg": 269.9700622558594,
+      "road_id": 15,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 17,
+      "destination_id": "T01_017",
+      "x": 158.0469207763672,
+      "y": 27.17995834350586,
+      "z": 0.0,
+      "yaw_deg": 270.069580078125,
+      "road_id": 25,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 18,
+      "destination_id": "T01_018",
+      "x": 295.0817565917969,
+      "y": 199.1566162109375,
+      "z": 0.0,
+      "yaw_deg": 0.004655823577195406,
+      "road_id": 12,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 15,
+      "destination_id": "T01_015",
+      "x": 144.05946350097656,
+      "y": 129.4339599609375,
+      "z": 0.0,
+      "yaw_deg": 180.02560424804688,
+      "road_id": 4,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 39,
+      "destination_id": "T01_039",
+      "x": 232.20021057128906,
+      "y": 326.6037292480469,
+      "z": 0.0,
+      "yaw_deg": 180.00611877441406,
+      "road_id": 6,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 0,
+      "destination_id": "T01_000",
+      "x": 334.7345886230469,
+      "y": 273.74285888671875,
+      "z": 0.0,
+      "yaw_deg": 90.03459930419922,
+      "road_id": 19,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 94,
+      "destination_id": "T01_094",
+      "x": 213.88052368164062,
+      "y": 1.9618257284164429,
+      "z": 0.0,
+      "yaw_deg": 0.0061187744140625,
+      "road_id": 1,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 44,
+      "destination_id": "T01_044",
+      "x": 88.41559600830078,
+      "y": 299.92132568359375,
+      "z": 0.0,
+      "yaw_deg": 89.99127960205078,
+      "road_id": 24,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 93,
+      "destination_id": "T01_093",
+      "x": 213.88040161132812,
+      "y": 59.484954833984375,
+      "z": 0.0,
+      "yaw_deg": -0.006981649901717901,
+      "road_id": 10,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 27,
+      "destination_id": "T01_027",
+      "x": 142.3605194091797,
+      "y": 199.1442108154297,
+      "z": 0.0,
+      "yaw_deg": 0.004655823577195406,
+      "road_id": 12,
+      "lane_id": -1,
+      "lane_width_m": 4.0
+    },
+    {
+      "spawn_index": 74,
+      "destination_id": "T01_074",
+      "x": 322.0962829589844,
+      "y": 55.47176742553711,
+      "z": 0.0,
+      "yaw_deg": 179.99301147460938,
+      "road_id": 10,
+      "lane_id": 1,
+      "lane_width_m": 4.0
+    }
+  ],
+  "fleets": [
+    {
+      "vehicles": 5,
+      "config": "config/pilots/town01_05.json",
+      "history": "data/input/Town01/pilots/vehicle_history_05.csv",
+      "history_rows": 150,
+      "min_spawn_center_distance_m": 75.08806789507912,
+      "config_sha256": "4b345e73a5e16d6da1b5d7063bbf64ed09bb7c0fb9f404e86ab9c1a6bce8dcd1",
+      "history_sha256": "72d326a958156422a246a30b7ca7970334e45986ae133fdcd61f6af5fdbac62d"
+    },
+    {
+      "vehicles": 10,
+      "config": "config/pilots/town01_10.json",
+      "history": "data/input/Town01/pilots/vehicle_history_10.csv",
+      "history_rows": 300,
+      "min_spawn_center_distance_m": 75.08806789507912,
+      "config_sha256": "158e4a10f328d7976c6da0f1be89a08afb6dcf4461cfd52e61199f6f3768da92",
+      "history_sha256": "6fd31ec7b6564d7be1e31da93affe44861b73087bf2b4b5cc6b2c28e11c19dc5"
+    },
+    {
+      "vehicles": 20,
+      "config": "config/pilots/town01_20.json",
+      "history": "data/input/Town01/pilots/vehicle_history_20.csv",
+      "history_rows": 600,
+      "min_spawn_center_distance_m": 49.806335819000886,
+      "config_sha256": "f52013bacb4439c19c66250528cc7866996828cf6d1eddc40cb7af097abf6d16",
+      "history_sha256": "dee48396f12cad74fc340ee49b37b79d683fa2b4c58d95a34eb06e876a6aee81"
+    }
+  ]
+}
