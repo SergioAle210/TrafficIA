@@ -1,5 +1,6 @@
 """Camera callback/frame association, state transitions and resource ownership."""
 import tempfile
+import csv
 import json
 import threading
 import unittest
@@ -8,7 +9,7 @@ from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
 from src.trip_runner import TripSimulation, TripSimulationConfig
-from src.visual_review import ImageRecorder, VisualReviewSimulation, image_index, capture_spacing
+from src.visual_review import ImageRecorder, VisualReviewSimulation, image_index, capture_spacing, agent_light_context
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,6 +30,19 @@ class Image:
 
 
 class VisualReviewTests(unittest.TestCase):
+    def test_cached_agent_light_is_observed_without_rerunning_hazard_detector(self):
+        light = Mock(id=72, get_state=Mock(return_value='Red'))
+        agent = NS(_last_traffic_light=light, _affected_by_traffic_light=Mock())
+        self.assertEqual(agent_light_context(NS(agent=agent)), (72, 'Red'))
+        agent._affected_by_traffic_light.assert_not_called()
+        self.assertIs(agent._last_traffic_light, light)
+        light.get_state.return_value = 'Green'
+        self.assertEqual(agent_light_context(NS(agent=agent)), (72, 'Green'))
+
+    def test_no_active_trip_does_not_report_stale_agent_light(self):
+        self.assertEqual(agent_light_context(None), ('',''))
+        self.assertEqual(agent_light_context(NS(agent=NS(_last_traffic_light=None))), ('',''))
+
     def config(self, **overrides):
         return TripSimulationConfig.from_json(ROOT/'config/multi_vehicle_trip.json', overrides)
 
@@ -153,6 +167,33 @@ class VisualReviewTests(unittest.TestCase):
             summary = json.loads((Path(directory)/'capture_summary.json').read_text())
             self.assertFalse(summary['image_capture_enabled'])
             self.assertEqual(summary['cameras'], {})
+
+    def test_no_camera_stream_preserves_rows_and_counts_without_retaining_them(self):
+        simulation = VisualReviewSimulation(self.config(), ROOT, 1, capture_images=False)
+        state = simulation.vehicle_states[0]
+        simulation.vehicle_states = [state]
+        state.actor = Mock(id=11)
+        state.actor.get_transform.return_value = NS(location=NS(x=1., y=2., z=0.), rotation=NS(yaw=0.))
+        state.actor.get_velocity.return_value = NS(x=1., y=0., z=0.)
+        state.active_trip = NS(trip_id='trip_001', destination=NS(destination_id='D1'))
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict('sys.modules', {'carla':Mock()}), patch.object(TripSimulation,'_write_run_config'):
+                simulation._write_run_config(Path(directory), '0.9.15', [])
+            with patch.object(TripSimulation, '_update_active_trip') as update:
+                for frame in range(1, 501):
+                    simulation._update_active_trip(Mock(), state.actor, frame, frame*.05, state)
+            self.assertEqual(update.call_count, 500)
+            self.assertEqual(simulation._observations, {})
+            simulation._finalize_review()
+            with (Path(directory)/'observation_log.csv').open(newline='', encoding='utf8') as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(len(rows), 500)
+            self.assertEqual(rows[-1]['frame'], '500')
+            self.assertEqual(rows[-1]['context_trip_id'], 'trip_001')
+            self.assertEqual(rows[-1]['phase_after'], 'travel')
+            summary = json.loads((Path(directory)/'capture_summary.json').read_text())
+            self.assertEqual(summary['observation_rows_by_vehicle'], {state.vehicle_id:500})
+            state.actor.apply_control.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -17,7 +17,8 @@ OBSERVATION_FIELDS = [
     'vehicle_id', 'frame', 'simulation_time_s', 'phase_before', 'phase_after',
     'trip_before', 'trip_after', 'context_trip_id', 'destination_id',
     'x', 'y', 'z', 'yaw_deg', 'speed_mps', 'low_speed',
-    'traffic_light_id', 'traffic_light_state', 'at_traffic_light', 'nearby_vehicles_json',
+    'traffic_light_id', 'traffic_light_state', 'at_traffic_light',
+    'agent_traffic_light_id', 'agent_traffic_light_state', 'nearby_vehicles_json',
 ]
 INDEX_FIELDS = [
     'vehicle_id', 'frame', 'simulation_time_s', 'sensor_timestamp_s', 'camera_transform_json', 'path', 'saved', 'error',
@@ -135,6 +136,13 @@ def phase_record(trip):
     return ('travel', trip.trip_id) if trip is not None else ('dwell', '')
 
 
+def agent_light_context(active_trip):
+    """Read the prior control step's cached light without invoking its detector."""
+    agent = getattr(active_trip, 'agent', None)
+    light = getattr(agent, '_last_traffic_light', None)
+    return (light.id, str(light.get_state())) if light is not None else ('', '')
+
+
 class VisualReviewSimulation(TripSimulation):
     """Observe before/after updates; inherit every route/control/tick decision."""
 
@@ -149,6 +157,7 @@ class VisualReviewSimulation(TripSimulation):
         self.config.navigation_diagnostics_enabled = True
         self._recorder = None
         self._observations = {}
+        self._observation_counts = Counter()
         self._observation_file = None
         self._last_trips = {}
         self._review_output = None
@@ -171,7 +180,7 @@ class VisualReviewSimulation(TripSimulation):
                         'src/navigation_diagnostics.py', 'src/visual_review.py', 'src/vehicle_history.py',
                         'src/run_logger.py', 'scripts/run_trip_simulation.py', 'scripts/review_trip_simulation.py']
         inputs = [self.config.destinations_config, self.config.vehicle_history_config]
-        metadata = dict(schema_version=2, image_capture_enabled=self.capture_images,
+        metadata = dict(schema_version=3, image_capture_enabled=self.capture_images,
             camera=CAMERA if self.capture_images else None,
             source_sha256={f: hashlib.sha256((self.project_root/f).read_bytes()).hexdigest() for f in source_files},
             input_sha256={f: hashlib.sha256((self.project_root/f).read_bytes()).hexdigest()
@@ -179,6 +188,7 @@ class VisualReviewSimulation(TripSimulation):
             observation_semantics='After physics tick, before/after unchanged trip update. New-trip selection later in the same frame first appears next frame.',
             low_speed_threshold_mps=self.config.blocked_speed_threshold_mps,
             nearby_radius_m=30, nearby_scope='configured fleet only; offsets in ego forward/right axes; center distances, not clearance',
+            agent_traffic_light_semantics='During low speed and active trips only: ID cached by BasicAgent in the prior control step, with current light state. Passive context, not exclusive stop attribution; blank during dwell.',
             camera_attachment='rigid relative x=0 y=0 z=18; pitch=-90 yaw=0 roll=0; default RGB postprocessing',
             capture_integrity='Exact vehicle/frame join to world time; retain raw sensor timestamp separately; report cadence gaps and camera startup.',
             timestamp_semantics='CARLA 0.9.15 RGB uses a render-thread frame and a later stream timestamp. Sensor timestamp can lead world time of its frame. No nearest-time remapping.',
@@ -221,7 +231,9 @@ class VisualReviewSimulation(TripSimulation):
         low_speed = speed < self.config.blocked_speed_threshold_mps
         near = []
         light, light_state, at_light = '', '', ''
+        agent_light, agent_light_state = '', ''
         if low_speed:
+            agent_light, agent_light_state = agent_light_context(state.active_trip)
             at_light = vehicle.is_at_traffic_light()
             if at_light:
                 traffic_light = vehicle.get_traffic_light()
@@ -245,8 +257,13 @@ class VisualReviewSimulation(TripSimulation):
                    context_trip_id=trip.trip_id if trip else '', destination_id=trip.destination.destination_id if trip else '',
                    x=location.x, y=location.y, z=location.z, yaw_deg=transform.rotation.yaw, speed_mps=speed,
                    low_speed=low_speed, traffic_light_id=light, traffic_light_state=light_state, at_traffic_light=at_light,
+                   agent_traffic_light_id=agent_light, agent_traffic_light_state=agent_light_state,
                    nearby_vehicles_json=json.dumps(sorted(near, key=lambda n:n['distance_m'])))
-        self._observations[(state.vehicle_id, frame)] = row
+        # Only RGB needs a delayed frame join. Headless observation is streamed
+        # to CSV so memory does not grow with vehicles times simulation ticks.
+        if self.capture_images:
+            self._observations[(state.vehicle_id, frame)] = row
+        self._observation_counts[state.vehicle_id] += 1
         self._observation_writer.writerow(row)
         return result
 
@@ -287,7 +304,7 @@ class VisualReviewSimulation(TripSimulation):
                 last_image_frame=received_frames[-1] if received_frames else None)
         metadata = dict(run_id=self.run_id, simulation_completed=self._review_finished,
                         image_capture_enabled=self.capture_images,
-                        observation_rows_by_vehicle=dict(Counter(v for v, f in self._observations)), cameras=by_vehicle,
+                        observation_rows_by_vehicle=dict(self._observation_counts), cameras=by_vehicle,
                         camera_actor_ids=self._camera_ids, wall_seconds_since_camera_setup=time.monotonic()-self._start_wall if self._start_wall else None,
                         note=('Warm-up before the first image is not silently counted as complete visual coverage.'
                               if self.capture_images else 'No RGB cameras requested. Logs do not provide visual coverage.'))
