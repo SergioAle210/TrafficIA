@@ -6,6 +6,40 @@ hipótesis, archivos afectados, pruebas realizadas, rutas de resultados y
 limitaciones pendientes. No reemplazar resultados antiguos ni presentar pruebas
 unitarias como validación de física real.
 
+## 2026-09-23 - Gráficas y comparación de segunda campaña de 3600 s
+
+Campaña `demand20_100_seed_210_20260923T045032867422Z`, iniciada el 22 a las
+22:50 y terminada el 23 a las 06:10, hora local. Cuatro corridas completas;
+20/100 vehículos, semilla 210, 3600 s, 5x solicitado y sin cámaras.
+[Resultados y comparación](repetibilidad_demandas_3600.md). Derivados en
+`data/output/visual_analysis20_100_3600_repeat_20260923/`.
+
+Se reauditaron ambas campañas: 104 hashes de salida, instantáneas válidas,
+27 archivos de código/entradas idénticos y condiciones comparables.
+Veinte: 423/398 llegadas, cero blocked/route_failed, 12/0 callbacks de
+colisión y 0/0 invasiones. Cien: 237/254 llegadas, 4154/4152 blocked,
+804/235 route_failed, 542630/51473 callbacks y 72/8 invasiones.
+Los grupos descriptivos de contacto con cien son 396/45; no accidentes
+independientes. El patrón agregado persiste pero los incidentes no se
+reproducen exactamente. Causa de divergencia no determinada en este análisis.
+
+Se añadió `scripts/campaign_comparison.py` y opción `--compare-data` al
+exportador para tablas y dos láminas comparativas. El emparejamiento verifica
+cantidad/selector/semilla y condiciones; el porcentaje con base cero queda
+indefinido. Tres pruebas de regresión nuevas: emparejamiento fuera de orden,
+base cero y rechazo de datos incompatibles. 135 pruebas pasaron con
+carla-env/CARLA_PYTHONAPI. No se cambió conducción ni blocked; no se ejecutó
+CARLA ni se hicieron commits. README y contexto académico actualizados;
+figuras anteriores y documentos TeX del estudiante conservados.
+
+Cierre de validación: 17.28 millones de observaciones, 9120 celdas,
+4253 ocupadas, 33 bandas guía con soporte; conservación y q=k*v verificadas.
+Los 44 deltas entre campañas y hashes de sus entradas coinciden. Catorce
+páginas renderizadas y revisadas. Segunda mitad de cien aleatorio: 17
+llegadas y 0.196 km/h, frente a 46 y 0.628 en la primera campaña.
+Muestras fuera de proyección driving: 293857 frente a 102060; permanecen
+en registros y series globales, excluidas solo de las celdas locales.
+
 ## 2026-09-22 - Gráficas de la campaña de 3600 segundos
 
 El estudiante terminó las cuatro corridas de `demand20_100_seed_210_20260922T040147250610Z`

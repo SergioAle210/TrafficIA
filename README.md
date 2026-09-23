@@ -984,6 +984,15 @@ vehículos y todavía no comparan dos demandas. Los scripts
 trabajan offline con `carla-env`; no requieren servidor ni cambian conducción.
 Pasaron 118 pruebas, incluidas siete de agregación espacio-temporal.
 
+**Repetición de 3600 segundos (23 de septiembre):** la
+[comparación entre campañas](docs/repetibilidad_demandas_3600.md) añade
+catorce láminas para la ejecución de la noche 22-23, sin sobrescribir la
+primera. Se verificaron 104 archivos de salida entre ambas y 27 fuentes/
+entradas idénticas. Veinte mantiene métricas agregadas cercanas; cien
+aleatorio pasa de 252 a 237 llegadas y de 1.75 a 1.52 km/h, con más contactos.
+La misma semilla no produjo resultados exactamente iguales. El detector
+blocked sigue vigente. 135 pruebas pasaron; sin simulaciones ni commits.
+
 **Gráficas de 3600 segundos (22 de septiembre):** la nueva
 [galería y análisis](docs/graficas_demandas_3600.md) conserva los resultados
 anteriores y presenta doce láminas, incluidas las guías de tráfico y una

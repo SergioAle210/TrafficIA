@@ -1,6 +1,6 @@
 # Contexto del trabajo de graduación
 
-Actualizado: 2026-09-22. Este documento orienta las decisiones de desarrollo,
+Actualizado: 2026-09-23. Este documento orienta las decisiones de desarrollo,
 validación y análisis de TrafficIA. Distingue los objetivos del protocolo,
 las decisiones del estudiante y las propuestas pendientes. No sustituye el
 protocolo ni acredita objetivos como cumplidos sin evidencia.
@@ -383,6 +383,19 @@ ambiguo; no son accidentes verificados. La siguiente prioridad es explicar
 las primeras secuencias de bloqueo antes de fijar cien como demanda mayor
 o planear cantidades intermedias/réplicas. Una semilla no establece
 significancia ni superioridad del selector. No se exige cero invasiones.
+
+## Actualización del 23 de septiembre: repetibilidad con semilla 210
+
+La [segunda campaña de 3600 s](docs/repetibilidad_demandas_3600.md) preserva
+27 archivos de código/entradas de la primera y las condiciones registradas.
+Veinte produce métricas agregadas cercanas (423/398 llegadas); cien alcanza
+237/254 frente a 252/252, con variación importante de callbacks e invasiones.
+No se demuestra determinismo exacto ni se estima variabilidad entre semillas
+con estas dos repeticiones. Continúa pendiente explicar contactos y evaluar
+la intervención del detector blocked: sigue terminando viajes por baja
+velocidad prolongada; todavía no se implementó conservar el destino.
+Los nuevos resultados no invalidan por sí solos las métricas ni certifican
+capacidad vial; la interpretación debe conservar esta limitación.
 
 ## Actualización del 22 de septiembre: una hora por combinación
 
