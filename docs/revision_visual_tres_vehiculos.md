@@ -226,3 +226,33 @@ con idéntica instrumentación para ambos tratamientos.
 No se crearon configuraciones de mayor flota ni se ejecutaron esos pilotos
 en esta revisión. No se hicieron commits. Se conservaron los resultados
 anteriores y las modificaciones preexistentes del repositorio.
+
+Actualización posterior: el estudiante autorizó guardar los Markdown/Python
+pendientes y ejecutar el piloto de cinco, dejando preparados diez y veinte.
+El avance, configuraciones, historiales y resultados de esa etapa se registran
+en [pilotos de escalamiento](pilotos_escalamiento.md). Los resultados de tres
+vehículos descritos arriba permanecen como antecedente independiente.
+
+El piloto de cinco completó ambos escenarios: 17 y 19 llegadas, cinco viajes
+activos al corte por escenario, sin errores de integridad ni `blocked`.
+Las configuraciones e historiales de 10/20 quedaron preparados en esa etapa.
+No se fijaron demandas finales.
+
+Actualización del **2026-09-17**: se completaron diez y después veinte, ambos
+selectores, 600 s, semilla 42 y sin cámaras. Llegadas: 28/33 con diez y 55/63
+con veinte. Las cuatro auditorías pasaron, sin bloqueos, fallos de ruta ni
+colisiones. Veinte registró dos invasiones NONE por escenario del Cybertruck;
+se conservaron y contextualizaron sin modificar conducción. Se auditaron
+179 llegadas, 175 ciclos completos y 720,000 observaciones. Los cuatro ciclos
+restantes terminaron en espera al corte de duración. El informe de pilotos
+incluye resultados por vehículo, comparación 5/10/20 y próximos pasos.
+La evidencia sigue siendo de registros; la revisión visual permanece pendiente.
+
+Ampliación posterior del mismo día: se completaron cuatro corridas de veinte
+con semillas 210/109, ambos selectores y 1,800 s a ritmo solicitado 5×.
+Se auditaron 783 llegadas y 781 ciclos; las dos esperas finales quedaron
+cortadas por duración. Hubo dos episodios de contacto entre vehículos
+(524 callbacks) en baseline, conservados sin ajustar conducción. Resultados,
+reconstrucciones y límites en la
+[campaña larga de veinte](campana_larga_veinte_vehiculos.md). Sigue pendiente
+la revisión con imágenes; esta ampliación no la declara completada.
