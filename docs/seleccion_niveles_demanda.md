@@ -1,5 +1,12 @@
 # Revisión de la corrida manual y selección de niveles de demanda
 
+**Actualización 2026-09-17:** los pilotos 5/10/20 y las corridas largas de
+veinte ya se completaron. La nueva [investigación de referencias y criterios](fundamento_demandas_town01.md)
+propone veinte como candidato menor y cien como referencia mayor publicada
+para Town01, condicionada a un barrido propio y a viabilidad. No son demandas
+finales aprobadas ni una capacidad medida. El contenido del 15 de septiembre
+se conserva abajo como antecedente; sus tareas pendientes describen esa fecha.
+
 Fecha del análisis: 2026-09-15. Corrida del estudiante: 2026-09-14.
 Estado: análisis offline y propuesta experimental; no se ejecutaron pilotos
 con más vehículos ni se fijaron cantidades finales. No se inició CARLA.
