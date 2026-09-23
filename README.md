@@ -779,8 +779,10 @@ Resultados de esa validación previa:
 La limpieza final dejó cero vehículos y sensores, modo asíncrono y no-rendering.
 Esto valida la corrección en esas condiciones; no demuestra ausencia de
 contactos con otros modelos, semillas o cargas.
-No se inicia monitoreo automático. La comparación estadística formal, las
-gráficas de densidad/flujo y más vehículos quedan para el siguiente incremento.
+No se inicia monitoreo automático. En aquella validación quedaron pendientes
+la comparación estadística formal, las gráficas de densidad/flujo y más
+vehículos. Los avances posteriores se registran abajo; las primeras
+[gráficas exploratorias](docs/graficas_campana_veinte.md) ya están disponibles.
 
 La corrección posterior de llegada y espera (2026-09-08), con tres vehículos,
 semilla 42 y 600 s por escenario, obtuvo:
@@ -932,7 +934,105 @@ la validación visual y los niveles definitivos de demanda siguen pendientes.
 
 ## Próximos pasos
 
-La campaña larga ya está ejecutada y revisada. Según la aclaración posterior
+La [revisión del controlador y los incidentes](docs/control_e_incidentes.md)
+explica qué cambios redujeron contactos e invasiones, su evidencia y sus
+límites para comparar selectores. Las tasas corresponden al controlador
+común corregido; no se exige cero eventos ni se atribuye su reducción al 80/20.
+
+Los [pilotos de cinco, diez y veinte](docs/pilotos_escalamiento.md) completaron
+ambos escenarios sin cámaras, semilla 42 y 600 s a 1×. El 17 de septiembre se
+ejecutaron diez (28/33 llegadas baseline/histórico) y veinte (55/63 llegadas).
+Las cuatro corridas nuevas tienen cero errores de integridad, bloqueos,
+fallos de ruta, timeout y colisiones. Con veinte hubo dos invasiones por
+escenario, todas del Cybertruck y conservadas como métrica. Se auditaron
+179 llegadas, 175 ciclos completos y 720,000 observaciones; los cuatro ciclos
+restantes quedaron en espera al corte. Las 235 elecciones se reprodujeron
+sin diferencias. Pasaron 111 pruebas y las fuentes permanecieron intactas.
+
+Configuraciones e historiales: `config/pilots/` y `data/input/Town01/pilots/`.
+[Comparación de las seis corridas](data/output/scaling_pilots_20260917/metrics/report.md).
+CARLA quedó en Town01 sin vehículos/sensores, asíncrono y con renderizado.
+Sigue registrar repeticiones/semillas y validar mayor duración antes de fijar
+las dos demandas; veinte no demuestra por sí solo saturación. No se modificó
+el controlador ni se hicieron commits en esta etapa.
+
+Actualización del 17 de septiembre: se completó y auditó una
+[campaña larga con veinte vehículos](docs/campana_larga_veinte_vehiculos.md),
+semillas 210/109, ambos selectores, 1,800 s y ritmo solicitado 5×, sin cámaras
+ni cambios de conducción. Ritmo alcanzado: 1.730–1.832×. Hubo 783 llegadas,
+78 viajes cortados, 781 ciclos completos y 861 decisiones reproducidas sin
+diferencias, con 2,880,000 observaciones y cero errores de integridad.
+Baseline 210/109 registró 14/510 callbacks de colisión, concentrados en dos
+episodios entre vehículos; histórico registró cero. No hubo invasiones,
+bloqueos, fallos de ruta ni timeout. Los historiales crecieron a 796/791
+visitas. El intento inicial a 1× se conserva como parcial excluido, tras
+la petición de acelerar las cuatro corridas. CARLA quedó limpio en Town01.
+Sigue definir la unidad de incidente y una matriz comparable de repeticiones
+y flotas antes de fijar las demandas; estas dos semillas son una ampliación
+exploratoria y no prueban por sí solas repetibilidad física exacta.
+
+**Gráficas del 17 de septiembre:** [guía e interpretación](docs/graficas_campana_veinte.md),
+[PDF de nueve láminas](data/output/visual_analysis20_20260917/graficas_campana.pdf)
+y [galería local](data/output/visual_analysis20_20260917/index.html).
+Cubren destinos, tiempos completos/cortados, velocidad de presencia,
+colisiones/invasiones, crecimiento del historial y relaciones locales
+velocidad–densidad, flujo–densidad y velocidad–flujo. Estas últimas usan
+38 tramos de 50 m y ventanas de 60 s: 2,458 celdas con presencia, sin ajuste
+de curva ni estimación de capacidad. Las cuatro corridas tienen veinte
+vehículos y todavía no comparan dos demandas. Los scripts
+`scripts/build_campaign_plot_data.py` y `scripts/plot_mobility_campaign.py`
+trabajan offline con `carla-env`; no requieren servidor ni cambian conducción.
+Pasaron 118 pruebas, incluidas siete de agregación espacio-temporal.
+
+**Gráficas de 3600 segundos (22 de septiembre):** la nueva
+[galería y análisis](docs/graficas_demandas_3600.md) conserva los resultados
+anteriores y presenta doce láminas, incluidas las guías de tráfico y una
+comparación de ambas medias horas. Con veinte hubo 422/397 llegadas, sin
+blocked ni rutas rechazadas; con cien, 252/252 llegadas y 3932/4147 blocked.
+Se verificaron 52 archivos y se procesaron 17.28 millones de observaciones.
+132 pruebas pasaron. Análisis offline, sin cambios de conducción ni commits.
+
+**Líneas guía para leer los diagramas (20 de septiembre):** la
+[explicación y galería revisada](docs/lectura_diagramas_y_guias.md) añade
+resúmenes por bandas de densidad a los mismos puntos observados. Cada
+marcador conserva q=k·v; se interrumpe la guía donde hay pocas celdas. No se
+ajusta una parábola ni se estima capacidad. Se aclara la diferencia entre
+probabilidad 80/20, nubes observadas y modelos teóricos. Pasaron 130 pruebas;
+sin nuevas simulaciones. Las figuras del día 19 se conservan.
+
+**Gráficas de 20 y 100 vehículos (19 de septiembre):** se analizó la campaña
+completa del día 18, semilla 210, ambos selectores y 1,800 s por caso. La
+[guía de resultados](docs/graficas_demandas_20_100.md) enlaza once láminas
+PNG/SVG, PDF, galería y datos derivados. Se verificaron 52 archivos y se
+procesaron 8.64 millones de observaciones offline. Con veinte hubo 215/196
+llegadas y 10.38/10.71 km/h; con cien, 173/183 y 2.47/2.55 km/h. Cien acumuló
+3,460 `blocked` y 417 `route_failed` entre ambos selectores, separados de los
+cortes por fin de simulación. Las nubes de tráfico cubren mayores densidades,
+pero los contactos y bloqueos impiden presentarlas como una capacidad vial
+calibrada. Primero corresponde investigar esas secuencias; no se exige cero
+invasiones. Pasaron 126 pruebas; no se ejecutó CARLA para generar las figuras.
+
+**Fundamento de las demandas:** la [investigación del 17 de septiembre](docs/fundamento_demandas_town01.md)
+verifica el antecedente NoCrash (20/100 en Town01; 15/70 en Town02) y distingue
+capacidad vial, carga computacional y población simultánea. El 18 de septiembre
+el estudiante eligió probar directamente **20 y 100**, semilla **210**, ambos
+selectores y **1,800 s por corrida a 5× solicitado**. Las dos cantidades siguen
+siendo candidatas; cien no implica saturación por definición. La
+[campaña preparada y sus comprobaciones](docs/campana_demanda_20_100.md)
+conserva historiales completos y registra cada frame sin cámaras RGB.
+
+Con una sola instancia de CARLA 0.9.15 en Town01, desde la raíz del repositorio:
+
+```powershell
+.\carla-env\Scripts\python.exe -u scripts/run_demand_campaign.py --seed 210 --seconds 1800 --simulation-speed 5
+```
+
+Ejecuta secuencialmente 20/baseline, 20/histórico, 100/baseline y 100/histórico;
+crea una carpeta nueva de campaña, comprueba limpieza entre casos y genera
+auditorías y métricas. `--check-only` comprueba las entradas y el servidor sin
+crear actores. La velocidad real depende de la carga; 5× no es una garantía.
+
+La campaña larga previa con tres vehículos ya está ejecutada y revisada. Según la aclaración posterior
 del estudiante y el objetivo específico 3, **no se exige cero invasiones de
 carril**: se conservan como métrica de comparación. La recomendación previa
 de eliminar las invasiones del Cybertruck como requisito para avanzar queda
@@ -979,7 +1079,8 @@ El estudiante confirmó que los niveles de demanda serán distintas cantidades
 de vehículos simultáneos. Elegir esas cantidades y la matriz de repeticiones
 queda para después de corregir rutas/llegadas, definir límites temporales y
 preparar las métricas. Cinco vehículos no es un requisito del protocolo.
-No se amplió la flota.
+La ampliación técnica hasta veinte quedó validada en los pilotos del día 17;
+la elección de las dos demandas definitivas sigue pendiente.
 Sigue pendiente caracterizar la variación física entre repeticiones si se
 requiere determinismo por frame para el experimento.
 Todavía no se calculan densidad o flujo para diagramas

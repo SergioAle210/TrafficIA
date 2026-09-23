@@ -1,6 +1,6 @@
 # Contexto del trabajo de graduación
 
-Actualizado: 2026-09-15. Este documento orienta las decisiones de desarrollo,
+Actualizado: 2026-09-22. Este documento orienta las decisiones de desarrollo,
 validación y análisis de TrafficIA. Distingue los objetivos del protocolo,
 las decisiones del estudiante y las propuestas pendientes. No sustituye el
 protocolo ni acredita objetivos como cumplidos sin evidencia.
@@ -59,7 +59,7 @@ mapa o flota esté validado.
 | Objetivo | Evidencia actual | Trabajo pendiente |
 |---|---|---|
 | 1: ODD, categorías y demanda | Town01 y condiciones de corrida registradas; configuración con tres categorías de destinos | Consolidar el ODD experimental y operacionalizar/comparar dos niveles de demanda |
-| 2: agentes simultáneos | Tres vehículos realizan viajes sucesivos; correcciones de rutas de retorno y continuidad de llegada implementadas | Ampliar validación bajo los niveles de demanda elegidos |
+| 2: agentes simultáneos | Pilotos de 5/10/20 vehículos completados en ambos escenarios con semilla 42 y 600 s; rutas de retorno y continuidad de llegada implementadas | Repetir condiciones, otras semillas y mayor duración bajo las flotas candidatas |
 | 3: comparación de cuatro métricas | Análisis descriptivo implementado y probado sobre logs; se distinguen poblaciones y exposición | Ejecutar la comparación final de ambos selectores bajo los dos niveles de demanda |
 
 En `config/multi_vehicle_trip.json`, las categorías implementadas son
@@ -78,6 +78,31 @@ Los 20/70 de las configuraciones antiguas corresponden a Town03 y no justifican
 directamente los niveles del runner actual en Town01. La definición de demanda
 por población simultánea no equivale a flujo de entrada en vehículos/hora.
 Procedimiento y fuentes: [selección de demanda](docs/seleccion_niveles_demanda.md).
+
+Actualización bibliográfica del 2026-09-17: se verificó el antecedente
+NoCrash, con 20/100 vehículos de fondo en Town01 y 15/70 en Town02. Se
+propone revisar los candidatos previos hacia **20 como menor y 100 como
+referencia mayor**, con exploración intermedia y posible reducción justificada
+por viabilidad medida. Es una adaptación a agentes totales, sin peatones y
+otro controlador; no adopción literal ni decisión final del estudiante.
+La [justificación y regla de selección](docs/fundamento_demandas_town01.md)
+distingue rendimiento del equipo, evidencia vial y datos faltantes. El
+barrido no equivale a la comparación definitiva de dos demandas.
+
+El 2026-09-18 el estudiante adopta **20/100 como candidatos a ensayar
+directamente**, sin exigir primero el barrido intermedio: semilla 210,
+1,800 segundos simulados por escenario y ritmo solicitado 5×. Se prepara una
+[campaña secuencial](docs/campana_demanda_20_100.md) para que pueda dejarla
+ejecutándose. La prueba técnica corta verifica creación/limpieza y registros;
+no sustituye las corridas largas ni establece saturación. Tras analizar esta
+semilla se decidirán réplicas y, si hace falta, niveles intermedios. La
+comparación conserva el controlador y el historial inicial por vehículo;
+cien tiene 3,000 visitas iniciales y veinte 600 para el selector histórico,
+que crecen dentro de cada caso. Baseline registra sus nuevas llegadas sin
+usar ese bootstrap para decidir destinos. Pasaron 123 pruebas y cuatro casos
+técnicos reales de 15 s, con 72,000 observaciones íntegras y limpieza correcta.
+Las cuatro corridas largas fueron ejecutadas por el estudiante el día 18;
+su análisis del día 19 se registra a continuación.
 
 ## Modelo y comparación
 
@@ -271,7 +296,143 @@ y las paradas necesitan contexto antes de interpretarse como congestión.
 La estabilidad gráfica del equipo también limita qué instrumentación puede
 usarse durante la campaña; no debe confundirse con estabilidad del modelo.
 
+## Piloto de cinco y preparación de 10/20
+
+El piloto de cinco del 2026-09-15 completó ambos escenarios (600 s, semilla
+42, 1×, sin cámaras): 17/19 llegadas y cinco activos al corte por escenario,
+sin errores de integridad, bloqueos, fallos de ruta, colisiones o invasiones.
+Se auditaron 36 ciclos completos y pasaron 111 pruebas. Las configuraciones
+e historiales de diez y veinte ya están preparados; sigue ejecutar diez y
+auditar antes de veinte. Una sola semilla y estos resultados no establecen
+capacidad, congestión ni las dos cantidades finales de demanda. Detalle en
+[pilotos de escalamiento](docs/pilotos_escalamiento.md).
+
+## Pilotos de diez y veinte completados — 2026-09-17
+
+Diez: 28/33 llegadas en baseline/histórico. Veinte: 55/63. Las cuatro corridas
+de 600 s a 1×, semilla 42 y sin cámaras pasaron auditorías: 179 llegadas,
+175 ciclos completos, 720,000 observaciones, cero errores de integridad,
+bloqueos, fallos de ruta, timeout o colisiones. Hubo dos callbacks de invasión
+NONE por escenario con veinte, del Cybertruck 011 en una curva, conservados
+sin cambios de controlador. Las 235 decisiones coinciden con la reproducción
+de sus semillas e historiales. Las entradas no se sobrescriben; el histórico
+acumuló 333 visitas con diez y 663 con veinte, contando sus visitas iniciales.
+
+El equipo sostuvo un ritmo cercano a 1× y no hubo crashes. Se acredita la
+ejecución técnica de estos tamaños bajo estas condiciones, no saturación ni
+demanda real calibrada. Los modelos/recorridos añadidos también influyen en
+las métricas. Faltan repeticiones, semillas y mayor duración para elegir las
+dos demandas finales. La revisión visual permanece pendiente. Resultados y
+límites en [pilotos de escalamiento](docs/pilotos_escalamiento.md).
+
+## Ampliación larga de veinte completada — 2026-09-17
+
+La ampliación larga de veinte del mismo día ya se completó: semillas 210/109,
+ambos selectores, 1,800 s, sin cámaras, ritmo solicitado 5× y alcanzado
+1.730–1.832×. Se auditaron 783 llegadas, 781 ciclos, 78 viajes cortados y
+861 decisiones, sin errores de integridad. Los 524 callbacks de colisión
+pertenecen a dos episodios de baseline; histórico no registró colisiones.
+No hubo invasiones, bloqueos, fallos de ruta o timeout. El objetivo 3 debe
+distinguir callback de episodio antes de inferir frecuencia de accidentes;
+se conservan todas las métricas originales. Los historiales crecieron a
+796/791 visitas. Cada tratamiento/semilla tiene una ejecución, por lo que
+todavía falta repetición física idéntica y contraste de demandas candidatas.
+[Resultados y próximos pasos](docs/campana_larga_veinte_vehiculos.md).
+
+## Gráficas exploratorias de objetivos — 2026-09-17
+
+Se generaron [nueve láminas y una guía](docs/graficas_campana_veinte.md)
+con las cuatro corridas largas de veinte. Cubren las cuatro métricas del
+objetivo 3, destinos por categoría/ID, tiempos completados y censurados,
+velocidad incluyendo esperas y tasas de eventos por vehículo-km. El historial
+creciente y las ramas del selector tienen gráficas separadas. Un callback
+no es un accidente independiente; la definición formal de episodio sigue
+pendiente y no se ocultan los registros originales.
+
+Las relaciones locales v–k, q–k y v–q usan celdas de 50 m por 60 s y medidas
+compatibles de distancia/tiempo. Son nubes exploratorias, sin curva impuesta,
+capacidad ni densidad crítica estimadas. Cubren 38 tramos rectos, excluyendo
+cruces; una parada no se clasifica automáticamente como congestión. Las
+cuatro corridas tienen veinte vehículos: no satisfacen por sí solas la
+comparación de dos demandas del objetivo 1. El siguiente diseño debe
+contrastar cantidades simultáneas bajo condiciones comparables y repetir
+las corridas, sin exigir conducción perfecta ni una forma teórica prefijada.
+
+## Contraste 20/100 analizado — 2026-09-19
+
+La campaña del día 18 completó ambos selectores, 1,800 s, semilla 210.
+Los hashes de 52 salidas, métricas recalculadas y auditorías respaldan su
+integridad; las parejas son comparables. El objetivo 1 ya tiene un contraste
+exploratorio de dos cantidades simultáneas. Las [once láminas](docs/graficas_demandas_20_100.md)
+cubren las métricas del objetivo 3, el historial creciente y relaciones
+locales de tráfico. Pasaron 126 pruebas. No se ejecutó CARLA en este análisis.
+
+Veinte registra 215/196 llegadas y 10.38/10.71 km/h de presencia. Cien registra
+173/183 y 2.47/2.55 km/h, con 1,673/1,787 blocked, 340/77 rutas rechazadas y
+7/3 invasiones; se mantienen como resultados. La velocidad de los últimos
+cinco minutos es 0.529/0.223 km/h con cien. El historial histórico crece de
+600 a 796 y de 3,000 a 3,183. Las medias de completados excluyen muchos
+intentos fallidos, por lo que deben leerse junto a los estados y la evolución.
+
+Las nubes locales llegan a 140 vehículos/km/carril. No se interpreta ese
+máximo ni el flujo máximo muestral como capacidad: hay contactos persistentes,
+salidas de proyección driving en baseline y numerosos rechazos de rutas.
+`Dwell` significa sin viaje activo e incluye pausas tras fallos. Los
+episodios de contacto agrupados son descriptivos y algunos tienen actor ajeno
+ambiguo; no son accidentes verificados. La siguiente prioridad es explicar
+las primeras secuencias de bloqueo antes de fijar cien como demanda mayor
+o planear cantidades intermedias/réplicas. Una semilla no establece
+significancia ni superioridad del selector. No se exige cero invasiones.
+
+## Actualización del 22 de septiembre: una hora por combinación
+
+La [campaña de 3600 s](docs/graficas_demandas_3600.md), semilla 210,
+20/100 vehículos y ambos selectores, terminó con registros íntegros.
+Veinte mantiene 422/397 llegadas sin blocked ni route_failed; cien produce
+252/252 llegadas con 3932/4147 blocked y 1280/235 rechazos. La duración
+adicional permite estudiar evolución temporal, pero no sustituye réplicas
+ni valida como capacidad los estados con contactos persistentes. Se
+conservan invasiones como métrica y todos los intentos fallidos.
+Doce láminas incluyen una comparación entre mitades de las mismas corridas.
+Son análisis descriptivos; no se declara superioridad causal ni se fija
+la demanda definitiva. El controlador permanece intacto.
+
 ## Restricciones de trabajo vigentes
+
+- El 2026-09-20 se añadió una [lectura con líneas guía](docs/lectura_diagramas_y_guias.md)
+  a la lámina de relaciones de tráfico, conservando datos y figuras previas.
+  Son resúmenes de exposición por bandas de densidad, no un ajuste de modelo
+  ni una estimación de capacidad. Las frecuencias 78.14 %/79.18 % de rutina
+  respaldan el selector probabilístico; no validan por sí solas el diagrama
+  fundamental. No se impone una forma teórica como criterio de éxito del
+  objetivo 3. Pasaron 130 pruebas; sin simulaciones nuevas ni commits.
+
+- Preparación autorizada el 2026-09-18 para 20/100, ambos selectores, semilla
+  210, sin cámaras y 5× solicitado. La campaña larga queda al estudiante;
+  las comprobaciones técnicas breves se identifican por separado. No se
+  reinicia CARLA ni se cambia el mapa. No hay autorización nueva de commits.
+
+- Ampliación autorizada el 2026-09-17: veinte vehículos, semillas 210/109,
+  ambos selectores, 1,800 s simulados y ritmo 5× solicitado por el estudiante.
+  Se mantiene el controlador; las semillas varían destinos y modelos.
+  Los historiales iniciales permanecen fijos y crecen dentro de cada corrida.
+  [Protocolo y resultados](docs/campana_larga_veinte_vehiculos.md). Esta campaña
+  sigue siendo validación exploratoria, sin fijar demandas definitivas.
+
+- El 2026-09-17 el estudiante pidió explicitar la influencia de las correcciones
+  de conducción sobre incidentes y autorizó el piloto de diez cuando prepare
+  CARLA/Town01. Se mantiene el controlador común, sin exigir cero eventos;
+  la interpretación y los cambios están en [control e incidentes](docs/control_e_incidentes.md).
+  Posteriormente autorizó ejecutar diez y después veinte, con auditoría entre
+  flotas. No hay nueva autorización de commits ni de reinicio/cambio de mapa
+  por el asistente. Los pilotos conservan 600 s, semilla 42 y ambos selectores.
+
+- El 2026-09-15 se autorizó guardar los Markdown/Python pendientes antes
+  del piloto de cinco. Se crearon `e94fe4e`, `433bd8d` y `77d08bf`.
+  La preparación y los cambios posteriores del piloto quedan sin commit.
+  Se autorizó ejecutar cinco y dejar configuraciones e historiales de diez
+  y veinte listos; en esa etapa aún no se habían ejecutado. Su validación
+  posterior del día 17 se documenta arriba.
 
 - El estudiante autorizó el 2026-09-10 Conventional Commits de los cambios
   actualmente acumulados, agrupados por conjuntos de archivos. Esta indicación

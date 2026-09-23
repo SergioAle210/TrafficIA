@@ -6,6 +6,398 @@ hipótesis, archivos afectados, pruebas realizadas, rutas de resultados y
 limitaciones pendientes. No reemplazar resultados antiguos ni presentar pruebas
 unitarias como validación de física real.
 
+## 2026-09-22 - Gráficas de la campaña de 3600 segundos
+
+El estudiante terminó las cuatro corridas de `demand20_100_seed_210_20260922T040147250610Z`
+en 7 h 17 min aproximadamente. Se validaron 52 hashes y la instantánea de
+fuentes; auditorías y métricas recalculadas sin errores, parejas comparables.
+[Resultados y límites](graficas_demandas_3600.md). Nuevos derivados en
+`data/output/visual_analysis20_100_3600_20260922/`; resultados previos intactos.
+
+Se corrigieron etiquetas de duración, fecha y porcentajes históricos en
+`plot_demand_campaign.py`. Histograma ahora conserva ventanas de 60 s:
+31 bordes fijos habrían dado 120 s por ventana para esta duración.
+`tests/test_demand_plotting.py` comprueba duración, límites y ventana parcial.
+Se añadió comparación de mitades con medias ponderadas por exposición,
+identificando desfase de 0.05 s de las ventanas. No son réplicas independientes.
+La suite completa, con CARLA_PYTHONAPI, pasó 132 pruebas. La primera ejecución
+sin esa variable omitió pruebas del SDK; se repitió correctamente. Pytest no
+está instalado; la suite del proyecto usa unittest y no se instalaron paquetes.
+
+Con veinte: 422/397 llegadas, cero blocked/route_failed/colisiones y 2/0
+invasiones. Con cien: 252/252 llegadas, 3932/4147 blocked, 1280/235 route_failed,
+160955/77904 callbacks de colisión y 30/17 invasiones. Los grupos descriptivos
+de contacto (173/65) no equivalen a accidentes independientes. El próximo
+paso sigue siendo investigar primeras secuencias de bloqueo/rechazo/contacto,
+sin exigir cero incidentes. No hubo simulaciones nuevas, cambios de conducción
+ni commits en esta entrega. README y contexto académico actualizados.
+
+Cierre: 9120 celdas, 4437 ocupadas, 37 bandas guía con soporte. Conservación
+de exposición/distancia y recuentos verificada. Doce páginas renderizadas y
+revisadas; leyenda de la lámina 12 ajustada para no ocultar valores. En la
+segunda media hora, cien baja a 0.63/0.80 km/h y produce 46/67 llegadas,
+frente a 206/185 en la primera; veinte mantiene 215/207 y 195/202 llegadas.
+No se infiere automáticamente causa ni capacidad del mapa.
+
+## 2026-09-20 — Explicación y líneas guía de relaciones de tráfico
+
+El estudiante compara la nube con dos esquemas teóricos y solicita una guía
+visual y valoración del avance. Se consultó FHWA (metodología, sección 3)
+para distinguir identidad q=k*v, forma funcional y calibración estacionaria.
+Las imágenes aportadas muestran hipótesis distintas; una relación lineal
+v(k) produce una parábola q(k), mientras otra referencia incluye q(k)
+triangular. La orientación de ejes q/v también cambia entre imágenes.
+
+Se añadió `density_band_guides` a `src/traffic_flow_analysis.py` y se adaptó
+`scripts/plot_demand_campaign.py`. Por cada corrida se agrupan celdas ocupadas
+en bandas fijas de 10 veh/km/carril; se suman S, D y A=L*T para obtener
+k=1000S/A, q=3600D/A y v=3.6D/S. Se conservan los triples en los tres paneles,
+ordenados por densidad. Se trazan solo bandas con diez o más celdas y se
+interrumpe al faltar soporte; parámetros de visualización, no significancia.
+No se extrapola ni se ajusta forma. q=k*v se garantiza en los marcadores,
+no en cada punto de sus uniones visuales. Se mantienen los puntos originales.
+
+Nueva salida: `data/output/visual_analysis20_100_guides_20260920/`, con
+once PNG/SVG, PDF/HTML actualizados, `flow_guides.csv`, `guide_method.json`
+y copias con hashes de los insumos del día 19. La salida anterior permanece
+intacta. La lámina 09 tiene 3/4/9/8 marcadores con soporte según corrida;
+los restantes resúmenes se conservan en CSV. No se releen millones de filas
+ni se ejecuta CARLA: se usan los mismos 4,560 registros de celdas derivadas.
+
+Pasaron 130 pruebas con carla-env, cuatro nuevas de ponderación/identidad,
+bandas escasas o ausentes, fronteras, celdas vacías/paradas y entradas inválidas.
+Se renderizó e inspeccionó la página modificada del PDF. Se documentaron
+procedimiento, lectura y límites en [la guía nueva](lectura_diagramas_y_guias.md),
+README y contexto académico. Las 78.14 %/79.18 % decisiones de rutina son
+cercanas al 80 % esperado; no implican una cuota exacta ni validación del
+diagrama. Sigue pendiente explicar los bloqueos/contactos de cien antes
+de calibrar capacidad o fijar la demanda definitiva. Sin commits ni cambios
+en conducción, simulación, TeX o CSV originales.
+
+## 2026-09-19 — Gráficas de la campaña 20/100 ejecutada el día 18
+
+El estudiante terminó la campaña y solicita regenerar las figuras con las
+dos cantidades. Se identificó
+`data/output/demand20_100_seed_210_20260918T190119084914Z/campaign.json`:
+estado completed, cuatro casos de 1,800 s, semilla 210, ambos selectores.
+Se verificaron 52 archivos originales contra sus hashes y la instantánea de
+fuentes, y se recalcularon las métricas: sin errores, parejas comparables.
+No se creó cliente CARLA ni se avanzó la simulación.
+
+La [guía nueva](graficas_demandas_20_100.md) enlaza once láminas PNG/SVG,
+PDF, galería HTML, CSV y manifiestos en
+`data/output/visual_analysis20_100_20260919/`. Se preservó la galería anterior.
+`build_campaign_plot_data.py` ahora procesa observaciones por bloques y
+calcula hashes por bloques para evitar cargar millones de filas/bytes en
+RAM; incorpora cantidad de vehículos a las salidas. Se conserva la misma
+selección de 38 tramos de 50 m y ventanas de 60 s. La plantilla anterior
+era específica de veinte y semillas 210/109: se añadió
+`plot_demand_campaign.py` para cantidades distintas con una semilla, sin
+reutilizar títulos, cifras fijas ni etiquetas de cortes de aquella campaña.
+
+`review_demand_chart_inputs.py` verifica entradas y resume historiales,
+estados y episodios. `src/incident_analysis.py` agrupa callbacks por par
+de actores y separación máxima consecutiva de 1 s; no sustituye la métrica
+bruta ni define accidentes. Pasaron 126 pruebas, incluidas tres para
+sensores opuestos, parejas diferentes, IDs ambiguos y tiempos inválidos.
+
+Veinte/baseline: 215 llegadas, 155.49 s de media completa, 10.38 km/h,
+18 callbacks de colisión. Veinte/histórico: 196, 168.59 s, 10.71 km/h,
+cero eventos. Cien/baseline: 173 llegadas, 173.97 s, 2.47 km/h, 1,673
+blocked, 340 route_failed, 48,814 callbacks de colisión y siete invasiones.
+Cien/histórico: 183, 204.47 s, 2.55 km/h, 1,787 blocked, 77 route_failed,
+19,768 callbacks y tres invasiones. Los 20/19/87/90 aborted son cortes
+simulation_end, separados de bloqueos y rutas rechazadas. Total: 767
+completados de 4,860 intentos. Un vehículo puede acumular muchos intentos.
+
+Los contactos forman 1/0/57/15 grupos descriptivos; 24 grupos tienen ID
+ajeno no positivo y pueden mezclar objetos estáticos. Las consolas explican
+los rechazos de cien/baseline: 129 inicios de ruta demasiado lejos del origen
+y 211 distancias excesivas al carril. Cien/histórico: 73 inicios desalineados
+y cuatro rutas sin tramo anterior al destino. No se investigó aún la
+secuencia física causante de esas posiciones.
+
+Las once páginas del PDF fueron renderizadas e inspeccionadas. Las láminas
+separan incompletos, tasas por exposición, decisiones sin llegada y crecimiento
+de historial. Se corrigió una etiqueta analítica: dwell significa sin viaje
+activo e incluye pausas tras fallos, no exclusivamente espera en destino.
+Histórico crece 600→796 y 3,000→3,183; rutina 78.14 %/79.18 %.
+
+Se derivaron 8,640,000 observaciones, 4,560 celdas, 2,330 con presencia y
+sin huecos entre frames. El primer intervalo no observado suma 1/1/5/5
+vehículo-segundos; no se inventa. Cien/baseline tiene 47,648 muestras fuera
+de proyección driving; las demás cero. Se conserva esa limitación y las
+transiciones entre road/lane. Error máximo q-k*v: 1.14e-13. Densidad máxima
+con cien: 140 vehículos/km/carril, sin interpretarla como densidad crítica.
+La media de velocidad de las últimas cinco ventanas es 0.529/0.223 km/h
+con cien, con 96.28/98.52 % de presencia bajo 0.2 m/s. Esto es deterioro
+grave de circulación, pero no demuestra una rama congestionada estable.
+
+Pendiente: reconstruir primeras secuencias de bloqueo/contacto/rechazo antes
+de decidir cien como demanda mayor definitiva o nuevos pilotos intermedios.
+Después, réplicas con más semillas. No se cambió conducción, no se ejecutaron
+simulaciones ni commits, y se preservaron TeX, CSV originales y cambios
+anteriores. README, contexto, fundamento y guía de campaña actualizados.
+
+## 2026-09-18 — Preparación directa de la campaña 20/100
+
+El estudiante solicita probar directamente veinte como carga menor y cien
+como mayor, semilla 210 y ritmo 5×; ofrece dejar ejecutándose los comandos.
+Se prepara una campaña secuencial de ambos selectores, 1,800 s por caso,
+sin cámaras. Este encargo sustituye el barrido intermedio como siguiente
+acción. La duración coincide con la ampliación previa de veinte; no acredita
+equilibrio ni suficiencia estadística. Detalle y comando en
+[campaña de 20/100](campana_demanda_20_100.md).
+
+Se verificó CARLA cliente/servidor 0.9.15 en localhost:2000, Town01 limpio y
+asíncrono. `prepare_demand_campaign.py` crea configuraciones separadas,
+historial de 3,000 visitas y manifiesto geométrico/hashes. Cien conserva
+spawns e historiales de veinte; mínima separación entre centros 16.1605 m.
+La semilla inicial de historiales sigue siendo 42; la de ejecución es 210.
+Baseline no usa el bootstrap. `run_demand_campaign.py` comprueba entradas,
+mapa y limpieza, fija el clima anterior común, guarda fuentes/entradas,
+ejecuta y audita cada caso, y restaura el mundo al terminar. Los eventos y
+viajes incompletos no se convierten en fallos técnicos automáticamente.
+
+Antes de escalar se confirmó en `visual_review.py` que se conservaban en RAM
+todas las observaciones incluso sin cámaras: 3.6 millones de filas para
+cien durante 1,800 s. Se eliminó esa copia exclusivamente en modo sin RGB;
+el CSV y los contadores permanecen. `audit_observation_stream.py` comprueba
+las observaciones de forma secuencial. No se modificaron decisiones de
+conducción: runner, planificador y agente coinciden byte a byte con la
+instantánea de `reliability20_20260917_seeds210_109_x5/source_snapshot/`.
+
+El primer ensayo de 15 s de veinte terminó físicamente y limpió CARLA, pero
+falló el auditor nuevo porque `arrival_log.csv` no existe antes de la primera
+llegada. Se conservó ese intento como `incomplete`, se corrigió el auditor
+para aceptar ausencia solo cuando no hay completados y se añadió regresión.
+Resultados iniciales: `data/output/demand20_100_technical_20260918/`.
+
+Pasaron 123 pruebas con `carla-env`. La campaña técnica corregida,
+`data/output/demand20_100_technical_20260918_v2/`, completó cuatro casos de
+15 s: 6,000/6,000/30,000/30,000 observaciones, cero errores de integridad,
+cero eventos y parejas comparables. Veinte no completó viajes en ese período;
+cien histórico completó uno y aumentó su historial de 3,000 a 3,001 visitas.
+Los 20/20/100/100 viajes restantes se cortaron por `simulation_end`, no
+`blocked`. Tiempos reales de proceso 11.891/11.796/53.344/53.969 s, incluidos
+preparación y cierre; no se extrapolan a rendimiento estable. Se crearon
+y retiraron cien vehículos en ambos selectores. Estado final: Town01,
+cero vehículos/sensores/peatones, asíncrono, clima y renderizado restaurados.
+
+La campaña larga queda lista para el estudiante, **aún sin ejecutar**.
+Después corresponde auditar sus cuatro casos, ampliar gráficas de métricas
+y relaciones locales de tráfico, investigar incompletos/colas y decidir
+réplicas o demandas intermedias. Cien no se etiqueta como saturación por
+su cantidad. README, fundamento y contexto académico quedan actualizados.
+Se conservan modificaciones anteriores; sin commits ni cambios a los TeX
+o CSV genéricos. Log de pruebas:
+`data/output/demand_preparation_20260918/unit_tests_final.txt`.
+
+## 2026-09-17 — Referencias para justificar las dos demandas
+
+El estudiante solicita una justificación bibliográfica o experimental para
+las cantidades, considerando equipo, mapa y diagramas de tráfico, e informa
+que CARLA/Town01 están listos. Se verificó cliente/servidor 0.9.15, Town01,
+cero vehículos/sensores/peatones, modo asíncrono y renderizado activo.
+Solo consultas: no se avanzaron frames ni se crearon actores.
+
+La [investigación](fundamento_demandas_town01.md) contrasta NoCrash, FHWA 2019,
+benchmark de rendimiento de CARLA y diagramas macroscópicos urbanos. Se
+verificó por descarga de código de CARLA, commit
+`1614d19581d43eac9966e4001611cc8341bf5319`, que sus cargas son 20/100 para
+Town01 y 15/70 para Town02. Se documentan versión 0.8.4, peatones y vehículo
+protagonista como diferencias frente a TrafficIA; no se copian etiquetas
+de congestión ni se afirma el origen de los antiguos 20/70 de Town03.
+
+Propuesta todavía no adoptada: menor veinte, mayor con referencia cien,
+explorando 30/40/60/80/100 y congelando la pareja después de los pilotos.
+La regla usa antecedente bibliográfico y viabilidad ensayada; incidentes no
+son criterio de descarte. La capacidad computacional y la vial se miden
+por separado. El ritmo 1.730–1.832× de veinte no prueba su máximo.
+
+Se revisaron 255 spawns proyectados en carril driving fuera de cruces.
+La extensión espacial conserva los primeros veinte; cien candidatos tienen
+16.16 m de separación mínima entre centros. Es geometría, no prueba de
+creación o circulación. Se midieron 24 procesadores lógicos y 31.77 GiB
+de RAM física. WMI denegó datos detallados de CPU/GPU; no se infiere una
+GPU activa. Evidencia en `data/output/demand_basis_20260917/`.
+
+Se actualizaron README, contexto y documento previo de selección, conservando
+sus antecedentes. No hay nuevas corridas, cambios del controlador, ajustes
+del mundo ni commits. El siguiente experimento propuesto es el escalón de
+treinta con historial completo, ambos selectores, semilla 42 y 600 s a 5×
+solicitado. El barrido y confirmación larga siguen pendientes.
+
+## 2026-09-17 — Gráficas de objetivos y relaciones de tráfico
+
+El estudiante solicita visualizar sus métricas y explorar los diagramas
+velocidad–densidad, flujo–densidad y velocidad–flujo de una imagen conceptual.
+Se analizaron offline las cuatro corridas largas de veinte, semillas 210/109,
+sin ejecutar CARLA, modificar el controlador ni reescribir logs originales.
+Se entregan nueve láminas PNG/SVG, PDF, galería HTML y CSV derivados en
+`data/output/visual_analysis20_20260917/`. La
+[guía de lectura](graficas_campana_veinte.md) relaciona las figuras con los
+objetivos y explica sus límites; el paquete conserva método y manifiestos.
+
+El nuevo módulo `src/traffic_flow_analysis.py` divide trayectorias en celdas
+espacio-temporales y calcula medidas compatibles de Edie. El script
+`scripts/build_campaign_plot_data.py` selecciona geometría recta de Town01
+fuera de intersecciones usando OpenDRIVE offline: 38 tramos completos de
+50 m, ventanas de 60 s y última ventana con su duración real. Se incluyen
+paradas y esperas. Se conservan 4,560 celdas, 2,458 con presencia; cero huecos
+de observación. Se cuantifican transiciones de carril/carretera excluidas,
+primer intervalo no observado y pequeños desplazamientos en reversa.
+La identidad q=k*v tiene error numérico máximo menor que 1e-12; cumplirla
+no demuestra que exista una curva fundamental calibrada.
+
+`scripts/plot_mobility_campaign.py` exporta las cuatro métricas del objetivo 3,
+tiempos censurados separados, destinos asignados/alcanzados, historial creciente,
+ramas 80/20, nubes locales y cobertura. Se distingue callback de episodio:
+524 callbacks pertenecen a dos contactos persistentes; cero invasiones.
+El tiempo medio cambia en sentidos opuestos entre semillas. La nube muestra
+velocidades menores en celdas más densas, con pocas observaciones altas;
+no permite estimar capacidad ni fijar las dos demandas. Los veinte vehículos
+globales no equivalen a la densidad local de un carril.
+
+Pasaron 118 pruebas con `carla-env` y SDK, incluidas siete nuevas sobre
+unidades, conservación en fronteras, detenciones, reversa y ventana parcial.
+Se inspeccionaron las nueve imágenes. README y contexto académico enlazan
+los resultados; no se hicieron commits ni se modificaron los documentos TeX.
+Quedan pendientes repeticiones y comparación de cantidades simultáneas con
+las mismas duraciones, semillas y definiciones de medición.
+
+## 2026-09-17 — Campaña larga de veinte: semillas 210 y 109
+
+Se autorizan cuatro corridas de 1,800 s simulados, ambos selectores y veinte
+vehículos, conservando el controlador. Al inicio el estudiante solicita
+cambiar 1× por 5×. Se conserva el intento parcial a 1×, se limpian sus actores
+residuales por ID y se inicia una campaña independiente a 5×. No se cambia
+el paso físico de 0.05 s ni se reinicia CARLA o Town01. Las entradas de
+historial se conservan; cada corrida acumula solo sus propias llegadas.
+
+Protocolo, limitaciones y resultados en
+[campaña larga de veinte](campana_larga_veinte_vehiculos.md). Evidencia en
+`data/output/reliability20_20260917_seeds210_109_x5/`. Estado: completada.
+Las semillas varían también la flota, que se registra por vehículo. Sin
+cambios de conducción ni commits; se conservan archivos previos y TeX.
+
+Las cuatro corridas terminaron los 1,800 s. Llegadas baseline/histórico:
+215/196 con 210 y 181/191 con 109; activos cortados: 20/19 y 19/20.
+Total: 783 llegadas válidas, 781 ciclos completos, 861 decisiones reproducidas,
+2,880,000 observaciones y cero errores de integridad. No hubo blocked,
+route_failed, timeout ni invasiones. Baseline registró 14 y 510 callbacks
+de colisión: dos episodios entre 003/007 (0.30 s, cerca de 95,200) y 001/018
+(12.95 s, cerca de 92,5), respectivamente. Son contactos entre vehículos
+en intersecciones, no 524 accidentes independientes ni objetos estáticos.
+Todos los viajes implicados llegaron después. Histórico no registró eventos.
+
+Los historiales crecieron de 600 a 796/791 visitas. Ambas parejas conservan
+modelos, spawns, clima, paso y controlador; entre semillas cambian 18 modelos.
+Las salidas y los 18 archivos congelados conservaron sus hashes. El ritmo
+real fue 1.730–1.832× con 5× solicitado, unos 69 minutos para la campaña.
+CARLA quedó en Town01, asíncrono, renderizado activo y cero actores de prueba.
+Pasaron las comprobaciones numéricas de llegada y proyección de carriles;
+las 111 pruebas unitarias previas del mismo día siguen referidas a fuentes
+idénticas, sin nueva modificación de conducción. Las figuras reconstruyen
+logs y no completan la revisión visual. Faltan definición formal de episodio,
+repetición de condiciones idénticas y comparación de demandas candidatas.
+
+## 2026-09-17 — Revisión del controlador antes del piloto de diez
+
+El estudiante preguntó si las correcciones sesgan las tasas de incidentes.
+Se revisaron commits, código, resultados anteriores y criterios de eventos.
+La síntesis [control e incidentes](control_e_incidentes.md) detalla el detector
+colineal, `distance_ratio` 0.5 → 0.1, aproximación y alineación de llegada,
+comparaciones y límites. Sí afectan las métricas: estas describen el generador
+con ese controlador común, no un efecto aislado del selector. No se cambió
+la conducción ni se filtraron registros para responder esta consulta.
+
+Se autorizó el piloto de diez en ambos escenarios, semilla 42, 600 s a 1×,
+sin cámaras, con entradas ya preparadas. El estudiante prepara el servidor
+con `CarlaUE4.exe -quality-level=Low -dx11 -RenderOffScreen` y Town01.
+La primera comprobación de `localhost:2000` agotó ocho segundos de timeout;
+todavía no acredita mapa ni permite iniciar las corridas. Se pidió aviso de
+disponibilidad. La suite offline pasó 111 pruebas con `carla-env` y la SDK.
+La preparación queda registrada en `data/output/pilot10_20260917/`.
+Veinte sigue pendiente. No se hicieron commits ni cambios a los CSV de entrada.
+
+### Inicio autorizado de los pilotos de diez y veinte
+
+El estudiante autorizó ejecutar diez y después veinte conservando el modelo.
+La nueva comprobación encontró CARLA 0.9.15 en Town01, cero vehículos,
+sensores y peatones, modo asíncrono y renderizado activo. El clima coincide
+con el piloto de cinco (precipitación 40, mojado 80 y resto de campos).
+La orden de arranque Low/DX11/RenderOffScreen procede del estudiante; la
+consulta de la línea de proceso por Windows no estuvo disponible y no se
+presenta como verificada. La API sí confirma el estado del mundo.
+
+Se ejecutan ambos selectores por flota, 600 s, 1×, semilla 42, sin cámaras,
+con sensores de incidentes activos y diagnósticos. Se congelan fuentes y
+entradas antes de correr; la conducción y los umbrales permanecen iguales.
+El script local `data/output/pilot10_20260917/run_pilots.py` conserva consolas,
+manifiestos, hashes y auditorías. No exige cero incidentes ni un mínimo de
+llegadas para considerar íntegros los registros. Se revisará diez antes de
+iniciar veinte; un fallo técnico conserva la carpeta y detiene la secuencia.
+
+### Cierre de diez y paso a veinte
+
+Ambos escenarios de diez completaron 600 s y pasaron auditorías y comparación
+de condiciones. Baseline: 28 completed / 10 aborted. Histórico: 33 completed /
+9 aborted; el 009 estaba en espera tras llegar a t=597.35 s. No hubo blocked,
+route_failed, timeout, colisiones, invasiones ni errores de integridad.
+Se conservaron 240,000 observaciones, 61 llegadas y 60 ciclos completos; el
+último ciclo del 009 queda cortado por la duración. La reproducción offline
+de las decisiones no presenta diferencias. Los hashes permanecen intactos.
+CARLA quedó limpio antes de comenzar veinte. Detalle y nombres de corrida en
+[pilotos de escalamiento](pilotos_escalamiento.md).
+
+### Cierre de veinte y balance de la etapa
+
+Baseline de veinte: 55 completed / 20 aborted / 2 invasiones / 0 colisiones.
+Histórico: 63 completed / 17 aborted / 2 invasiones / 0 colisiones; 004, 009 y
+014 estaban en espera después de llegar a t=595.55, 597.25 y 597.35 s.
+Ambos avanzaron 600 s y pasaron auditoría y comparación de condiciones, sin
+blocked, route_failed, timeout o errores de integridad. El tiempo del observador
+fue aproximadamente 600.42/600.45 s, con ritmo limitado a 1×.
+
+Los cuatro callbacks de invasión son del Cybertruck 011 en su tercer viaje,
+marca NONE, en la curva cerca de (8–11, 2–3). Baseline: t=318.70/319.35 s;
+histórico: t=236.60/237.00 s. Circulaba cerca de 20 km/h, con más de 170/283 m
+de ruta restante. Los otros vehículos más cercanos estaban a más de 55/41 m.
+Los registros no respaldan atribuirlos a una cola cercana o al frenado de
+llegada. Los eventos se conservan y no equivalen a accidentes/infracciones.
+El Cybertruck forma parte de los modelos añadidos: población, modelos y
+recorridos cambian conjuntamente al ampliar la flota.
+
+Las cuatro corridas nuevas suman **179 llegadas, 175 ciclos completos, 56
+interrupciones por fin de simulación y 720,000 observaciones**. Las cuatro
+esperas restantes quedaron cortadas por duración. Cada vehículo tiene al
+menos un ciclo completo por escenario. Las 179 llegadas cumplen umbrales y
+las proyecciones de carril coinciden con el mapa. Las 235 decisiones se
+reprodujeron sin diferencias. Historiales históricos finales: 333 y 663
+visitas; entradas y fuentes intactas, comprobadas por SHA-256. Pasaron las
+111 pruebas previas y no hubo cambios posteriores de conducción.
+
+Campañas completas: `data/output/pilot10_20260917/` y
+`data/output/pilot20_20260917/`. La comparación con cinco, auditoría final,
+distribuciones y figura están en `data/output/scaling_pilots_20260917/`.
+El informe de pilotos identifica las cuatro carpetas de corrida originales,
+resultados individuales y contexto de eventos. Se revisaron las figuras de
+comparación y reconstrucción de la curva; no son capturas del simulador.
+
+Entre diez y veinte, los viajes completados comparables aumentan 2.383 s
+en promedio en baseline (27 pares) y 2.841 s en histórico (33 pares), con
+incrementos individuales de hasta 40.70/48.60 s. Ese subconjunto excluye los
+incompletos y no es una estimación causal libre de censura. Los resultados
+no prueban saturación ni superioridad estadística. Siguen repeticiones,
+otras semillas y mayor duración antes de elegir las demandas definitivas;
+no se ejecutaron esas ampliaciones en esta etapa.
+
+La comprobación final encontró Town01, cero vehículos/sensores, modo
+asíncrono y renderizado activo. No se reinició CARLA ni se cambió el mapa.
+Se actualizaron README, informe de pilotos, seguimiento de la revisión de
+tres y contexto académico. Sin commits, sin tocar CSV de entrada o LaTeX.
+
 ## 2026-09-08: primeras pruebas de 600 segundos
 
 Condiciones: CARLA 0.9.15, Town01, tres vehículos en `[133, 6, 101]`, semilla 42,
@@ -1534,3 +1926,74 @@ integridad de logs, después a diez y veinte. Aún no se fijan los dos niveles
 definitivos ni se afirma superioridad de un selector con una sola semilla.
 No se exigen cero invasiones. No se aumentó la flota, no se alteraron CSV
 genéricos ni documentos TeX y no se hicieron commits.
+
+## 2026-09-15 — Inicio del piloto de cinco y preparación de 10/20
+
+Antes de continuar, el estudiante autorizó Conventional Commits de los
+Markdown/Python pendientes. Se revisaron los archivos y se repitieron las
+107 pruebas; quedaron `e94fe4e` (instrumentación), `433bd8d` (análisis) y
+`77d08bf` (documentación). No se incluyeron TeX, CSV ni resultados generados.
+
+CARLA 0.9.15 respondió en localhost:2000 con Town01, cero vehículos/sensores,
+renderizado y el mismo clima lluvioso. Se prepararon configuraciones
+separadas para 5/10/20 y sus historiales de 30 visitas por vehículo, en
+`config/pilots/` y `data/input/Town01/pilots/`. Los primeros cinco historiales
+se preservan y las flotas mayores extienden las menores. El script
+`prepare_pilots.py` selecciona spawns dispersos del catálogo, sin crear
+actores ni cambiar mapa; conserva manifiesto con criterios, posiciones y
+hashes. Cinco usa `[133,6,101,67,43]`; no se fijan demandas definitivas.
+
+Se añadió observación pasiva del semáforo retenido por BasicAgent durante
+paradas, sin invocar su detector ni cambiar conducción o umbral `blocked`.
+Pasaron 111 pruebas y una comprobación histórica real de 15 s con cinco:
+1,500 observaciones, historiales completos y limpieza correcta. Se inició
+baseline de 600 s a 1×, sin cámaras; después corresponde histórico con las
+mismas condiciones. Diez y veinte solo quedan preparados, sin corridas.
+
+Detalle y resultados de cierre en [pilotos de escalamiento](pilotos_escalamiento.md).
+Los cambios nuevos de esta etapa permanecen sin commit.
+
+### Cierre del piloto de cinco
+
+Se completaron ambas corridas de 600 s a 1×, sin cámaras y sin reiniciar el
+servidor entre ellas. Baseline: 17 llegadas (5/4/2/3/3 por vehículo) y cinco
+`aborted`; histórico: 19 llegadas (4/4/3/5/3) y cinco `aborted`. Todos los
+incompletos llevan motivo `simulation_end`. Cero `blocked`, `route_failed`,
+`timeout`, colisiones, invasiones o errores de integridad en ambos casos.
+
+`scripts/audit_observations.py` adapta la auditoría a N vehículos y revisó
+120,000 observaciones, 36 ciclos completos y las 36 llegadas contra el
+OpenDRIVE local. También se inspeccionaron ambas figuras de velocidad y
+trayectoria. El registro del semáforo retenido por el agente es pasivo y no
+modifica decisiones. Baseline tuvo 39 paradas de al menos 10 s y el histórico
+38; máximos 32.20/32.15 s. En cada escenario 37 intervalos incluyen rojo
+retenido, y 12/10 incluyen otros vehículos cercanos; los grupos se superponen.
+Dos ejemplos de baseline muestran al 002 detrás del 003 y al 005 detrás del
+004, con unos 7.2/7.4 m entre centros, sin atribuir congestión automáticamente.
+
+Tiempo medio de completados: 152.476 / 124.595 s. Velocidad de presencia:
+11.619 / 11.483 km/h. Presencia bajo 0.2 m/s: 35.15 / 36.02 %.
+La menor duración media del histórico no demuestra superioridad con una
+semilla y distinta población de recorridos. Los vehículos comunes con las
+corridas de tres conservan destinos/estados: duraciones iguales en baseline
+y variación máxima de 0.25 s en histórico. El piloto no demuestra todavía
+un régimen de alta demanda ni una capacidad máxima del simulador.
+
+Las condiciones y hashes coinciden entre tratamientos. Se preservaron una
+copia del código/entradas y hashes de salidas en `data/output/pilot5_20260915/`,
+junto con auditorías, consolas, figuras y `metrics/`. Corridas completas:
+
+- `town01_random_baseline_seed_42_20260916T020205968035Z/`
+- `town01_history_80_20_seed_42_20260916T021229659097Z/`
+
+La fecha de carpetas es UTC; fecha local 15 de septiembre. El tiempo de pared
+observado fue 600.172/600.094 s, próximo a 1×; no se mide rendimiento máximo.
+CARLA quedó en Town01, sin vehículos/sensores, asíncrono y con renderizado.
+
+Se puede avanzar al piloto de diez, que tiene 300 visitas de historial;
+veinte tiene 600. Ambas configuraciones preservan los vehículos, spawns e
+historiales de los prefijos menores. Sus puntos tienen validación geométrica,
+pero aún necesitan pruebas reales de creación y circulación. La revisión
+visual completa sigue pendiente. Los resultados no cambian el criterio de
+conservar invasiones como métrica. No se modificaron los CSV originales ni
+los documentos TeX; los nuevos CSV son entradas específicas de estos pilotos.
