@@ -27,6 +27,8 @@ def parse_args(parser=None) -> argparse.Namespace:
     parser.add_argument("--town", help="Sobrescribe el mapa esperado del JSON.")
     parser.add_argument("--seed", type=int, help="Sobrescribe la semilla del JSON.")
     parser.add_argument("--seconds", type=float, help="Sobrescribe la duración simulada.")
+    parser.add_argument("--blocked-policy", choices=("terminate", "keep_trip"),
+                        help="Terminar el viaje o conservar destino al superar el umbral de detención.")
     parser.add_argument("--max-trip-seconds", type=float,
                         help="Límite por viaje en segundos simulados; 0 lo desactiva hasta el fin de corrida.")
     parser.add_argument(
@@ -77,6 +79,8 @@ def configuration_from_args(args: argparse.Namespace) -> TripSimulationConfig:
     """Apply CLI inputs before validating the effective scenario configuration."""
 
     overrides = {}
+    if getattr(args, "blocked_policy", None) is not None:
+        overrides["blocked_policy"] = args.blocked_policy
     if args.town:
         overrides["town"] = args.town
     if args.seed is not None:

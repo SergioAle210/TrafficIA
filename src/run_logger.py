@@ -55,6 +55,11 @@ class RunLogger:
         self._route_writer = None
         self._control_writer = None
         self._arrival_writer = None
+        self._blocked_writer = self._create_writer("blocked_warnings.csv", [
+            "vehicle_id", "trip_id", "frame", "simulation_time_s", "destination_id", "counter_s", "policy"])
+
+    def write_blocked_warning(self, row):
+        self._blocked_writer.writerow(row)
 
     def _create_writer(self, file_name: str, fieldnames: Iterable[str]) -> csv.DictWriter:
         csv_file = (self.output_directory / file_name).open("w", newline="", encoding="utf-8")

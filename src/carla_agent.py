@@ -15,6 +15,19 @@ class CollinearSafeBasicAgent(BasicAgent):
     lane checks, junction handling, braking, and the official planner unchanged.
     """
 
+    def run_step(self):
+        self.hazard_observation = {}
+        return super().run_step()
+
+    def _affected_by_traffic_light(self, *args, **kwargs):
+        result = super()._affected_by_traffic_light(*args, **kwargs)
+        if hasattr(self, 'hazard_observation'):
+            affected, light = result
+            self.hazard_observation.update(light_detected=bool(affected),
+                light_id=light.id if light is not None else None,
+                light_state=str(light.get_state()) if light is not None else None)
+        return result
+
     def set_arrival_speed(self, target_speed_kmh, cruise_speed_kmh):
         """Shorten the lateral horizon as the destination speed tends to zero.
 
@@ -36,6 +49,12 @@ class CollinearSafeBasicAgent(BasicAgent):
     ):
         if low_angle_th == 0:
             low_angle_th = -COLLINEAR_ANGLE_EPSILON_DEG
-        return super()._vehicle_obstacle_detected(
+        result = super()._vehicle_obstacle_detected(
             vehicle_list, max_distance, up_angle_th, low_angle_th, lane_offset
         )
+        if hasattr(self, 'hazard_observation'):
+            affected, actor, distance = result
+            self.hazard_observation.update(vehicle_detected=bool(affected),
+                obstacle_id=actor.id if actor is not None else None,
+                obstacle_distance_m=float(distance) if affected else None)
+        return result

@@ -44,6 +44,7 @@ class ArrivalSeamTests(unittest.TestCase):
                         navigation_diagnostics_enabled=False)
         sim._sample_trajectory = Mock()
         sim._finish_trip = Mock()
+        sim._on_blocked_threshold = Mock()
         trip = NS(distance_traveled_m=0, last_location=Location(.9), last_update_time_s=None,
                   departure_time_s=0, stopped_time_s=0, last_moving_time_s=0,
                   approach=NS(update=Mock(), remaining_m=remaining), destination_location=Location(),

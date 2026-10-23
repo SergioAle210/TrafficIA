@@ -83,6 +83,7 @@ class TripSimulationConfig:
     client_timeout_seconds: float = 30.0
     navigation_diagnostics_enabled: bool = False
     controller_distance_ratio: float = 0.1
+    blocked_policy: str = "terminate"
 
     @classmethod
     def from_json(
@@ -120,6 +121,8 @@ class TripSimulationConfig:
         return config
 
     def validate(self) -> None:
+        if self.blocked_policy not in {"terminate", "keep_trip"}:
+            raise ValueError("blocked_policy debe ser terminate o keep_trip.")
         if self.max_trip_time_seconds is not None and (
             not math.isfinite(self.max_trip_time_seconds) or self.max_trip_time_seconds <= 0
         ):
@@ -212,6 +215,7 @@ class ActiveTrip:
     arrival_corridor: Any = None
     last_update_time_s: Optional[float] = None
     stopped_time_s: float = 0.0
+    blocked_warning_issued: bool = False
 
     @property
     def trip_id(self) -> str:
@@ -571,7 +575,8 @@ class TripSimulation:
                 "max_trip_time_seconds": self.config.max_trip_time_seconds,
                 "null_meaning": "no independent trip deadline; active trips are aborted at simulation end",
                 "blocked_time_threshold_seconds": self.config.blocked_time_threshold_seconds,
-                "blocked_meaning": "continuous speed below threshold; does not classify traffic-light versus physical blockage",
+                "blocked_policy": self.config.blocked_policy,
+                "blocked_meaning": "time since departure or last speed strictly above threshold; no causal classification",
                 "travel_time": "all simulated time since departure, including stops",
             },
             "event_counting": {
@@ -992,6 +997,7 @@ class TripSimulation:
         del now_s
         state = self._state_or_primary(state)
         for event in state.event_collector.drain():
+            self._on_sensor_event(state, event)
             # Totals include every phase. A callback from before this departure
             # must not be charged to a newly started trip merely because it was late.
             trip = state.active_trip
@@ -1088,6 +1094,7 @@ class TripSimulation:
             vehicle, carla_map.get_waypoint(location))
         if current_speed > self.config.blocked_speed_threshold_mps:
             trip.last_moving_time_s = now_s
+            trip.blocked_warning_issued = False
         self._sample_trajectory(carla_map, vehicle, frame, now_s, state)
         if (at_destination
                 and stopped_and_aligned(vehicle, carla_map.get_waypoint(location), current_speed)):
@@ -1108,13 +1115,36 @@ class TripSimulation:
               and now_s - trip.departure_time_s >= self.config.max_trip_time_seconds):
             self._finish_trip(now_s, "timeout", state)
         elif now_s - trip.last_moving_time_s >= self.config.blocked_time_threshold_seconds:
-            self._finish_trip(now_s, "blocked", state)
+            if not getattr(trip, "blocked_warning_issued", False):
+                trip.blocked_warning_issued = True
+                self._on_blocked_threshold(state, frame, now_s)
+            if getattr(self.config, "blocked_policy", "terminate") == "terminate":
+                self._finish_trip(now_s, "blocked", state)
+
+    def _on_blocked_threshold(self, state, frame, now_s):
+        trip = state.active_trip
+        self.logger.write_blocked_warning(dict(
+            vehicle_id=state.vehicle_id, trip_id=trip.trip_id, frame=frame,
+            simulation_time_s=now_s, destination_id=trip.destination.destination_id,
+            counter_s=now_s-trip.last_moving_time_s, policy=self.config.blocked_policy))
+        print("AVISO DETENCION {}/{} destino={} contador={:.2f}s politica={}".format(
+            state.vehicle_id, trip.trip_id, trip.destination.destination_id,
+            now_s-trip.last_moving_time_s, self.config.blocked_policy), flush=True)
+
+    def _on_sensor_event(self, state, event):
+        """Passive observation hook; never drains callbacks a second time."""
+
+    def _after_observation_frame(self, frame, now_s):
+        """Called once after every vehicle has observed this physics frame."""
+
+    def _record_applied_control(self, state, frame, now_s, control):
+        """Attribute the command to its issue frame, before the next physics tick."""
 
     @staticmethod
-    def _brake(carla_module: Any, vehicle: Any) -> None:
-        vehicle.apply_control(
-            carla_module.VehicleControl(throttle=0.0, steer=0.0, brake=1.0)
-        )
+    def _brake(carla_module: Any, vehicle: Any) -> Any:
+        control = carla_module.VehicleControl(throttle=0.0, steer=0.0, brake=1.0)
+        vehicle.apply_control(control)
+        return control
 
     def _write_metrics(self, logger: RunLogger, simulation_duration_s: float) -> None:
         trips_started = sum(state.trips_started for state in self.vehicle_states)
@@ -1365,6 +1395,7 @@ class TripSimulation:
             world.tick()
             snapshot = world.get_snapshot()
             start_sim_time_s = snapshot.timestamp.elapsed_seconds
+            self.start_sim_time_s = start_sim_time_s
             now_s = start_sim_time_s
             self._capture_environment_conditions(world)
             output_directory = self._output_directory()
@@ -1399,11 +1430,13 @@ class TripSimulation:
                     self._update_active_trip(
                         active_map, state.actor, frame, now_s, state
                     )
+                self._after_observation_frame(frame, now_s)
                 if elapsed_s >= self.config.duration_seconds:
                     break
                 for state in self.vehicle_states:
                     if state.active_trip is None:
-                        self._brake(carla, state.actor)
+                        control = self._brake(carla, state.actor)
+                        self._record_applied_control(state, frame, now_s, control)
                         if state.dwell_started_time_s is not None and (
                             now_s - state.dwell_started_time_s
                             >= self.config.destination_dwell_time_seconds
@@ -1427,6 +1460,7 @@ class TripSimulation:
                                        target_speed_kmh=trip.approach.target_speed_kmh(self.config.target_speed_kmh))
                             self.logger.write_control(row)
                         state.actor.apply_control(control)
+                        self._record_applied_control(state, frame, now_s, control)
                 # This only caps wall-clock pace; academic time remains simulated time.
                 target_wall_elapsed = elapsed_s / float(self.simulation_speed)
                 remaining = target_wall_elapsed - (time.monotonic() - wall_start)

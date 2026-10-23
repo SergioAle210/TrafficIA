@@ -265,7 +265,11 @@ class VisualReviewSimulation(TripSimulation):
             self._observations[(state.vehicle_id, frame)] = row
         self._observation_counts[state.vehicle_id] += 1
         self._observation_writer.writerow(row)
+        self._observe_row(carla_map, state, trip, row)
         return result
+
+    def _observe_row(self, carla_map, state, trip, row):
+        """Optional passive consumer of an already collected observation."""
 
     def _write_metrics(self, logger, duration):
         # Drain already rendered GPU callbacks without generating extra simulation ticks.
