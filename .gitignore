@@ -7,3 +7,6 @@ __pycache__/
 # Generated simulation outputs
 /data/output/*
 !/data/output/.gitkeep
+
+# Generated figure collection (images, gallery, catalogue and LaTeX snippets)
+/images/

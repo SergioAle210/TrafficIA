@@ -44,7 +44,18 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data',type=Path,required=True)
     parser.add_argument('--compare-data',type=Path,help='Previous figure folder; requires re-audit in data/previous_review.')
+    parser.add_argument('--independent-output',type=Path,help='Export one academic plot per file into a separate directory, without changing the input directory.')
+    parser.add_argument('--prefix',default='campana_demanda',help='Readable filename prefix for independent figures.')
     args=parser.parse_args();out=args.data
+    if args.independent_output:
+        from scripts.export_results_charts import Exporter, load_campaign, export_campaign, export_repetitions
+        exporter=Exporter(args.independent_output)
+        campaign=load_campaign(args.data)
+        export_campaign(campaign,exporter,args.prefix)
+        if args.compare_data:
+            export_repetitions(load_campaign(args.compare_data),campaign,exporter)
+        exporter.finish()
+        return
     derived=read(out/'derivation_manifest.json');review=read(out/'chart_input_review.json')
     if review['errors'] or any(not p['comparable'] for p in review['pairs']):raise ValueError('Unvalidated inputs')
     runs=review['metrics'];extra=review['runs'];counts=sorted({r['vehicle_count'] for r in runs})

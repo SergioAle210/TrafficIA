@@ -62,7 +62,16 @@ class Figures:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--data',type=Path,required=True)
+    parser.add_argument('--independent-output',type=Path,help='Export one academic plot per file without changing the input directory.')
+    parser.add_argument('--prefix',default='movilidad_20veh_1800s',help='Readable filename prefix for independent figures.')
     args=parser.parse_args();out=args.data;style()
+    if args.independent_output:
+        sys.path.insert(0,str(ROOT))
+        from scripts.export_results_charts import Exporter, load_campaign, export_campaign
+        exporter=Exporter(args.independent_output)
+        export_campaign(load_campaign(args.data),exporter,args.prefix)
+        exporter.finish()
+        return
     derived=read_json(out/'derivation_manifest.json');campaign=Path(derived['campaign']).parent
     analysis=read_json(campaign/'metrics/analysis.json');runs=analysis['runs']
     if [(r['seed'],r['scenario'],r['vehicle_count']) for r in runs]!=[(s,m,20) for s in (210,109) for m in ('random_baseline','history_80_20')]:
