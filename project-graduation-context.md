@@ -5,6 +5,27 @@ validación y análisis de TrafficIA. Distingue los objetivos del protocolo,
 las decisiones del estudiante y las propuestas pendientes. No sustituye el
 protocolo ni acredita objetivos como cumplidos sin evidencia.
 
+Decisión del 2026-09-23: comparar el cierre `blocked` con una política que
+conserva viaje y destino tras 60 s sin superar 0.2 m/s. Experimento diagnóstico
+de 100 vehículos, baseline, semilla 210, **300 s por política a 1x**, observando
+el espectador sin cámaras. No redefine las demandas ni el controlador común.
+La opción predeterminada permanece `terminate`; no adoptar `keep_trip` en
+campañas académicas sin revisar resultados y separar avisos, esperas y viajes
+completados. Cero cierres `blocked` bajo esa opción no acredita una mejora.
+[Protocolo, semántica y resultados](docs/diagnostico_blocked.md).
+Estado: implementación y 144 pruebas unitarias disponibles. La técnica de
+15 s produjo registros íntegros y vista confirmada por el estudiante, pero
+CARLA falló gráficamente durante el cierre. Las dos corridas de 300 s siguen
+pendientes; no hay todavía evidencia para comparar o adoptar las políticas.
+
+Presentación de resultados (2026-09-23): [colección de imágenes](images/README.md)
+con pilotos 3/5/10/20 y campañas 20/100, incluidas ambas repeticiones de 3600 s.
+El cuerpo sugerido conserva las cuatro métricas del objetivo 3; `blocked`
+queda en respaldo diagnóstico. Esto no autoriza ocultar viajes incompletos
+al interpretar medias ni convertir los diagramas exploratorios en una
+estimación de capacidad. Se añadieron nombres, pies y fragmentos LaTeX sin
+modificar los documentos académicos del estudiante.
+
 ## Fuentes y prioridad
 
 - [protocolo-final.tex](protocolo-final.tex), sección «Objetivos»: fuente de los

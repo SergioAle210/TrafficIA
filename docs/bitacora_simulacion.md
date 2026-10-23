@@ -6,6 +6,81 @@ hipótesis, archivos afectados, pruebas realizadas, rutas de resultados y
 limitaciones pendientes. No reemplazar resultados antiguos ni presentar pruebas
 unitarias como validación de física real.
 
+## 2026-09-28 - Revisión de archivos y exclusión de imágenes de Git
+
+Se revisaron el estado de Git, los scripts, las referencias de configuración
+y las reglas de exclusión. Se añadió `/images/` a `.gitignore`: la colección
+generada, su galería, catálogo y fragmentos LaTeX quedan locales. No tenía
+archivos versionados, por lo que no fue necesario modificar el índice de Git.
+Se conservaron las exclusiones de resultados, entorno virtual y cachés.
+
+README documenta qué conservar: implementación, pruebas, configuraciones,
+manifiestos e historiales de entrada, análisis y generadores de gráficas.
+No se añadió una exclusión global de CSV ni se modificaron entradas o TeX.
+Se recomienda separar la redacción académica en Trabajo-Profesional, sin
+mover ni retirar archivos en esta revisión. El diagnóstico de detenciones
+sigue siendo experimental y la comparación de 300 s permanece pendiente.
+
+Verificación con `git check-ignore`: `images/` queda excluida y los scripts,
+entradas, configuración, documentación y `data/output/.gitkeep` permanecen
+disponibles para versionarse. Las fuentes históricas de las figuras requieren
+respaldo separado: el generador no las reconstruye solo a partir del código.
+No se ejecutó CARLA ni se hicieron commits.
+
+## 2026-09-23 - Colección de imágenes para resultados y LaTeX
+
+El estudiante solicitó reunir las figuras de 3/5/10/20 y 20/100 vehículos,
+incluidas las dos campañas de 3600 s, con nombres entendibles y sin adoptar
+`blocked` como métrica académica. Se creó `images/`: 59 figuras de resultados
+y 18 de respaldo técnico (77 PNG y 56 SVG), organizadas por etapa, duración,
+semilla y repetición. Las láminas de blocked/fallos se conservan como respaldo
+opcional y están ocultas inicialmente en la galería; no se borraron originales.
+
+Se copiaron 68 figuras y se generaron nueve: dos resúmenes por piloto 3/5/10/20
+(tiempo/velocidad/tasas y categorías de destinos), más una comparación de las
+dos repeticiones de 3600 s sin panel blocked. Los resúmenes parten de análisis
+auditados; las poblaciones de completados e incompletos siguen explícitas.
+La repetición 1 es la noche local 21-22 septiembre y la 2 la noche 22-23.
+
+`images/README.md` incluye índice, método, procedencia y uso sugerido;
+`images/index.html` ofrece búsqueda y filtro; `images/figuras_resultados.tex`
+contiene 59 fragmentos independientes y `catalogo.json` registra hashes.
+Verificación: 133 archivos de imagen, fuentes y copias cotejadas, PNG legibles,
+SVG válidos y 59 referencias LaTeX existentes. Revisión visual de los nueve
+resúmenes nuevos; se corrigió el solapamiento de etiquetas de la comparación.
+Registro: `data/output/results_images_collection_20260923/validation.json`.
+
+Sin CARLA, sin nuevas corridas, sin cambios a documentos TeX ni commits.
+Se excluyen duplicados de QA, frames RGB y smoke tests de la selección.
+Se preserva la nube antigua sin guías como antecedente; el cuerpo de resultados
+usa la versión con guías. Generador: `scripts/prepare_results_images.py`.
+
+## 2026-09-23 - Comparación diagnóstica de detenciones
+
+Se implementó `--blocked-policy terminate|keep_trip` con `terminate` por defecto.
+La alternativa avisa a 60 s sin superar 0.2 m/s y mantiene el viaje/destino;
+solo las llegadas completadas aumentan el historial. No se cambia controlador.
+El nuevo seguimiento usa el espectador de CARLA, sin cámaras, y registra las
+decisiones originales del agente sin ejecutar detectores adicionales. Se
+distinguen avisos, terminaciones y episodios físicos a través de reintentos.
+
+Validación inicial: 142 pruebas pasaron con carla-env/CARLA_PYTHONAPI. CARLA
+0.9.15 respondió en Town01 limpio, asíncrono y con renderizado tras prepararlo
+el estudiante. Se inicia prueba técnica de 15 s y se preparan dos corridas de
+300 s (100 vehículos, baseline, semilla 210, 1x). [Detalles y cierre](diagnostico_blocked.md).
+Conservar TeX y resultados anteriores. Sin commits.
+
+Cierre provisional: la técnica alcanzó 15 s y 30,000 observaciones íntegras,
+cero incidentes y 100 `aborted` por fin de simulación. El estudiante confirmó
+vista clara. CARLA confirmó limpieza de actores, pero falló después durante
+el cierre de campaña: assert `DXGI_ERROR_INVALID_CALL` en D3D11Query.cpp:356,
+GPU Intel UHD Graphics 770, sin marca de OOM. Campaña conservada como
+incompleta: `data/output/blocked_comparison_20260923T235312623044Z/`.
+No se ejecutaron las dos corridas de 300 s. Causa del fallo gráfico no
+aislada; no atribuirlo a blocked ni afirmar que quitar cámaras lo resuelve.
+Se pidió al estudiante preparar otra vez CARLA/Town01. Suite final: 144
+pruebas pasan; falta validar las políticas en corridas reales con avisos.
+
 ## 2026-09-23 - Gráficas y comparación de segunda campaña de 3600 s
 
 Campaña `demand20_100_seed_210_20260923T045032867422Z`, iniciada el 22 a las

@@ -4,6 +4,92 @@ Los objetivos académicos, criterios de evaluación y prioridades vigentes está
 en [project-graduation-context.md](project-graduation-context.md). Consultarlo
 antes de proponer cambios a la simulación o requisitos de aceptación.
 
+## Figuras organizadas para el capítulo de resultados
+
+La carpeta [images](images/README.md) reúne los pilotos de 3/5/10/20 vehículos,
+veinte con dos semillas, la campaña 20/100 de 1800 s y las dos repeticiones
+de 3600 s. Contiene **77 figuras: 59 de resultados y 18 de respaldo técnico**,
+con nombres que identifican flota, duración, semilla, repetición y contenido.
+
+- [Galería visual con búsqueda](images/index.html).
+- [Fragmentos LaTeX con nombres y pies sugeridos](images/figuras_resultados.tex).
+- [Catálogo de procedencia y hashes](images/catalogo.json).
+
+Se conservan PNG y SVG cuando están disponibles; usar PNG directamente con
+`graphicx`. `blocked` y otros diagnósticos quedan en respaldo, sin añadirse
+como métricas del objetivo 3. Los viajes incompletos siguen documentados para
+interpretar los tiempos de llegada. Se agregaron ocho resúmenes de pilotos
+y una comparación de repeticiones centrada en movilidad, incidentes y
+cobertura; el resto son copias idénticas. No se ejecutó CARLA ni se modificaron
+las figuras originales o documentos TeX. `scripts/prepare_results_images.py`
+reproduce la colección y rechaza sobrescribir una carpeta `images` existente.
+
+La colección completa `images/` es una salida local excluida de Git, incluidos
+su catálogo, galería y fragmentos LaTeX. Los enlaces anteriores están disponibles
+cuando la colección existe en el equipo. El generador requiere las fuentes
+históricas de `data/output/`; clonar el código no descarga esos resultados.
+
+## Qué conservar en el repositorio
+
+Git conserva la implementación y las entradas reproducibles. Los resultados
+experimentales se respaldan por separado; excluirlos de Git no los elimina
+del disco ni sustituye ese respaldo.
+
+| Grupo | Criterio |
+|---|---|
+| `src/`, `scripts/` y `tests/` | Conservar código, herramientas de preparación, ejecución, análisis, gráficos y pruebas. |
+| `config/` y entradas referenciadas de `data/input/Town01/` | Conservar configuraciones, clima, manifiestos, catálogo e historiales iniciales de 3/5/10/20/100 vehículos. Son entradas, aunque se hayan generado mediante scripts. |
+| `README.md`, `docs/`, `project-graduation-context.md`, `rutas.md`, `requirements.txt` y `LICENSE` | Conservar instrucciones, decisiones, límites, dependencias y licencia. |
+| `images/` y `data/output/` | Excluir las salidas generadas; conservar únicamente `data/output/.gitkeep` en Git. Respaldar fuera de Git las corridas originales necesarias para verificar las figuras. |
+| `carla-env/`, `__pycache__/` y bytecode | Excluir entorno y cachés, ya cubiertos por `.gitignore`. |
+| Documentos de redacción académica | Se recomienda mantener `protocolo-final.tex`, `i-marco_teorico.tex` y `resultados_discusion.md` en Trabajo-Profesional. Esta recomendación no los mueve ni retira del seguimiento actual. |
+
+No usar una regla global `*.csv`: ocultaría entradas necesarias. Los CSV
+genéricos ya versionados no se modifican ni se retiran con esta organización.
+Los documentos de iteraciones anteriores, como `doc_final.md`, son antecedentes;
+deben leerse con su alcance original y no como descripción del estado actual.
+
+Conservar `scripts/prepare_results_images.py` como generador de la colección
+histórica: usa carpetas de campañas concretas y requiere adaptar sus rutas para
+otras campañas. Conservar también `scripts/run_blocked_comparison.py`,
+`src/stop_review.py`, sus pruebas y la [guía diagnóstica](docs/diagnostico_blocked.md)
+como trabajo experimental pendiente de completar las dos corridas de 300 s.
+Actualmente ese script fija 100 vehículos; todavía no permite elegir la flota
+por argumento. Sus cambios asociados en runner, agente, logger e instrumentación
+deben revisarse como un conjunto.
+
+`scripts/load_town01.py` y `scripts/demo_spawn.py` son ejemplos iniciales. Para
+el flujo actual se prefieren `scripts/change_map.py`, `scripts/stable_traffic.py`
+y los runners de viajes/campañas; los ejemplos se conservan como antecedentes.
+
+## Observar detenciones y conservar el destino (2026-09-23)
+
+La comparación diagnóstica de `blocked` usa 100 vehículos, baseline, semilla
+210 y dos corridas de **300 s a 1x solicitado**, precedidas por una prueba
+técnica de 15 s. CARLA debe estar visible, con Town01 limpio y renderizado
+activo; abrir sin `-RenderOffScreen`. No crea cámaras RGB.
+
+```powershell
+.\carla-env\Scripts\python.exe -u scripts/run_blocked_comparison.py
+```
+
+`--technical-only` ejecuta solo los 15 s; `--skip-technical` ejecuta solamente
+las dos comparaciones después de validar la prueba técnica. El espectador
+sigue inicialmente al primer vehículo activo, luego la detención activa más
+larga desde 30 s y queda fijado al primer vehículo que alcanza el aviso de
+60 s. La consola indica identificador, destino, velocidad, contador y
+evidencia del agente. El script restaura el espectador y el estado del mundo.
+
+El runner común acepta `--blocked-policy terminate|keep_trip`: `terminate`
+conserva el comportamiento anterior; `keep_trip` emite el aviso pero mantiene
+viaje, destino y ruta. No añade visitas al historial hasta completar una llegada.
+Al terminar la simulación los viajes pendientes son `aborted`. Ninguna opción
+modifica ganancias del controlador ni cambia automáticamente la ruta.
+
+Los registros nuevos distinguen avisos, terminaciones y episodios físicos
+continuos, incluyendo esperas entre viajes. [Guía y resultados](docs/diagnostico_blocked.md).
+No interpretar cero terminaciones `blocked` en `keep_trip` como mejor movilidad.
+
 Base técnica para crear tráfico urbano controlado y reproducible en **CARLA
 0.9.15**. Conserva la primera iteración de tráfico estable y añade una prueba
 de vehículos simultáneos reutilizados que ejecutan viajes sucesivos con selección
