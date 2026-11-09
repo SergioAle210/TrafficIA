@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class DemandCampaignTests(unittest.TestCase):
     def test_nested_hundred_preserves_twenty_histories_and_destination_streams(self):
+        """Check that extending to 100 vehicles preserves the first 20 histories and destination sequences."""
         manifest = read(ROOT/'config/demand_20_100/preparation_manifest.json')
         check_hashes(manifest['input_sha256'])
         destinations = load_destinations(ROOT/'data/input/Town01/destinations_config.csv', 'Town01')
@@ -44,6 +45,7 @@ class DemandCampaignTests(unittest.TestCase):
             old, old_spawns = current, config.resolved_spawn_point_indices()
 
     def test_preflight_rejects_wrong_map_or_existing_actors_without_modifying_world(self):
+        """Check that preflight rejects an unsuitable world without changing its actors or settings."""
         world = Mock()
         world.get_map.return_value.name = 'Carla/Maps/Town01'
         world.get_settings.return_value = NS(synchronous_mode=False, fixed_delta_seconds=None, no_rendering_mode=False)
@@ -62,7 +64,9 @@ class DemandCampaignTests(unittest.TestCase):
         world.set_weather.assert_not_called()
 
     def audit_fixture(self, folder, gap=False, missing_arrival=False, no_arrivals=False):
+        """Create small observation logs with optional missing records and run the streaming audit."""
         def write(name, rows):
+            """Write sample rows and their column names to a test CSV file."""
             with (folder/name).open('w', newline='', encoding='utf8') as stream:
                 writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
                 writer.writeheader()
@@ -84,6 +88,7 @@ class DemandCampaignTests(unittest.TestCase):
         return audit_stream(folder, dict(simulation_duration_s=.15, completed=0 if no_arrivals else 1, integrity_errors=[]))
 
     def test_streaming_audit_accepts_complete_arrival_and_rejects_missing_frames(self):
+        """Check that the audit accepts complete observations and reports missing frames."""
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             result = self.audit_fixture(folder)
@@ -98,6 +103,7 @@ class DemandCampaignTests(unittest.TestCase):
             self.assertIn('arrival_frame_missing', missing['integrity_errors'])
 
     def test_no_arrival_file_is_allowed_only_when_no_trip_completed(self):
+        """Check that an arrival log is required whenever a completed trip is reported."""
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             self.assertEqual(self.audit_fixture(folder, no_arrivals=True)['integrity_errors'], [])

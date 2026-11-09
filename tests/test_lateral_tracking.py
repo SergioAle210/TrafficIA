@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class TrackingConfigurationTests(unittest.TestCase):
     def test_ratio_defaults_and_explicit_stock_replay(self):
+        """Check the default look-ahead ratio and the option to restore CARLA's original value."""
         for file in ("single_vehicle_trip.json", "multi_vehicle_trip.json"):
             config = TripSimulationConfig.from_json(ROOT / "config" / file)
             self.assertEqual(config.controller_distance_ratio, 0.1)
@@ -24,12 +25,14 @@ class TrackingConfigurationTests(unittest.TestCase):
         self.assertEqual(config.controller_distance_ratio, 0.5)
 
     def test_invalid_ratios_rejected_before_connection(self):
+        """Check that invalid look-ahead ratios fail before connecting to CARLA."""
         for value in (-0.1, float("nan"), float("inf")):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 TripSimulationConfig.from_json(ROOT / "config/multi_vehicle_trip.json",
                                                {"controller_distance_ratio": value})
 
     def test_cli_replays_stock_ratio_and_enables_diagnostics(self):
+        """Check command-line options for the original look-ahead ratio and navigation diagnostics."""
         args = NS(config=ROOT / "config/multi_vehicle_trip.json", town=None, seed=None,
                   seconds=None, scenario="random_baseline", history_in=None,
                   no_rendering=True, navigation_diagnostics=True, controller_distance_ratio=0.5)
@@ -41,6 +44,7 @@ class TrackingConfigurationTests(unittest.TestCase):
 class LocalPlannerTurnTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        """Load the CARLA local planner or skip these tests if the SDK is unavailable."""
         try:
             import carla
             configure_carla_agents(carla, os.environ.get("CARLA_PYTHONAPI"))
@@ -50,6 +54,7 @@ class LocalPlannerTurnTests(unittest.TestCase):
         cls.carla, cls.planner_type, cls.option = carla, LocalPlanner, RoadOption
 
     def planner(self, ratio):
+        """Build a local planner with a mock vehicle and a known curved route."""
         carla = self.carla
         vehicle = Mock()
         vehicle.get_location.return_value = carla.Location(92.989, 205.934, 0)
@@ -68,6 +73,7 @@ class LocalPlannerTurnTests(unittest.TestCase):
         return local, route
 
     def test_shorter_horizon_keeps_curve_target_instead_of_skipping_it(self):
+        """Check that shorter look-ahead retains the needed waypoint on a curve."""
         stock, stock_route = self.planner(0.5)
         fixed, fixed_route = self.planner(0.1)
         stock.run_step()
@@ -79,6 +85,7 @@ class LocalPlannerTurnTests(unittest.TestCase):
         fixed._vehicle_controller.run_step.assert_called_once_with(20, fixed_route[3][0])
 
     def test_last_waypoint_still_brakes_when_reached(self):
+        """Check that the local planner brakes after reaching the last waypoint."""
         local, route = self.planner(0.1)
         local._vehicle.get_location.return_value = route[-1][0].transform.location
         local.set_global_plan([route[-1]], stop_waypoint_creation=True, clean_queue=True)
@@ -88,6 +95,7 @@ class LocalPlannerTurnTests(unittest.TestCase):
         self.assertEqual(control.throttle, 0)
 
     def test_builder_keeps_full_plan_and_options_are_independent(self):
+        """Check that agent construction preserves the whole route and does not share mutable options."""
         with patch("src.navigation.carla_agent.CollinearSafeBasicAgent") as agent_type:
             route = [object(), object()]
             build_basic_agent(object(), route, 20)

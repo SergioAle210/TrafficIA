@@ -9,6 +9,7 @@ from scripts.index_demo_outputs import build_rows, write_index
 
 class DemoIndexTests(unittest.TestCase):
     def setUp(self):
+        """Create a temporary demonstration campaign with explicit case identities."""
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -21,9 +22,11 @@ class DemoIndexTests(unittest.TestCase):
         ]
 
     def save(self):
+        """Write the current test cases to the temporary campaign manifest."""
         self.path.write_text(json.dumps(dict(duration_s=180, cases=self.cases)), encoding="utf-8")
 
     def test_labels_follow_cases_not_directory_order(self):
+        """Check that index labels use case identities rather than directory order."""
         self.cases.reverse()
         self.save()
         rows = build_rows(self.path, self.root)
@@ -32,6 +35,7 @@ class DemoIndexTests(unittest.TestCase):
         ])
 
     def test_partial_campaign_preserves_status_and_missing_results(self):
+        """Check that unfinished campaigns retain their statuses and distinguish missing results from zeros."""
         self.cases[0].update(status="completed", completed_trips=0, run_directories=["run20"])
         self.cases[1].update(status="interrupted", run_directories=["partial"])
         self.save()
@@ -42,6 +46,7 @@ class DemoIndexTests(unittest.TestCase):
         self.assertEqual(rows[2]["carpeta"], "")
 
     def test_index_links_real_logs_without_modifying_sources(self):
+        """Check that the index links existing logs without modifying their contents."""
         run = self.root / "run20"
         run.mkdir()
         log = run / "trips_log.csv"
@@ -60,12 +65,14 @@ class DemoIndexTests(unittest.TestCase):
         self.assertEqual(before, (self.path.read_bytes(), log.read_bytes()))
 
     def test_duplicate_combination_is_rejected(self):
+        """Check that duplicate demonstration case combinations are rejected."""
         self.cases.append(dict(self.cases[0]))
         self.save()
         with self.assertRaises(ValueError):
             build_rows(self.path, self.root)
 
     def test_run_directory_must_remain_under_output_root(self):
+        """Check that indexed run directories cannot escape the allowed output folder."""
         self.cases[0]["run_directories"] = ["../outside"]
         self.save()
         with self.assertRaises(ValueError):

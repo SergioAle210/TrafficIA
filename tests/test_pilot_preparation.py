@@ -13,12 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class PilotPreparationTests(unittest.TestCase):
     def test_nested_spawn_extension_uses_distance_and_deterministic_ties(self):
+        """Check that new spawn points maximize separation and use a repeatable tie rule."""
         points = {0:(0,0), 1:(10,0), 2:(-10,0), 3:(2,0)}
         self.assertEqual(nested_spawns(points,[0],4), [0,1,2,3])
         with self.assertRaises(ValueError): nested_spawns(points,[0,0],3)
         with self.assertRaises(ValueError): nested_spawns(points,[0],5)
 
     def test_prepared_fleets_preserve_spawns_histories_and_individual_random_streams(self):
+        """Check that larger pilot groups preserve existing positions, histories, and per-vehicle random choices."""
         destinations = load_destinations(ROOT/'data/input/Town01/destinations_config.csv','Town01')
         allowed = {d.destination_id for d in destinations}
         previous_spawns = [133,6,101]

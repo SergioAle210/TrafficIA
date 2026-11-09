@@ -11,6 +11,7 @@ from src.navigation.route_planner import configure_carla_agents
 class CollinearObstacleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        """Load CARLA and both agent versions, skipping these tests if the SDK is unavailable."""
         try:
             import carla
             configure_carla_agents(carla, os.environ.get("CARLA_PYTHONAPI"))
@@ -23,9 +24,11 @@ class CollinearObstacleTests(unittest.TestCase):
         cls.fixed_type = CollinearSafeBasicAgent
 
     def agent_and_target(self, agent_type, x=8.0, y=0.0):
+        """Build an agent and a test vehicle at the requested relative position."""
         carla = self.carla
 
         def vehicle(actor_id, vx, vy):
+            """Create a lightweight vehicle with a fixed position, speed, and bounding box."""
             return SimpleNamespace(
                 id=actor_id, bounding_box=carla.BoundingBox(
                     carla.Location(), carla.Vector3D(2.0, 0.8, 1.0)),
@@ -35,6 +38,7 @@ class CollinearObstacleTests(unittest.TestCase):
             )
 
         def waypoint(location, **kwargs):
+            """Return a test lane based on the supplied sideways position."""
             return SimpleNamespace(
                 road_id=6, lane_id=1 if abs(location.y) < 1.0 else 2,
                 lane_width=3.5, is_junction=False,
@@ -55,6 +59,7 @@ class CollinearObstacleTests(unittest.TestCase):
         return agent, vehicle(2, x, y)
 
     def test_stock_misses_exactly_collinear_vehicle_and_fix_detects_it(self):
+        """Check that the adapted agent detects a directly aligned vehicle missed by the original agent."""
         stock, target = self.agent_and_target(self.stock_type)
         self.assertFalse(stock._vehicle_obstacle_detected([target], 10)[0])
         fixed, target = self.agent_and_target(self.fixed_type)
@@ -63,18 +68,21 @@ class CollinearObstacleTests(unittest.TestCase):
         self.assertEqual(actor.id, 2)
 
     def test_fix_keeps_behind_adjacent_and_distant_vehicles_excluded(self):
+        """Check that the fix still excludes vehicles behind, in another lane, or too far away."""
         for x, y in [(-8.0, 0.0), (8.0, 3.5), (30.0, 0.0)]:
             with self.subTest(x=x, y=y):
                 fixed, target = self.agent_and_target(self.fixed_type, x, y)
                 self.assertFalse(fixed._vehicle_obstacle_detected([target], 10)[0])
 
     def test_nonzero_angle_and_explicit_positive_lower_bound_keep_stock_behavior(self):
+        """Check that ordinary angles and explicit angle limits preserve the original detection behavior."""
         fixed, target = self.agent_and_target(self.fixed_type, 8, 0.2)
         self.assertTrue(fixed._vehicle_obstacle_detected([target], 10)[0])
         fixed, target = self.agent_and_target(self.fixed_type)
         self.assertFalse(fixed._vehicle_obstacle_detected([target], 10, low_angle_th=10)[0])
 
     def test_official_run_step_brakes_for_a_collinear_obstacle(self):
+        """Check that the normal driving step brakes for a directly aligned obstacle."""
         fixed, target = self.agent_and_target(self.fixed_type)
         actors = Mock()
         actors.filter.return_value = [target]
@@ -90,6 +98,7 @@ class CollinearObstacleTests(unittest.TestCase):
         self.assertAlmostEqual(control.steer, 0.1)
 
     def test_arrival_horizon_tracks_speed_and_restores_cruise_without_changing_pid(self):
+        """Check that arrival speed adjusts waypoint look-ahead without changing controller gains."""
         fixed, _ = self.agent_and_target(self.fixed_type)
         local = fixed._local_planner
         local._base_min_distance = 3.0

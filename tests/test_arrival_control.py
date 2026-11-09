@@ -13,14 +13,17 @@ from src.simulation.trip_runner import ActiveTrip, TripSimulation, TripSimulatio
 
 class Location:
     def __init__(self, x=0, y=0, z=0):
+        """Store coordinates for a lightweight test location."""
         self.x, self.y, self.z = x, y, z
 
     def distance(self, other):
+        """Return the straight-line distance to another test location."""
         return math.sqrt((self.x-other.x)**2+(self.y-other.y)**2+(self.z-other.z)**2)
 
 
 class Waypoint:
     def __init__(self, s, lane_id=-1, curved=False):
+        """Build a waypoint on a simple straight or curved test lane."""
         self.s, self.lane_id = s, lane_id
         self.road_id, self.section_id = 20, 0
         self.curved = curved
@@ -29,15 +32,18 @@ class Waypoint:
         self.transform = NS(location=location, rotation=NS(yaw=math.degrees(angle)))
 
     def next(self, distance):
+        """Return the next test waypoint in the lane's driving direction."""
         return [Waypoint(self.s+distance*(1 if self.lane_id < 0 else -1), self.lane_id, self.curved)]
 
 
 def route(points):
+    """Convert coordinate pairs into a minimal route for arrival tests."""
     return [(NS(transform=NS(location=Location(x,y))), None) for x,y in points]
 
 
 class ArrivalControlTests(unittest.TestCase):
     def test_route_finishes_at_exact_goal_in_curve_and_both_lane_directions(self):
+        """Check that the route ends at the exact goal on curves and in both lane directions."""
         for lane, points, goal_s in [(-1,[0,2,4,6],9), (1,[10,8,6,4],1)]:
             goal = Waypoint(goal_s, lane, curved=True)
             fixed = arrival_route([(Waypoint(s,lane,True),"curve") for s in points], goal)
@@ -46,16 +52,19 @@ class ArrivalControlTests(unittest.TestCase):
                                 for a,b in zip(fixed[3:],fixed[4:])))
 
     def test_terminal_overshoot_is_trimmed_without_an_about_turn(self):
+        """Check that a route overshoot is trimmed without forcing a turn back."""
         goal = Waypoint(5)
         fixed = arrival_route([(Waypoint(s),None) for s in [0,2,4,6,8]], goal)
         self.assertEqual(fixed[-1][0].s,5)
         self.assertTrue(all(a[0].s < b[0].s for a,b in zip(fixed,fixed[1:])))
 
     def test_missing_lane_anchor_fails_instead_of_inventing_a_route(self):
+        """Check that arrival planning fails when the required lane anchor is missing."""
         with self.assertRaises(RuntimeError):
             arrival_route([(Waypoint(0,1),None)],Waypoint(3,-1))
 
     def test_nearby_later_leg_does_not_jump_to_destination(self):
+        """Check that proximity to a later route segment does not falsely complete progress."""
         path = route([(0,0),(10,0),(20,0),(20,20),(10,20),(0,20),(0,1)])
         approach = ArrivalApproach(path)
         approach.update(Location(0,1))
@@ -63,6 +72,7 @@ class ArrivalControlTests(unittest.TestCase):
         self.assertEqual(approach.target_speed_kmh(20),20)
 
     def test_curve_speed_uses_route_length_and_reduces_before_arrival_radius(self):
+        """Check that braking uses remaining route length and begins before the arrival radius."""
         approach = ArrivalApproach(route([(0,0),(10,0),(10,10)]))
         approach.update(Location(10,2))
         self.assertEqual(approach.remaining_m,8)
@@ -73,6 +83,7 @@ class ArrivalControlTests(unittest.TestCase):
         self.assertEqual(approach.target_speed_kmh(20),0)
 
     def test_braking_keeps_live_steering_and_cannot_override_hazard_stop(self):
+        """Check that arrival braking preserves steering and the agent's obstacle stop."""
         approach = ArrivalApproach(route([(0,0),(10,0)]))
         agent = Mock()
         agent.run_step.return_value = NS(throttle=0.0, brake=0.5, steer=0.42)
@@ -86,6 +97,7 @@ class ArrivalControlTests(unittest.TestCase):
         self.assertEqual(agent.run_step.call_count,2)
 
     def test_arrival_requires_stop_heading_and_centering(self):
+        """Check that arrival requires low speed, correct heading, and lane centering."""
         waypoint = Waypoint(5)
         vehicle = Mock()
         for speed, yaw, y, expected in [(5.34,0,0,False),(.01,-33,0,False),
@@ -94,6 +106,7 @@ class ArrivalControlTests(unittest.TestCase):
             self.assertEqual(stopped_and_aligned(vehicle,waypoint,speed),expected)
 
     def test_alignment_creep_retains_obstacle_braking_and_stops_once_aligned(self):
+        """Check that slow alignment preserves obstacle braking and stops once alignment is complete."""
         approach = ArrivalApproach(route([(0,0),(10,0)]))
         approach.update(Location(9.6))
         approach.settling = True
@@ -108,6 +121,7 @@ class ArrivalControlTests(unittest.TestCase):
         self.assertEqual(control.brake,1)
 
     def test_runner_wait_starts_only_after_stopping_and_records_one_visit(self):
+        """Check that waiting starts only after a valid stop and exactly one visit is recorded."""
         root = Path(__file__).resolve().parents[1]
         sim = TripSimulation(TripSimulationConfig.from_json(root/'config/multi_vehicle_trip.json'),root,1)
         sim.logger = Mock()

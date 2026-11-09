@@ -10,24 +10,29 @@ from src.simulation.trip_runner import TripSimulation, TripSimulationConfig, is_
 
 class Location:
     def __init__(self, x=0, y=0, z=0):
+        """Store coordinates for a lightweight test location."""
         self.x, self.y, self.z = x, y, z
 
     def distance(self, other):
+        """Return the straight-line distance to another test location."""
         return math.sqrt((self.x-other.x)**2 + (self.y-other.y)**2 + (self.z-other.z)**2)
 
 
 def waypoint(x, lane=1, road=15):
+    """Build a waypoint with explicit road and lane IDs for boundary tests."""
     return NS(road_id=road, section_id=0, lane_id=lane, s=100-x,
               transform=NS(location=Location(x), rotation=NS(yaw=0)))
 
 
 class ArrivalSeamTests(unittest.TestCase):
     def setUp(self):
+        """Prepare a destination and its verified continuation across a road boundary."""
         self.goal = waypoint(0, -1, 20)
         self.corridor = ArrivalLaneCorridor([(self.goal, None)] + [(waypoint(i*.5), None) for i in range(1, 13)])
         self.map = NS(get_waypoint=lambda loc, **kw: self.goal if loc.x == 0 else waypoint(loc.x))
 
     def test_seam_is_valid_only_on_verified_bounded_continuation(self):
+        """Check that arrival across a road boundary is limited to the verified nearby continuation."""
         self.assertTrue(is_at_destination(self.map, Location(.91), Location(), 4, self.corridor))
         self.assertFalse(is_at_destination(self.map, Location(.91), Location(), 4))
         self.assertFalse(is_at_destination(self.map, Location(3.1), Location(), 4, self.corridor))
@@ -38,6 +43,7 @@ class ArrivalSeamTests(unittest.TestCase):
         self.assertFalse(self.corridor.contains(distant_s, Location(.9)))
 
     def simulation(self, remaining=0, limit=None):
+        """Create a minimal simulation and vehicle for arrival and trip-time checks."""
         sim = TripSimulation.__new__(TripSimulation)
         sim.config = NS(arrival_threshold_m=4, blocked_speed_threshold_mps=.2,
                         blocked_time_threshold_seconds=60, max_trip_time_seconds=limit,
@@ -57,6 +63,7 @@ class ArrivalSeamTests(unittest.TestCase):
         return sim, state, vehicle
 
     def test_runner_keeps_alignment_after_seam_and_completes_only_when_aligned(self):
+        """Check that crossing a road boundary does not bypass the final alignment requirement."""
         sim, state, vehicle = self.simulation()
         sim._update_active_trip(self.map, vehicle, 1, 1, state)
         self.assertTrue(state.active_trip.approach.settling)
@@ -66,6 +73,7 @@ class ArrivalSeamTests(unittest.TestCase):
         sim._finish_trip.assert_called_once_with(1.05, "completed", state)
 
     def test_disabled_deadline_keeps_moving_trip_beyond_300_seconds(self):
+        """Check that a moving trip continues past 300 seconds when its deadline is disabled."""
         for limit in [None, 300]:
             sim, state, vehicle = self.simulation(remaining=100, limit=limit)
             vehicle.get_velocity.return_value = Location(5)
@@ -76,12 +84,14 @@ class ArrivalSeamTests(unittest.TestCase):
                 sim._finish_trip.assert_called_once_with(301, "timeout", state)
 
     def test_disabled_deadline_preserves_blockage_and_records_stopped_time(self):
+        """Check that disabling the trip deadline still allows blocked detection and stopped-time recording."""
         sim, state, vehicle = self.simulation(remaining=100)
         sim._update_active_trip(self.map, vehicle, 1, 60, state)
         sim._finish_trip.assert_called_once_with(60, "blocked", state)
         self.assertEqual(state.active_trip.stopped_time_s, 60)
 
     def test_deadline_configuration_rejects_nonfinite_or_nonpositive_values(self):
+        """Check that invalid trip deadlines are rejected during configuration validation."""
         config = Path(__file__).resolve().parents[1] / "config/multi_vehicle_trip.json"
         for limit in [-1, 0, float("nan"), float("inf")]:
             with self.assertRaises(ValueError):
@@ -89,6 +99,7 @@ class ArrivalSeamTests(unittest.TestCase):
         self.assertIsNone(TripSimulationConfig.from_json(config).max_trip_time_seconds)
 
     def test_cli_can_restore_legacy_deadline_or_disable_it(self):
+        """Check that command-line options can enable or disable the trip deadline."""
         from scripts.run_trip_simulation import parse_args, configuration_from_args
         config = Path(__file__).resolve().parents[1] / "config/multi_vehicle_trip.json"
         for argument, expected in [("0", None), ("300", 300)]:
@@ -96,6 +107,7 @@ class ArrivalSeamTests(unittest.TestCase):
                 self.assertEqual(configuration_from_args(parse_args()).max_trip_time_seconds, expected)
 
     def test_exposure_includes_motion_during_dwell_and_all_elapsed_time(self):
+        """Check that presence measurements include waiting time and any movement during waits."""
         state = NS(actor=Mock(), exposure_last_time_s=None, exposure_last_location=None,
                    observed_time_s=0, observed_distance_m=0, active_trip=None)
         for time, x in [(10, 0), (12, 5), (15, 5.2)]:

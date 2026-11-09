@@ -14,6 +14,7 @@ from src.navigation.route_planner import configure_carla_agents
 
 class StopPolicyTests(unittest.TestCase):
     def simulation(self, policy='keep_trip'):
+        """Build a stationary test vehicle and trip using the requested blocked-attempt policy."""
         config = TripSimulationConfig.from_json(Path('config/multi_vehicle_trip.json'), dict(blocked_policy=policy))
         sim = TripSimulation(config, Path('.'), 1)
         state = sim.vehicle_states[0]
@@ -33,10 +34,12 @@ class StopPolicyTests(unittest.TestCase):
         return sim, state, actor
 
     def step(self, sim, state, actor, now):
+        """Update a test trip at the requested time while preventing an arrival."""
         with patch('src.simulation.trip_runner.is_at_destination', return_value=False), patch('src.simulation.trip_runner.is_aligned', return_value=True):
             sim._update_active_trip(Mock(), actor, int(now*20), now, state)
 
     def test_warning_boundary_once_recovery_rearms_and_keeps_destination(self):
+        """Check that the warning fires once per stop and can fire again after movement resumes."""
         sim, state, actor = self.simulation()
         trip = state.active_trip
         for now in (59.95,60,60.05,70): self.step(sim,state,actor,now)
@@ -56,6 +59,7 @@ class StopPolicyTests(unittest.TestCase):
         self.assertEqual(sim.logger.write_blocked_warning.call_count,2)
 
     def test_default_terminates_and_arrival_has_priority(self):
+        """Check that the default stop policy closes blocked trips while valid arrival takes priority."""
         sim,state,actor = self.simulation('terminate')
         self.step(sim,state,actor,60)
         sim._finish_trip.assert_called_once_with(60,'blocked',state)
@@ -68,6 +72,7 @@ class StopPolicyTests(unittest.TestCase):
         sim.logger.write_blocked_warning.assert_not_called()
 
     def test_cli_and_invalid_policy(self):
+        """Check command-line stop-policy selection and rejection of invalid policy values."""
         from scripts.run_trip_simulation import parse_args, configuration_from_args
         with patch('sys.argv',['run','--config','config/multi_vehicle_trip.json','--blocked-policy','keep_trip']):
             self.assertEqual(configuration_from_args(parse_args()).blocked_policy,'keep_trip')
@@ -76,6 +81,7 @@ class StopPolicyTests(unittest.TestCase):
             TripSimulationConfig.from_json(Path('config/multi_vehicle_trip.json'),dict(blocked_policy='off'))
 
     def test_kept_trip_aborted_at_run_end_does_not_add_a_visit(self):
+        """Check that an unfinished retained trip adds no visit when the run ends."""
         sim,state,actor=self.simulation()
         trip=state.active_trip
         self.step(sim,state,actor,60)
@@ -87,6 +93,7 @@ class StopPolicyTests(unittest.TestCase):
         self.assertIsNone(state.active_trip)
 
     def test_policy_comparison_rejects_other_configuration_changes(self):
+        """Check that stop-policy comparisons reject unrelated configuration changes."""
         from scripts.run_blocked_comparison import comparison_conditions
         a=dict(simulation_config=dict(blocked_policy='terminate',output_root='a',seed=210),
                vehicles=[dict(carla_actor_id=1,blueprint_id='car',vehicle_id='v')], environment={'weather':'same'})
@@ -99,6 +106,7 @@ class StopPolicyTests(unittest.TestCase):
 
 class EpisodeTests(unittest.TestCase):
     def test_episode_continues_across_trip_and_dwell_and_censors_at_end(self):
+        """Check that a physical stop spans trip changes and is marked unfinished at observation end."""
         tracker=StopEpisodes(.2)
         for now,phase,trip in [(1,'travel','A'),(2,'retry_wait',''),(3,'travel','B')]:
             self.assertIsNone(tracker.update('v',now,1,.2,phase,trip))
@@ -114,12 +122,14 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(end['duration_s'],1)
 
     def test_follow_longest_then_lock_first_warning_even_after_trip_ends(self):
+        """Check that spectator selection locks on the first warning even after that trip ends."""
         selector=FollowSelector()
         self.assertEqual(selector.choose({'v1':31,'v2':40},set()),'v2')
         self.assertEqual(selector.choose({'v1':60,'v2':41},{'v1'}),'v1')
         self.assertEqual(selector.choose({'v2':200},{'v2'}),'v1')
 
     def test_failure_finalization_restores_spectator_and_closes_streams(self):
+        """Check that failed execution restores the spectator and closes diagnostic files."""
         config=TripSimulationConfig.from_json(Path('config/multi_vehicle_trip.json'))
         sim=StopReviewSimulation(config,Path('.'),1)
         sim.spectator=Mock()
@@ -140,12 +150,14 @@ class EpisodeTests(unittest.TestCase):
 class PassiveDetectorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        """Load CARLA's agent support or skip these tests when it is unavailable."""
         try:
             import carla
             configure_carla_agents(carla,os.environ.get('CARLA_PYTHONAPI'))
         except (ImportError,RuntimeError) as error: raise unittest.SkipTest(str(error))
 
     def test_each_detector_once_returns_identical_control_and_resets_cache(self):
+        """Check that passive observations use each detector once and leave the resulting control unchanged."""
         from src.navigation.carla_agent import CollinearSafeBasicAgent
         from agents.navigation.basic_agent import BasicAgent
         import carla
@@ -154,6 +166,7 @@ class PassiveDetectorTests(unittest.TestCase):
         light=NS(id=8,get_state=lambda:'Red')
         control=carla.VehicleControl(brake=.5,steer=.1)
         def stock_step(self):
+            """Simulate a normal agent step that checks vehicles and lights before returning its control."""
             self._vehicle_obstacle_detected([])
             self._affected_by_traffic_light([])
             return control

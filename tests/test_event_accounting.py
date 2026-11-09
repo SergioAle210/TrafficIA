@@ -10,11 +10,13 @@ from src.simulation.trip_runner import EventCollector, TripSimulation, TripSimul
 
 class EventAccountingTests(unittest.TestCase):
     def setUp(self):
+        """Create a multivehicle simulation with a mock logger for event-accounting tests."""
         config = TripSimulationConfig.from_json(Path("config/multi_vehicle_trip.json"))
         self.simulation = TripSimulation(config, Path("."), 1)
         self.simulation.logger = Mock()
 
     def queue(self, state, event_type, timestamp):
+        """Add a test sensor notification to the selected vehicle's event buffer."""
         event = SimpleNamespace(
             frame=100, timestamp=timestamp,
             transform=SimpleNamespace(location=SimpleNamespace(x=0, y=0, z=0)),
@@ -22,6 +24,7 @@ class EventAccountingTests(unittest.TestCase):
         state.event_collector._append(event_type, event, "", "test")
 
     def test_dwell_events_count_in_run_totals_but_not_another_vehicle(self):
+        """Check that waiting events enter run totals without being assigned to another vehicle."""
         state = self.simulation.vehicle_states[1]
         for _ in range(4):
             self.queue(state, "lane_invasion", 12.0)
@@ -41,6 +44,7 @@ class EventAccountingTests(unittest.TestCase):
         self.assertEqual(state.total_lane_invasions, 4)  # No double counting on drain.
 
     def test_active_events_update_both_scopes_and_stale_events_only_run_totals(self):
+        """Check that delayed events do not enter a newer trip's event counters."""
         state = self.simulation.vehicle_states[0]
         state.active_trip = SimpleNamespace(
             trip_id="trip_002", departure_time_s=20.0, collision_count=0, lane_invasion_count=0,
@@ -57,6 +61,7 @@ class EventAccountingTests(unittest.TestCase):
         self.assertEqual(state.active_trip.lane_invasion_count, 1)
 
     def test_collision_preserves_raw_callbacks_and_records_other_actor_type(self):
+        """Check that collision notifications retain individual callbacks and the other actor's type."""
         collector = EventCollector()
         vector = SimpleNamespace(x=1, y=2, z=3)
         event = SimpleNamespace(

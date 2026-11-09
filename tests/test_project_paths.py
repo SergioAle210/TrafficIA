@@ -15,6 +15,7 @@ from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
 class ProjectPathTests(unittest.TestCase):
     def test_all_relocated_inputs_keep_their_original_bytes(self):
+        """Check that relocated input files still match their recorded original fingerprints."""
         manifest = json.loads((PROJECT_ROOT / "docs/relocation-manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(len(manifest["files"]), 25)
         for entry in manifest["files"]:
@@ -25,11 +26,13 @@ class ProjectPathTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(current.read_bytes()).hexdigest(), entry["sha256"])
 
     def test_frozen_campaign_manifest_still_verifies(self):
+        """Check that the frozen campaign manifest remains valid after input relocation."""
         path = project_path("config/demand_20_100/preparation_manifest.json")
         manifest = json.loads(path.read_text(encoding="utf-8"))
         check_hashes(manifest["input_sha256"])
 
     def test_existing_snapshot_takes_priority_over_relocated_files(self):
+        """Check that an existing snapshot file is used before the relocated project input."""
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             old = root / "config/multi_vehicle_trip.json"
@@ -42,6 +45,7 @@ class ProjectPathTests(unittest.TestCase):
             self.assertEqual(project_path("config/multi_vehicle_trip.json", root).read_bytes(), b"original snapshot")
 
     def test_unknown_or_external_paths_are_not_redirected_to_project_data(self):
+        """Check that unrelated and external paths are not silently redirected to project files."""
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder) / "checkout"
             external = Path(folder) / "snapshot/config/multi_vehicle_trip.json"
@@ -49,6 +53,7 @@ class ProjectPathTests(unittest.TestCase):
             self.assertEqual(project_path("data/input/missing.csv", root), root / "data/input/missing.csv")
 
     def test_old_and_current_config_paths_load_the_same_simulation(self):
+        """Check that old and current configuration paths produce equivalent simulation settings."""
         for old, new in (
             ("config/multi_vehicle_trip.json", "config/trips/multi_vehicle_trip.json"),
             ("config/demand_20_100/town01_100.json", "config/experiments/demand_20_100/town01_100.json"),
@@ -65,6 +70,7 @@ class ProjectPathTests(unittest.TestCase):
             self.assertTrue(all(len(state.vehicle_history.events) == 30 for state in simulation.vehicle_states))
 
     def test_preparation_uses_relocated_path_and_refuses_different_content(self):
+        """Check that preparation resolves relocated paths without overwriting different existing content."""
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             old = root / "config/pilots/town01_05.json"
@@ -80,6 +86,7 @@ class ProjectPathTests(unittest.TestCase):
             self.assertFalse(old.exists())
 
     def test_relocated_snapshot_can_load_its_own_catalog_and_histories(self):
+        """Check that a relocated snapshot can load its own catalog and vehicle histories."""
         manifest = json.loads((PROJECT_ROOT / "docs/relocation-manifest.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

@@ -13,6 +13,7 @@ from src.recording.run_logger import RunLogger
 
 
 def waypoint(x, y, yaw=0, road=12):
+    """Create a lightweight waypoint with known position, orientation, and lane geometry."""
     location = NS(x=x, y=y, z=0)
     return NS(transform=NS(location=location, rotation=NS(yaw=yaw)),
               road_id=road, lane_id=-1, lane_width=4)
@@ -20,6 +21,7 @@ def waypoint(x, y, yaw=0, road=12):
 
 class RouteTraceTests(unittest.TestCase):
     def test_projection_is_on_segment_and_sign_is_right(self):
+        """Check that route projection stays on the segment and reports the correct sideways-error sign."""
         trace = RouteTrace([(waypoint(0, 0), "straight"), (waypoint(10, 0), "straight")])
         row = trace.project(5, 1, 10)
         self.assertEqual(row["route_x"], 5)
@@ -30,6 +32,7 @@ class RouteTraceTests(unittest.TestCase):
         self.assertAlmostEqual(trace.project(12, 1, 0)["route_distance_m"], math.sqrt(5))
 
     def test_duplicate_junction_points_and_yaw_wrap(self):
+        """Check that duplicate waypoints and the angle boundary are handled during route projection."""
         a, b = waypoint(10, 0, 179), waypoint(0, 0, -179)
         route = [(a, "lane"), (a, "right"), (b, "right")]
         trace = RouteTrace(route)
@@ -41,10 +44,12 @@ class RouteTraceTests(unittest.TestCase):
         self.assertEqual(row["heading_error_deg"], 1)
 
     def test_degenerate_route_has_no_fabricated_projection(self):
+        """Check that a route with no usable segment returns no invented projection."""
         trace = RouteTrace([(waypoint(0, 0), "end")])
         self.assertEqual(trace.project(0, 1, 0), {})
 
     def test_sample_preserves_control_and_distinguishes_vehicle_from_target(self):
+        """Check that diagnostics preserve controls and distinguish vehicle state from the target waypoint."""
         a, b = waypoint(0, 0), waypoint(10, 0)
         trace = RouteTrace([(a, "lane"), (b, "lane")])
         a.transform.location.distance = lambda other: 10
@@ -62,6 +67,7 @@ class RouteTraceTests(unittest.TestCase):
         agent.run_step.assert_not_called()
 
     def test_optional_writers_keep_frame_and_trip_keys(self):
+        """Check that optional diagnostic logs retain their frame and trip identifiers."""
         with TemporaryDirectory() as directory:
             output = Path(directory) / "run"
             logger = RunLogger(output)

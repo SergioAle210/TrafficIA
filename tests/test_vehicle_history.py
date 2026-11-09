@@ -20,12 +20,14 @@ from src.demand.vehicle_history import (
 class VehicleHistoryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        """Load the shared Town01 destination catalog and its valid identifiers."""
         cls.destinations = load_destinations(
             Path("data/input/Town01/destinations_config.csv"), "Town01"
         )
         cls.destination_ids = {item.destination_id for item in cls.destinations}
 
     def test_catalog_has_exactly_three_categories_and_no_manual_weights(self):
+        """Check that the catalog has the expected three categories without manual selection weights."""
         self.assertEqual(
             {item.category for item in self.destinations},
             {"residential", "work_education", "services_leisure"},
@@ -34,6 +36,7 @@ class VehicleHistoryTests(unittest.TestCase):
         self.assertTrue(all(item.weight == 1.0 for item in self.destinations))
 
     def test_dummy_generation_is_reproducible_but_individual(self):
+        """Check that synthetic histories repeat with the same seed but differ between vehicles."""
         kwargs = dict(
             destinations=self.destinations,
             vehicle_ids=["vehicle_001", "vehicle_002"],
@@ -52,6 +55,7 @@ class VehicleHistoryTests(unittest.TestCase):
         self.assertEqual(len(second_vehicle), 30)
 
     def test_routine_draw_uses_personal_most_visited_destinations(self):
+        """Check that routine draws use the vehicle's own most visited destinations."""
         events = generate_dummy_events(
             self.destinations, ["vehicle_001"], 30, 3, 0.8, 42
         )
@@ -66,6 +70,7 @@ class VehicleHistoryTests(unittest.TestCase):
             self.assertGreater(decision.visit_count_before, 0)
 
     def test_exploration_prioritizes_an_unvisited_destination(self):
+        """Check that exploration prefers destinations absent from the vehicle's history."""
         events = generate_dummy_events(
             self.destinations, ["vehicle_001"], 6, 3, 1.0, 42
         )
@@ -77,6 +82,7 @@ class VehicleHistoryTests(unittest.TestCase):
         self.assertEqual(decision.visit_count_before, 0)
 
     def test_csv_round_trip_and_record_updates_counts(self):
+        """Check that history survives CSV export and import and that new visits update counts."""
         events = generate_dummy_events(
             self.destinations, ["vehicle_001"], 10, 3, 0.8, 42
         )
@@ -92,6 +98,7 @@ class VehicleHistoryTests(unittest.TestCase):
         self.assertEqual(event.sequence, 11)
 
     def test_only_completed_trip_updates_history_and_incomplete_origin_is_relabelled(self):
+        """Check that only arrivals add visits and unfinished trips use a new physical-origin label."""
         class FakeLocation:
             x = 1.0
             y = 2.0
@@ -99,13 +106,16 @@ class VehicleHistoryTests(unittest.TestCase):
 
         class FakeLogger:
             def __init__(self):
+                """Initialize in-memory trip and history records for the test."""
                 self.trips = []
                 self.history = []
 
             def write_trip(self, row):
+                """Keep a trip record in memory for later assertions."""
                 self.trips.append(row)
 
             def write_history(self, row):
+                """Keep a history record in memory for later assertions."""
                 self.history.append(row)
 
         config = TripSimulationConfig.from_json(Path("config/single_vehicle_trip.json"))

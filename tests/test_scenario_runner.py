@@ -20,19 +20,23 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class Location:
     def __init__(self, x=1.0, y=2.0, z=0.0):
+        """Store coordinates for a lightweight test location."""
         self.x, self.y, self.z = x, y, z
 
     def distance(self, other):
+        """Return the straight-line distance to another test location."""
         return math.sqrt(sum((getattr(self, key) - getattr(other, key)) ** 2 for key in "xyz"))
 
 
 class Actors(list):
     def filter(self, pattern):
+        """Return test actors whose type matches the requested wildcard pattern."""
         return [actor for actor in self if fnmatch.fnmatch(actor.type_id, pattern)]
 
 
 class RunnerScenarioTests(unittest.TestCase):
     def run_with_fake_server(self, mode, directory, failure=None, diagnostics=False):
+        """Run a short simulation against a fake CARLA server with optional injected failures."""
         config = TripSimulationConfig.from_json(ROOT / "config/multi_vehicle_trip.json", {
             "destination_selection_mode": mode, "duration_seconds": 0.11,
             "output_root": directory,
@@ -70,6 +74,7 @@ class RunnerScenarioTests(unittest.TestCase):
         tick_times = []
 
         def tick():
+            """Advance the fake simulation clock and optionally trigger a test interruption."""
             tick_times.append(len(tick_times) * 0.05 + 0.05)
             if failure == "interrupt" and len(tick_times) == 5:
                 raise KeyboardInterrupt()
@@ -81,6 +86,7 @@ class RunnerScenarioTests(unittest.TestCase):
         )
 
         def spawn(_world, _blueprint, _carla, _map, _points, index, _fallback, vehicle_id):
+            """Create and track a mock vehicle, optionally simulating a spawn failure."""
             spawn_indices.append(index)
             if failure == "spawn" and len(spawn_indices) == 2:
                 raise RuntimeError("occupied spawn")
@@ -93,6 +99,7 @@ class RunnerScenarioTests(unittest.TestCase):
             return actor, index
 
         def spawn_sensor(*args, **kwargs):
+            """Create and track a mock sensor, optionally making its listener setup fail."""
             sensor = Mock(is_alive=True)
             sensors.append(sensor)
             if failure == "sensor":
@@ -110,6 +117,7 @@ class RunnerScenarioTests(unittest.TestCase):
         agents = []
 
         def build_agent(*args):
+            """Create and track a mock driving agent for the test vehicle."""
             agent = Mock()
             agents.append(agent)
             return agent
@@ -168,6 +176,7 @@ class RunnerScenarioTests(unittest.TestCase):
         return simulation, world, spawn_indices, replacements
 
     def test_diagnostics_capture_each_command_without_extra_ticks_or_agent_steps(self):
+        """Check that diagnostics record commands without adding simulation ticks or agent updates."""
         with TemporaryDirectory() as directory:
             simulation, world, _, helpers = self.run_with_fake_server(
                 "random_baseline", directory, diagnostics=True)
@@ -187,6 +196,7 @@ class RunnerScenarioTests(unittest.TestCase):
                              [0.1, 0.1, 0.1])
 
     def test_both_scenarios_write_all_vehicle_ids_and_share_one_tick_per_frame(self):
+        """Check that both selectors record every vehicle while sharing one world tick per frame."""
         for mode in ("random_baseline", "history_80_20"):
             with self.subTest(mode=mode), TemporaryDirectory() as directory:
                 simulation, world, spawns, helpers = self.run_with_fake_server(mode, directory)
@@ -227,14 +237,17 @@ class RunnerScenarioTests(unittest.TestCase):
                 self.assertEqual(metadata["environment"]["traffic_lights"][0]["state"], "Red")
 
     def test_ctrl_c_cleans_up_all_actors_and_sensors(self):
+        """Check that an interruption cleans up every owned vehicle and sensor."""
         with TemporaryDirectory() as directory:
             self.run_with_fake_server("random_baseline", directory, "interrupt")
 
     def test_spawn_failure_cleans_up_previously_created_vehicle(self):
+        """Check that a spawn failure removes vehicles already created by the run."""
         with TemporaryDirectory() as directory:
             self.run_with_fake_server("random_baseline", directory, "spawn")
 
     def test_listen_failure_cleans_up_the_new_sensor_too(self):
+        """Check that sensor-listener failure still removes the newly created sensor."""
         with TemporaryDirectory() as directory:
             self.run_with_fake_server("random_baseline", directory, "sensor")
 

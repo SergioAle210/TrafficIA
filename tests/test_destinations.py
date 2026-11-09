@@ -16,11 +16,13 @@ from src.navigation.route_planner import plan_route, validate_route_start
 
 class DestinationSelectionTests(unittest.TestCase):
     def setUp(self):
+        """Load the Town01 catalog used by destination-selection tests."""
         self.destinations = load_destinations(
             Path("data/input/Town01/destinations_config.csv"), "Town01"
         )
 
     def test_same_seed_produces_same_sequence(self):
+        """Check that the same seed reproduces the destination sequence."""
         first_rng = random.Random(42)
         second_rng = random.Random(42)
         first = [select_destination(self.destinations, None, 0.8, first_rng).destination_id for _ in range(20)]
@@ -28,6 +30,7 @@ class DestinationSelectionTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_current_destination_is_never_selected(self):
+        """Check that destination selection excludes the current destination."""
         for seed in range(100):
             destination = select_destination(
                 self.destinations, "T01_A", 0.8, random.Random(seed)
@@ -35,6 +38,7 @@ class DestinationSelectionTests(unittest.TestCase):
             self.assertNotEqual(destination.destination_id, "T01_A")
 
     def test_configured_cycle_visits_remaining_destinations_in_order(self):
+        """Check that fixed-cycle selection follows the configured destination order."""
         config = TripSimulationConfig.from_json(Path("config/single_vehicle_trip_cyclic.json"))
         simulation = TripSimulation(config, Path("."), 1)
         simulation.destinations = self.destinations
@@ -51,14 +55,17 @@ class DestinationSelectionTests(unittest.TestCase):
 
 class SpawnFallbackTests(unittest.TestCase):
     def test_uses_next_available_spawn_deterministically(self):
+        """Check that a failed spawn tries the next available point in a repeatable order."""
         class FakeLocation:
             def __init__(self, x=0.0, y=0.0, z=0.0):
+                """Store coordinates for a lightweight test location."""
                 self.x = x
                 self.y = y
                 self.z = z
 
         class FakeTransform:
             def __init__(self, location, rotation="rotation"):
+                """Store the position and rotation of a test transform."""
                 self.location = location
                 self.rotation = rotation
 
@@ -71,13 +78,16 @@ class SpawnFallbackTests(unittest.TestCase):
 
         class FakeMap:
             def get_waypoint(self, location, project_to_road, lane_type):
+                """Return a simple road waypoint at the requested test position."""
                 return type("Waypoint", (), {"transform": FakeTransform(location)})()
 
         class FakeWorld:
             def __init__(self):
+                """Initialize the list of attempted spawn positions."""
                 self.attempts = []
 
             def try_spawn_actor(self, _blueprint, transform):
+                """Record each spawn attempt, fail the first one, and allow the next one."""
                 self.attempts.append(transform)
                 return None if len(self.attempts) == 1 else "vehicle"
 
@@ -95,12 +105,15 @@ class SpawnFallbackTests(unittest.TestCase):
         self.assertEqual(len(world.attempts), 2)
 
     def test_fixed_spawn_does_not_try_another_position(self):
+        """Check that fixed-spawn mode does not silently choose a different position."""
         class FakeLocation:
             def __init__(self, x=0.0, y=0.0, z=0.0):
+                """Store coordinates for a lightweight test location."""
                 self.x, self.y, self.z = x, y, z
 
         class FakeTransform:
             def __init__(self, location, rotation="rotation"):
+                """Store the position and rotation of a test transform."""
                 self.location, self.rotation = location, rotation
 
         class FakeCarla:
@@ -111,12 +124,15 @@ class SpawnFallbackTests(unittest.TestCase):
 
         class FakeMap:
             def get_waypoint(self, location, **_kwargs):
+                """Return a simple road waypoint at the requested test position."""
                 return type("Waypoint", (), {"transform": FakeTransform(location)})()
 
         class FakeWorld:
             def __init__(self):
+                """Initialize the count of attempted spawns."""
                 self.attempts = 0
             def try_spawn_actor(self, _blueprint, _transform):
+                """Count the spawn attempt and simulate an occupied position."""
                 self.attempts += 1
                 return None
 
@@ -132,9 +148,11 @@ class SpawnFallbackTests(unittest.TestCase):
 class RouteOriginValidationTests(unittest.TestCase):
     class FakeLocation:
         def __init__(self, x=0.0, y=0.0, z=0.0):
+            """Store coordinates for a lightweight test location."""
             self.x, self.y, self.z = x, y, z
 
         def distance(self, other):
+            """Return the straight-line distance to another test location."""
             return (
                 (self.x - other.x) ** 2
                 + (self.y - other.y) ** 2
@@ -142,6 +160,7 @@ class RouteOriginValidationTests(unittest.TestCase):
             ) ** 0.5
 
     def test_synchronized_spawn_accepts_nearby_location(self):
+        """Check that a synchronized actor position close to its spawn is accepted."""
         error_m = validate_initial_spawn_location(
             self.FakeLocation(100.0, 50.0, 0.5),
             self.FakeLocation(100.0, 50.0, 0.6),
@@ -150,6 +169,7 @@ class RouteOriginValidationTests(unittest.TestCase):
         self.assertAlmostEqual(error_m, 0.1)
 
     def test_synchronized_spawn_rejects_stale_origin(self):
+        """Check that a stale actor position far from its spawn is rejected."""
         with self.assertRaisesRegex(RuntimeError, "origen inválido"):
             validate_initial_spawn_location(
                 self.FakeLocation(0.0, 0.0, 0.0),
@@ -158,6 +178,7 @@ class RouteOriginValidationTests(unittest.TestCase):
             )
 
     def test_route_start_rejects_distant_first_waypoint(self):
+        """Check that a route cannot start far from the vehicle's actual position."""
         waypoint = type(
             "Waypoint",
             (),
@@ -171,6 +192,7 @@ class RouteOriginValidationTests(unittest.TestCase):
             )
 
     def test_route_rejects_an_endpoint_far_from_requested_destination(self):
+        """Check that a route cannot end far from the requested destination."""
         waypoint = type(
             "Waypoint",
             (),

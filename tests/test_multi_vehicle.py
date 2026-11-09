@@ -16,22 +16,27 @@ class FakeLocation:
 
 class FakeLogger:
     def __init__(self):
+        """Initialize in-memory trip, history, and metric records for the tests."""
         self.trips = []
         self.history = []
         self.metrics = []
 
     def write_trip(self, row):
+        """Keep a trip record in memory for later assertions."""
         self.trips.append(row)
 
     def write_history(self, row):
+        """Keep a history record in memory for later assertions."""
         self.history.append(row)
 
     def write_metrics(self, row):
+        """Keep a metrics record in memory for later assertions."""
         self.metrics.append(row)
 
 
 class MultiVehicleStateTests(unittest.TestCase):
     def setUp(self):
+        """Prepare a multivehicle simulation and its destination catalog without starting CARLA."""
         self.config = TripSimulationConfig.from_json(
             Path("config/multi_vehicle_trip.json")
         )
@@ -45,6 +50,7 @@ class MultiVehicleStateTests(unittest.TestCase):
         }
 
     def test_configuration_creates_three_explicit_independent_states(self):
+        """Check that the configuration creates three separately identified vehicle states."""
         self.assertEqual(self.config.vehicle_count, 3)
         self.assertEqual(self.config.resolved_spawn_point_indices(), [133, 6, 101])
         self.assertEqual(
@@ -57,6 +63,7 @@ class MultiVehicleStateTests(unittest.TestCase):
         )
 
     def test_all_three_histories_load_thirty_individual_events(self):
+        """Check that each vehicle loads its own thirty initial visits."""
         self.simulation._load_vehicle_histories()
         self.assertEqual(
             [len(state.vehicle_history.events) for state in self.simulation.vehicle_states],
@@ -68,6 +75,7 @@ class MultiVehicleStateTests(unittest.TestCase):
         )
 
     def test_destination_sequences_are_reproducible_and_individual(self):
+        """Check that each vehicle has a repeatable, independent destination sequence."""
         first = self.simulation
         second = TripSimulation(self.config, Path("."), 1)
         second.destinations = self.simulation.destinations
@@ -94,6 +102,7 @@ class MultiVehicleStateTests(unittest.TestCase):
         self.assertEqual(len({tuple(sequence) for sequence in first_sequences}), 3)
 
     def test_completed_trip_updates_only_its_vehicle_history(self):
+        """Check that completing a trip updates only the corresponding vehicle's history."""
         self.simulation._load_vehicle_histories()
         self.simulation.logger = FakeLogger()
         destination = self.simulation.destinations[0]
@@ -134,6 +143,7 @@ class MultiVehicleStateTests(unittest.TestCase):
         self.assertEqual(self.simulation.logger.trips[0]["vehicle_id"], "vehicle_002")
 
     def test_summary_aggregates_all_vehicle_states(self):
+        """Check that run metrics combine the measurements from all vehicle states."""
         self.simulation.logger = FakeLogger()
         first, second, third = self.simulation.vehicle_states
         first.trips_started = 2
@@ -164,6 +174,7 @@ class MultiVehicleStateTests(unittest.TestCase):
 
 class MultiVehicleConfigValidationTests(unittest.TestCase):
     def test_duplicate_spawn_points_are_rejected(self):
+        """Check that two configured vehicles cannot use the same initial spawn index."""
         config = TripSimulationConfig.from_json(Path("config/single_vehicle_trip.json"))
         config.vehicle_count = 2
         config.initial_spawn_point_indices = [133, 133]
