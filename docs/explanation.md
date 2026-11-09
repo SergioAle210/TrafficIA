@@ -15,13 +15,13 @@ Guía para entender los archivos antes de grabar los videos. Describe la organiz
 
 **JSON:** conjunto de campos con valores; por ejemplo, `"vehicle_count": 20`. **CSV:** tabla; cada fila representa un destino, una visita, un intento u otra observación, según el archivo. `true` significa activado, `false` desactivado y `null` ausencia de un valor o límite.
 
-Los JSON y CSV originales se conservaron intactos al reorganizarlos. Por eso algunos JSON todavía contienen rutas antiguas: el programa las resuelve hacia las carpetas actuales. No hay que editar esas entradas para seguir esta guía.
+Los JSON de `config/` indican las rutas actuales de los catálogos, historiales y configuraciones. Las rutas relativas parten de la raíz de TrafficIA. Los registros históricos de `data/output/` conservan sus rutas originales; el programa mantiene la compatibilidad para resolverlas. Los manifiestos de preparación y las huellas actuales de `relocation-manifest.json` corresponden a los archivos actualizados; este último conserva también las huellas anteriores en `original_sha256` y `original_size_bytes`.
 
 ## 2. `config`: qué define cada JSON
 
 ### Archivos y diferencias principales
 
-| Carpeta y archivo | Contenido y uso |
+| Carpeta y archivo dentro de `config/` | Contenido y uso |
 |---|---|
 | `trips/single_vehicle_trip.json` | Prueba de **1 vehículo**, historial 80/20, semilla 42 y 600 s. Límite individual de viaje: 300 s. |
 | `trips/single_vehicle_trip_cyclic.json` | La misma prueba, pero repite una lista fija de destinos. Sirve para revisar recorridos. |
@@ -34,7 +34,7 @@ Los JSON y CSV originales se conservaron intactos al reorganizarlos. Por eso alg
 | `experiments/demand_20_100/town01_100.json` | Configuración base de **100 vehículos**; amplía posiciones e historial. |
 | `experiments/demand_20_100/weather.json` | Ambiente conservado para la comparación de 20 y 100. |
 | `experiments/demand_20_100/preparation_manifest.json` | Constancia de la preparación de 20/100 y huellas de sus entradas. |
-| `examples/scenario_basic.json` y `scenario_low_demand.json` | Referencias iniciales para Town03: 20 vehículos, semilla 42 y 90 s. |
+| `examples/scenario_basic.json` y `examples/scenario_low_demand.json` | Referencias iniciales para Town03: 20 vehículos, semilla 42 y 90 s. |
 | `examples/scenario_high_demand.json` | Referencia inicial para Town03: 70 vehículos, semilla 42 y 120 s. |
 | `examples/traffic_manager.json` | Parámetros de referencia de Traffic Manager para la etapa inicial. |
 
@@ -55,11 +55,11 @@ Los archivos de `examples` son antecedentes; no son las configuraciones de la ev
 | 7 | `initial_spawn_fallback_enabled` | `false`: no sustituir automáticamente la posición inicial por otra alternativa. |
 | 8 | `vehicle_count` | Cantidad simultánea: `20`. |
 | 9 | `initial_spawn_point_indices` | Lista ordenada de posiciones iniciales de los 20 vehículos. |
-| 10 | `destinations_config` | Ruta del catálogo de destinos. |
+| 10 | `destinations_config` | Ruta del catálogo: `data/input/catalogs/Town01/destinations_config.csv`. |
 | 11 | `output_root` | Carpeta donde crear la salida: `data/output`. |
 | 12 | `destination_selection_mode` | Selector base: `history_80_20`. La ejecución puede elegir `random_baseline`. |
 | 13 | `destination_cycle_order` | Lista utilizada solo con el selector `cyclic`; no fija el orden del histórico. |
-| 14 | `vehicle_history_config` | Ruta del historial inicial del grupo de 20. |
+| 14 | `vehicle_history_config` | Historial inicial de 20: `data/input/histories/Town01/scaling_pilots/vehicle_history_20.csv`. |
 | 15 | `routine_destination_count` | Hasta `3` destinos más visitados forman la rutina. |
 | 16 | `required_destination_categories` | Categorías que debe contener el catálogo: residencial, trabajo/educación y servicios/ocio. |
 | 17 | `routine_probability` | Probabilidad de rutina: `0.8`; no es una cuota exacta de decisiones. |
@@ -76,7 +76,7 @@ Los archivos de `examples` son antecedentes; no son las configuraciones de la ev
 | 28 | `target_speed_kmh` | Velocidad objetivo: `20 km/h`; no es la velocidad que siempre alcanza el vehículo. |
 | 29 | `vehicle_blueprint_filter` | Filtro de modelos candidatos: `vehicle.*`. |
 
-**Configuración base y ejecución:** los JSON de 20/100 indican 1800 s, pero las campañas principales utilizaron 3600 mediante un ajuste al ejecutar. También se cambia el selector para comparar ambos modelos. Lo que realmente se utilizó queda en `output/.../run_config.json`.
+**Configuración base y ejecución:** los JSON de 20/100 indican 1800 s, pero las campañas principales utilizaron 3600 mediante un ajuste al ejecutar. También se cambia el selector para comparar ambos modelos. Lo que realmente se utilizó queda en `data/output/.../run_config.json`.
 
 ### `weather.json`: ambiente de la comparación
 
@@ -184,7 +184,7 @@ En `traffic_manager.json`:
 
 ### Catálogos: una fila = un destino
 
-[Town01/destinations_config.csv](C:/CARLA/TrafficIA/data/input/catalogs/Town01/destinations_config.csv) contiene **42 destinos**. [Town03/destinations_config.csv](C:/CARLA/TrafficIA/data/input/catalogs/Town03/destinations_config.csv) conserva cinco destinos provisionales de una etapa anterior.
+[catalogs/Town01/destinations_config.csv](C:/CARLA/TrafficIA/data/input/catalogs/Town01/destinations_config.csv) contiene **42 destinos**. [catalogs/Town03/destinations_config.csv](C:/CARLA/TrafficIA/data/input/catalogs/Town03/destinations_config.csv) conserva cinco destinos provisionales de una etapa anterior.
 
 Orden de las columnas de **Town01**:
 
@@ -210,7 +210,7 @@ En Town01 las coordenadas y los campos de vía/carril están vacíos porque los 
 
 ### Historiales: una fila = una visita sintética
 
-| Archivo dentro de `input/histories/Town01/` | Contenido |
+| Archivo dentro de `data/input/histories/Town01/` | Contenido |
 |---|---|
 | `bootstrap/vehicle_history_dummy.csv` | 150 visitas: 5 vehículos × 30. Las pruebas de uno o tres toman los vehículos correspondientes. |
 | `scaling_pilots/vehicle_history_05.csv` | 150 visitas: 5 × 30. |
@@ -231,7 +231,7 @@ Ejemplo: `vehicle_001,1,T01_006,dummy` significa que la primera visita sintétic
 
 [Abrir el historial inicial de 20](C:/CARLA/TrafficIA/data/input/histories/Town01/scaling_pilots/vehicle_history_20.csv).
 
-### `input/examples`: datos de las primeras etapas
+### `data/input/examples`: datos de las primeras etapas
 
 Las columnas se enumeran de izquierda a derecha, como en sus encabezados.
 
