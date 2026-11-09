@@ -97,7 +97,7 @@ client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
 world = client.get_world()
 weather = carla.WeatherParameters()
-for name, value in json.loads(Path('config/demand_20_100/weather.json').read_text(encoding='utf-8')).items():
+for name, value in json.loads(Path('config/experiments/demand_20_100/weather.json').read_text(encoding='utf-8')).items():
     setattr(weather, name, value)
 world.set_weather(weather)
 print('Clima de la campaña aplicado.')
@@ -123,7 +123,7 @@ Cada bloque contiene una sola corrida de 180 segundos simulados.
 
 ```powershell
 .\carla-env\Scripts\python.exe -u .\scripts\review_trip_simulation.py `
-  --config .\config\demand_20_100\town01_020.json --scenario random_baseline `
+  --config .\config\experiments\demand_20_100\town01_020.json --scenario random_baseline `
   --seed 210 --seconds 180 --simulation-speed 1 --navigation-diagnostics --no-cameras `
   2>&1 | Tee-Object -FilePath (Join-Path $demo '20_uniforme_console.txt')
 if ($LASTEXITCODE -ne 0) { throw 'La ejecución 20_uniforme no terminó correctamente.' }
@@ -133,7 +133,7 @@ if ($LASTEXITCODE -ne 0) { throw 'La ejecución 20_uniforme no terminó correcta
 
 ```powershell
 .\carla-env\Scripts\python.exe -u .\scripts\review_trip_simulation.py `
-  --config .\config\demand_20_100\town01_020.json --scenario history_80_20 `
+  --config .\config\experiments\demand_20_100\town01_020.json --scenario history_80_20 `
   --seed 210 --seconds 180 --simulation-speed 1 --navigation-diagnostics --no-cameras `
   2>&1 | Tee-Object -FilePath (Join-Path $demo '20_historico_80_20_console.txt')
 if ($LASTEXITCODE -ne 0) { throw 'La ejecución 20_historico_80_20 no terminó correctamente.' }
@@ -143,7 +143,7 @@ if ($LASTEXITCODE -ne 0) { throw 'La ejecución 20_historico_80_20 no terminó c
 
 ```powershell
 .\carla-env\Scripts\python.exe -u .\scripts\review_trip_simulation.py `
-  --config .\config\demand_20_100\town01_100.json --scenario random_baseline `
+  --config .\config\experiments\demand_20_100\town01_100.json --scenario random_baseline `
   --seed 210 --seconds 180 --simulation-speed 1 --navigation-diagnostics --no-cameras `
   2>&1 | Tee-Object -FilePath (Join-Path $demo '100_uniforme_console.txt')
 if ($LASTEXITCODE -ne 0) { throw 'La ejecución 100_uniforme no terminó correctamente.' }
@@ -153,7 +153,7 @@ if ($LASTEXITCODE -ne 0) { throw 'La ejecución 100_uniforme no terminó correct
 
 ```powershell
 .\carla-env\Scripts\python.exe -u .\scripts\review_trip_simulation.py `
-  --config .\config\demand_20_100\town01_100.json --scenario history_80_20 `
+  --config .\config\experiments\demand_20_100\town01_100.json --scenario history_80_20 `
   --seed 210 --seconds 180 --simulation-speed 1 --navigation-diagnostics --no-cameras `
   2>&1 | Tee-Object -FilePath (Join-Path $demo '100_historico_80_20_console.txt')
 if ($LASTEXITCODE -ne 0) { throw 'La ejecución 100_historico_80_20 no terminó correctamente.' }
@@ -296,7 +296,7 @@ y cada vehículo tiene su agente de conducción.
 
 | Tiempo | Qué mostrar | Qué puedes decir |
 |---|---|---|
-| 0:00–0:35 | `scripts/review_trip_simulation.py` y la carpeta `config/demand_20_100/` | «Desde este comando inicio cada prueba. Lee las condiciones preparadas y recibe el grupo de vehículos, la regla de elección y la duración que vamos a mostrar». |
+| 0:00–0:35 | `scripts/review_trip_simulation.py` y la carpeta `config/experiments/demand_20_100/` | «Desde este comando inicio cada prueba. Lee las condiciones preparadas y recibe el grupo de vehículos, la regla de elección y la duración que vamos a mostrar». |
 | 0:35–1:10 | `src/simulation/trip_runner.py`, clase `TripSimulation` | «Aquí se coordina el ciclo de todos los vehículos: elegir, conducir, comprobar la llegada y volver a empezar». |
 | 1:10–1:45 | Carpetas `demand/` y `navigation/`; función `select_from_history` | «La elección del destino está separada de la conducción. El historial utiliza la regla 80/20; el planificador calcula el recorrido y cada agente controla su vehículo». |
 | 1:45–2:15 | `recording/` e `indice_individual.csv` | «Mientras el simulador avanza, guardamos el estado de los vehículos y lo que ocurre en los viajes. Este índice identifica los cuatro casos y la carpeta de cada uno». |

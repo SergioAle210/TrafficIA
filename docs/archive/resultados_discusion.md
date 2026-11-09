@@ -1,5 +1,7 @@
 # Plan para elaborar Resultados y Discusión
 
+> Antecedente de una etapa anterior. Para la organización y ejecución actuales, consultar [README](../../README.md) y [la guía de carpetas](../repository-layout.md).
+
 Preparado el 28 de septiembre de 2026 para trabajar en `C:/CARLA/Trabajo-Profesional`.
 Este archivo contiene instrucciones de redacción, fuentes y criterios de revisión;
 no constituye el capítulo ni acredita trabajo que todavía no se haya realizado.

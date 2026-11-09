@@ -17,7 +17,7 @@ commits ni cambios de conducción para este análisis.
 
 CARLA 0.9.15, Town01, cero peatones, paso fijo 0.05 s, ritmo solicitado
 5×, renderizado activo y sin cámaras RGB. Se conserva el clima lluvioso de
-la campaña anterior, con plantilla explícita en `config/demand_20_100/weather.json`.
+la campaña anterior, con plantilla explícita en `config/experiments/demand_20_100/weather.json`.
 Se restaura el clima previo al terminar. El controlador, rutas, llegadas,
 velocidad objetivo, detector `blocked`, pausas e incidentes no se ajustan.
 Los sensores existentes de colisión/invasión sí permanecen.
@@ -38,13 +38,13 @@ directamente cien, sustituyendo como siguiente acción el barrido intermedio.
 
 ## Entradas y reproducibilidad
 
-- `config/demand_20_100/town01_020.json` conserva los veinte spawns existentes.
-- `config/demand_20_100/town01_100.json` extiende ese prefijo mediante máxima
+- `config/experiments/demand_20_100/town01_020.json` conserva los veinte spawns existentes.
+- `config/experiments/demand_20_100/town01_100.json` extiende ese prefijo mediante máxima
   distancia mínima entre centros, desempate determinista y spawns únicos en
   carriles de circulación fuera de intersecciones. Separación mínima: 16.1605 m.
   Es un filtro geométrico; por sí solo no prueba capacidad ni circulación.
 - Veinte usa sus 600 visitas iniciales; cien usa las 3,000 de
-  `data/input/Town01/demand_20_100/vehicle_history_100.csv`. Cada vehículo tiene
+  `data/input/histories/Town01/demand_20_100/vehicle_history_100.csv`. Cada vehículo tiene
   30 visitas, generadas con semilla de bootstrap 42. **La semilla de corrida
   es 210**; son funciones distintas. Los primeros veinte historiales coinciden
   exactamente y se preservan sus flujos aleatorios individuales.

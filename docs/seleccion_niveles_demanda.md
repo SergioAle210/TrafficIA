@@ -100,8 +100,8 @@ cada uno. No obligan a representar una hora pico real ni a producir congestión,
 ni fijan 20 y 70. Sin datos de campo, la justificación será experimental y
 relativa a este ODD, no una calibración de demanda urbana real.
 
-Los archivos `config/scenario_low_demand.json` y
-`config/scenario_high_demand.json` contienen 20 y 70, pero corresponden a
+Los archivos `config/examples/scenario_low_demand.json` y
+`config/examples/scenario_high_demand.json` contienen 20 y 70, pero corresponden a
 Town03, usan 90 y 120 s y distinto renderizado. Son configuraciones de otra
 etapa y no tienen el esquema requerido por `run_trip_simulation.py`.
 No se deben reutilizar directamente para comparar los selectores en Town01.

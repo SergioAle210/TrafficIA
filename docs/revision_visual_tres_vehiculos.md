@@ -10,7 +10,7 @@ vehículos; no establece todavía los dos niveles definitivos de demanda.
 Town01, CARLA 0.9.15, tres vehículos, semilla 42, 600 segundos simulados
 por escenario (`random_baseline` y `history_80_20`), delta 0.05 s, ritmo 1×
 y renderizado activo. Se conservan los modelos, spawns `[133, 6, 101]`,
-clima lluvioso y parámetros de `config/multi_vehicle_trip.json`.
+clima lluvioso y parámetros de `config/trips/multi_vehicle_trip.json`.
 
 `scripts/review_trip_simulation.py` reutiliza los argumentos habituales y
 `VisualReviewSimulation` hereda la conducción de `TripSimulation`. El modo

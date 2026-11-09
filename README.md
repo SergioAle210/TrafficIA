@@ -1,8 +1,14 @@
 # Generador de tráfico urbano en CARLA
 
 Los objetivos académicos, criterios de evaluación y prioridades vigentes están
-en [project-graduation-context.md](project-graduation-context.md). Consultarlo
+en [project-graduation-context.md](docs/project-graduation-context.md). Consultarlo
 antes de proponer cambios a la simulación o requisitos de aceptación.
+
+La [guía de carpetas](docs/repository-layout.md) describe la organización actual:
+configuraciones separadas por uso, entradas separadas en catálogos e historiales,
+y documentos de etapas anteriores en `docs/archive/`. Los JSON y CSV trasladados
+conservan sus bytes originales; el código admite las rutas guardadas previamente.
+Consultar también el [índice de documentación](docs/README.md).
 
 ## Demostración de la defensa
 
@@ -50,15 +56,15 @@ del disco ni sustituye ese respaldo.
 | Grupo | Criterio |
 |---|---|
 | `src/`, `scripts/` y `tests/` | Conservar código, herramientas de preparación, ejecución, análisis, gráficos y pruebas. |
-| `config/` y entradas referenciadas de `data/input/Town01/` | Conservar configuraciones, clima, manifiestos, catálogo e historiales iniciales de 3/5/10/20/100 vehículos. Son entradas, aunque se hayan generado mediante scripts. |
-| `README.md`, `docs/`, `project-graduation-context.md`, `rutas.md`, `requirements.txt` y `LICENSE` | Conservar instrucciones, decisiones, límites, dependencias y licencia. |
+| `config/`, `data/input/catalogs/` y `data/input/histories/` | Conservar configuraciones, clima, manifiestos, catálogo e historiales iniciales de 3/5/10/20/100 vehículos. Son entradas, aunque se hayan generado mediante scripts. |
+| `README.md`, `docs/`, `docs/project-graduation-context.md`, `docs/rutas.md`, `requirements.txt` y `LICENSE` | Conservar instrucciones, decisiones, límites, dependencias y licencia. |
 | `images/` y `data/output/` | Excluir las salidas generadas; conservar únicamente `data/output/.gitkeep` en Git. Respaldar fuera de Git las corridas originales necesarias para verificar las figuras. |
 | `carla-env/`, `__pycache__/` y bytecode | Excluir entorno y cachés, ya cubiertos por `.gitignore`. |
-| Documentos de redacción académica | Se recomienda mantener `protocolo-final.tex`, `i-marco_teorico.tex` y `resultados_discusion.md` en Trabajo-Profesional. Esta recomendación no los mueve ni retira del seguimiento actual. |
+| Documentos de redacción académica | Se recomienda mantener `protocolo-final.tex`, `i-marco_teorico.tex` y `docs/archive/resultados_discusion.md` en Trabajo-Profesional. Esta recomendación no los mueve ni retira del seguimiento actual. |
 
 No usar una regla global `*.csv`: ocultaría entradas necesarias. Los CSV
 genéricos ya versionados no se modifican ni se retiran con esta organización.
-Los documentos de iteraciones anteriores, como `doc_final.md`, son antecedentes;
+Los documentos de iteraciones anteriores, como `docs/archive/doc_final.md`, son antecedentes;
 deben leerse con su alcance original y no como descripción del estado actual.
 
 Conservar `scripts/prepare_results_images.py` como generador de la colección
@@ -173,9 +179,15 @@ al abrir una terminal nueva. Usa `deactivate` para cerrarlo.
 ## Estructura principal
 
 ```text
-config/          Condiciones de los escenarios
-data/input/      Catálogo e historiales iniciales
+config/trips/    Demostraciones de uno o varios vehículos
+config/experiments/ Pilotos y comparación de 20/100
+config/examples/ Escenarios iniciales de referencia
+data/input/catalogs/ Catálogos separados por mapa
+data/input/histories/ Historiales por grupo y preparación
+data/input/examples/ CSV de las primeras etapas
 data/output/     Corridas, campañas y sus registros
+docs/            Guías, contexto y catálogo documentado
+docs/archive/    Propuestas y redacción de etapas anteriores
 scripts/         Comandos de preparación, ejecución, revisión y análisis
 src/demand/      Catálogo, historial y elección de destinos
 src/navigation/ Rutas, conducción y comprobación de llegada
@@ -185,8 +197,9 @@ src/analysis/   Cálculo de métricas sobre los registros
 ```
 
 Los directorios heredados `configs/`, `data/raw/`, `data/processed/` y
-`data/results/` no son usados por esta fase. La estructura activa sigue
-`instrucciones.md`: `config/`, `data/input/` y `data/output/`.
+`data/results/` no son usados por esta fase. La estructura activa está descrita
+en [repository-layout.md](docs/repository-layout.md). `instrucciones.md` se
+conserva en `docs/archive/` como antecedente del desarrollo inicial.
 
 ## Iniciar CARLA
 
@@ -274,10 +287,10 @@ El comando conserva los CSV genéricos anteriores y genera además un historial
 inicial individual y reproducible para Town01:
 
 ```text
-data/input/zones_config.csv
-data/input/destinations_config.csv
-data/input/demand_profiles.csv
-data/input/Town01/vehicle_history_dummy.csv
+data/input/examples/zones_config.csv
+data/input/examples/destinations_config.csv
+data/input/examples/demand_profiles.csv
+data/input/histories/Town01/bootstrap/vehicle_history_dummy.csv
 ```
 
 El catálogo Town01 no contiene pesos ni etiquetas permanentes de frecuencia. El
@@ -300,7 +313,7 @@ python .\scripts\run_trip_simulation.py --town Town01 --seed 42 --history-in .\d
 ```
 
 Para continuar una corrida de tres carros, añade también
-`--config .\config\multi_vehicle_trip.json`; el historial debe contener filas
+`--config .\config\trips\multi_vehicle_trip.json`; el historial debe contener filas
 para los tres `vehicle_id` configurados.
 
 En `history_80_20`, sin `--history-in` cada corrida vuelve al mismo dummy inicial.
@@ -309,7 +322,7 @@ ruta de dummy configurada.
 
 ## Ejecutar viajes sucesivos en Town01
 
-El catálogo contiene 42 destinos Town01 tomados de `rutas.md`. Cada destino
+El catálogo contiene 42 destinos Town01 tomados de `docs/rutas.md`. Cada destino
 referencia un spawn point válido sobre la red vial. La configuración
 predeterminada conserva la prueba compatible de un vehículo.
 
@@ -334,7 +347,7 @@ Para ejecutar simultáneamente `vehicle_001`, `vehicle_002` y `vehicle_003` en
 los spawn points 133, 6 y 101 respectivamente, usa:
 
 ```powershell
-python .\scripts\run_trip_simulation.py --config .\config\multi_vehicle_trip.json --town Town01 --seed 42 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+python .\scripts\run_trip_simulation.py --config .\config\trips\multi_vehicle_trip.json --town Town01 --seed 42 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
 Los tres actores se crean antes del mismo frame de sincronización y cada uno
@@ -359,7 +372,7 @@ Para comprobar únicamente las tres rutas ya validadas (6 → 101 → 133), cons
 el modo anterior con:
 
 ```powershell
-python .\scripts\run_trip_simulation.py --config .\config\single_vehicle_trip_cyclic.json --town Town01 --seed 42 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+python .\scripts\run_trip_simulation.py --config .\config\trips\single_vehicle_trip_cyclic.json --town Town01 --seed 42 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
 Las rutas se crean antes de circular con `GlobalRoutePlanner.trace_route()` y
@@ -417,7 +430,7 @@ python .\scripts\run_trip_simulation.py --town Town01 --seed 42 --no-rendering -
 1. Carga Town01 y mueve el spectator cerca del lugar conceptual.
 2. Ejecuta `python .\scripts\inspect_location.py --town Town01`.
 3. Copia la plantilla que imprime el script a
-   `data/input/Town01/destinations_config.csv`.
+   `data/input/catalogs/Town01/destinations_config.csv`.
 4. Usa las coordenadas del **waypoint vial accesible** (no las del edificio),
    junto con `road_id`, `lane_id` y el índice de spawn cercano mostrados.
 
@@ -469,7 +482,7 @@ PID, el timestep y la selección de destinos.
 Para registrar una prueba de tres vehículos con semilla 42:
 
 ```powershell
-.\carla-env\Scripts\python.exe scripts/run_trip_simulation.py --config config/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --navigation-diagnostics --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+.\carla-env\Scripts\python.exe scripts/run_trip_simulation.py --config config/trips/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --navigation-diagnostics --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
 Después de finalizar, repite el comando con `--scenario history_80_20`.
@@ -502,7 +515,7 @@ arranque. El observador no modifica la conducción: usa la versión actual del
 runner, incluida la corrección de llegada.
 
 ```powershell
-.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/trips/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
 Después de finalizar, repite con `--scenario history_80_20`. Acepta los mismos
@@ -569,8 +582,8 @@ equivalentes a las corridas que cerraban el viaje a velocidad de marcha.
 
 ### Ajustar el origen inicial fijo
 
-Edita [config/single_vehicle_trip.json](config/single_vehicle_trip.json) para un
-carro o [config/multi_vehicle_trip.json](config/multi_vehicle_trip.json) para
+Edita [config/trips/single_vehicle_trip.json](config/trips/single_vehicle_trip.json) para un
+carro o [config/trips/multi_vehicle_trip.json](config/trips/multi_vehicle_trip.json) para
 varios. En la configuración múltiple, `vehicle_count` debe coincidir con la
 cantidad de elementos únicos de `initial_spawn_point_indices`.
 `initial_spawn_fallback_enabled: false` impide que un actor cambie de origen por
@@ -638,13 +651,13 @@ Desde PowerShell, sin necesidad de activar el entorno:
 
 ```powershell
 cd C:\CARLA\TrafficIA
-.\carla-env\Scripts\python.exe .\scripts\run_trip_simulation.py --config .\config\multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+.\carla-env\Scripts\python.exe .\scripts\run_trip_simulation.py --config .\config\trips\multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
 Después de que aparezca `Corrida completada`, ejecuta:
 
 ```powershell
-.\carla-env\Scripts\python.exe .\scripts\run_trip_simulation.py --config .\config\multi_vehicle_trip.json --scenario history_80_20 --town Town01 --seed 42 --seconds 600 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+.\carla-env\Scripts\python.exe .\scripts\run_trip_simulation.py --config .\config\trips\multi_vehicle_trip.json --scenario history_80_20 --town Town01 --seed 42 --seconds 600 --simulation-speed 1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
 Si Town01 aún no está cargado, antes de las corridas usa:
@@ -684,7 +697,7 @@ su revisión encontró cero colisiones, pero fallos de planificación, un bloque
 de llegada e invasiones con el Cybertruck. Véanse los resultados abajo y la
 [bitácora](docs/bitacora_simulacion.md#2026-09-09--revisión-de-la-campaña-larga-ejecutada-por-el-usuario).
 
-Los dos comandos usan `config/multi_vehicle_trip.json`. `--scenario` sobrescribe
+Los dos comandos usan `config/trips/multi_vehicle_trip.json`. `--scenario` sobrescribe
 `destination_selection_mode` antes de validar la configuración efectiva; sin
 ese argumento se conserva el modo del JSON (`history_80_20` actualmente).
 Los modos anteriores `cyclic` y `stochastic` siguen disponibles mediante JSON.
@@ -1007,7 +1020,7 @@ solo una parada como congestión. Para ejecutarlo **sin cámaras RGB**:
 
 ```powershell
 .\carla-env\Scripts\python.exe -u scripts/review_trip_simulation.py `
-  --no-cameras --config config/multi_vehicle_trip.json `
+  --no-cameras --config config/trips/multi_vehicle_trip.json `
   --scenario random_baseline --seed 42 --seconds 600 --simulation-speed 1 `
   --navigation-diagnostics `
   --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
@@ -1051,7 +1064,7 @@ escenario, todas del Cybertruck y conservadas como métrica. Se auditaron
 restantes quedaron en espera al corte. Las 235 elecciones se reprodujeron
 sin diferencias. Pasaron 111 pruebas y las fuentes permanecieron intactas.
 
-Configuraciones e historiales: `config/pilots/` y `data/input/Town01/pilots/`.
+Configuraciones e historiales: `config/experiments/scaling_pilots/` y `data/input/histories/Town01/scaling_pilots/`.
 [Comparación de las seis corridas](data/output/scaling_pilots_20260917/metrics/report.md).
 CARLA quedó en Town01 sin vehículos/sensores, asíncrono y con renderizado.
 Sigue registrar repeticiones/semillas y validar mayor duración antes de fijar
@@ -1147,7 +1160,7 @@ La campaña larga previa con tres vehículos ya está ejecutada y revisada. Seg�
 del estudiante y el objetivo específico 3, **no se exige cero invasiones de
 carril**: se conservan como métrica de comparación. La recomendación previa
 de eliminar las invasiones del Cybertruck como requisito para avanzar queda
-actualizada por [el contexto académico](project-graduation-context.md).
+actualizada por [el contexto académico](docs/project-graduation-context.md).
 
 Los puntos 1–3 ya tienen implementación y validación focalizada: rutas de
 retorno, continuidad de llegada, límite temporal opcional y análisis de las
@@ -1250,14 +1263,14 @@ avanzadas o Google Maps API.
   el origen quedaba temporalmente en `(0,0,0)`. El runner ejecuta ahora un tick
   posterior al spawn, valida la posición real y rechaza cualquier ruta cuyo
   primer waypoint no esté alineado con el vehículo. Los valores de tolerancia
-  están en `config/single_vehicle_trip.json` y
-  `config/multi_vehicle_trip.json`.
+  están en `config/trips/single_vehicle_trip.json` y
+  `config/trips/multi_vehicle_trip.json`.
 - **Cambiar el origen fijo**: modifica `initial_spawn_point_index` en
-  `config/single_vehicle_trip.json`. Usa `inspect_location.py` con el spectator
+  `config/trips/single_vehicle_trip.json`. Usa `inspect_location.py` con el spectator
   situado sobre la carretera para conocer un índice cercano y válido.
 - **Tres destinos consecutivos de regresión**: `T01_006`, `T01_101` y
   `T01_133` usan los spawn points 6, 101 y 133. Se ejecutan con
-  `config/single_vehicle_trip_cyclic.json`; el modo normal usa historial 80/20.
+  `config/trips/single_vehicle_trip_cyclic.json`; el modo normal usa historial 80/20.
 - **CARLA se cierra con `DXGI_ERROR_INVALID_CALL`**: es un fallo del servidor
   Unreal/D3D11, no del planificador Python. En este equipo el crash context
   identifica `Intel UHD Graphics 770`, aunque CARLA recomienda una GPU dedicada

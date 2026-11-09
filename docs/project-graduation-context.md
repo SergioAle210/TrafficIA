@@ -12,13 +12,13 @@ el espectador sin cámaras. No redefine las demandas ni el controlador común.
 La opción predeterminada permanece `terminate`; no adoptar `keep_trip` en
 campañas académicas sin revisar resultados y separar avisos, esperas y viajes
 completados. Cero cierres `blocked` bajo esa opción no acredita una mejora.
-[Protocolo, semántica y resultados](docs/diagnostico_blocked.md).
+[Protocolo, semántica y resultados](diagnostico_blocked.md).
 Estado: implementación y 144 pruebas unitarias disponibles. La técnica de
 15 s produjo registros íntegros y vista confirmada por el estudiante, pero
 CARLA falló gráficamente durante el cierre. Las dos corridas de 300 s siguen
 pendientes; no hay todavía evidencia para comparar o adoptar las políticas.
 
-Presentación de resultados (2026-09-23): [colección de imágenes](images/README.md)
+Presentación de resultados (2026-09-23): [colección de imágenes](../images/README.md)
 con pilotos 3/5/10/20 y campañas 20/100, incluidas ambas repeticiones de 3600 s.
 El cuerpo sugerido conserva las cuatro métricas del objetivo 3; `blocked`
 queda en respaldo diagnóstico. Esto no autoriza ocultar viajes incompletos
@@ -28,12 +28,12 @@ modificar los documentos académicos del estudiante.
 
 ## Fuentes y prioridad
 
-- [protocolo-final.tex](protocolo-final.tex), sección «Objetivos»: fuente de los
+- [protocolo-final.tex](../../Trabajo-Profesional/protocolo-final.tex), sección «Objetivos»: fuente de los
   objetivos transcritos abajo. Su resumen y metodología delimitan el proyecto.
-- [i-marco_teorico.tex](i-marco_teorico.tex), apartados de ODD, trazabilidad,
+- [i-marco_teorico.tex](../../Trabajo-Profesional/i-marco_teorico.tex), apartados de ODD, trazabilidad,
   métricas de movilidad y comparación descriptiva: fundamentos conceptuales.
   Esta síntesis no supone una verificación independiente de su bibliografía.
-- [README.md](README.md) y [bitácora](docs/bitacora_simulacion.md): estado de la
+- [README.md](../README.md) y [bitácora](bitacora_simulacion.md): estado de la
   implementación, evidencia experimental y limitaciones técnicas.
 - Aclaración del estudiante del 2026-09-09: las invasiones de carril pueden
   formar parte de las métricas; la conducción no necesita ser perfecta.
@@ -83,7 +83,7 @@ mapa o flota esté validado.
 | 2: agentes simultáneos | Pilotos de 5/10/20 vehículos completados en ambos escenarios con semilla 42 y 600 s; rutas de retorno y continuidad de llegada implementadas | Repetir condiciones, otras semillas y mayor duración bajo las flotas candidatas |
 | 3: comparación de cuatro métricas | Análisis descriptivo implementado y probado sobre logs; se distinguen poblaciones y exposición | Ejecutar la comparación final de ambos selectores bajo los dos niveles de demanda |
 
-En `config/multi_vehicle_trip.json`, las categorías implementadas son
+En `config/trips/multi_vehicle_trip.json`, las categorías implementadas son
 `residential`, `work_education` y `services_leisure` (residencia,
 trabajo/educación y servicios/ocio). Estos nombres proceden de la configuración;
 el objetivo específico solo exige tres categorías.
@@ -98,7 +98,7 @@ la respuesta observada y la viabilidad técnica. No son cantidades ya validadas.
 Los 20/70 de las configuraciones antiguas corresponden a Town03 y no justifican
 directamente los niveles del runner actual en Town01. La definición de demanda
 por población simultánea no equivale a flujo de entrada en vehículos/hora.
-Procedimiento y fuentes: [selección de demanda](docs/seleccion_niveles_demanda.md).
+Procedimiento y fuentes: [selección de demanda](seleccion_niveles_demanda.md).
 
 Actualización bibliográfica del 2026-09-17: se verificó el antecedente
 NoCrash, con 20/100 vehículos de fondo en Town01 y 15/70 en Town02. Se
@@ -106,14 +106,14 @@ propone revisar los candidatos previos hacia **20 como menor y 100 como
 referencia mayor**, con exploración intermedia y posible reducción justificada
 por viabilidad medida. Es una adaptación a agentes totales, sin peatones y
 otro controlador; no adopción literal ni decisión final del estudiante.
-La [justificación y regla de selección](docs/fundamento_demandas_town01.md)
+La [justificación y regla de selección](fundamento_demandas_town01.md)
 distingue rendimiento del equipo, evidencia vial y datos faltantes. El
 barrido no equivale a la comparación definitiva de dos demandas.
 
 El 2026-09-18 el estudiante adopta **20/100 como candidatos a ensayar
 directamente**, sin exigir primero el barrido intermedio: semilla 210,
 1,800 segundos simulados por escenario y ritmo solicitado 5×. Se prepara una
-[campaña secuencial](docs/campana_demanda_20_100.md) para que pueda dejarla
+[campaña secuencial](campana_demanda_20_100.md) para que pueda dejarla
 ejecutándose. La prueba técnica corta verifica creación/limpieza y registros;
 no sustituye las corridas largas ni establece saturación. Tras analizar esta
 semilla se decidirán réplicas y, si hace falta, niveles intermedios. La
@@ -302,7 +302,7 @@ vehículos cercanos. Los registros permiten auditar las transiciones, pero no
 sustituyen la revisión visual originalmente prevista, que queda pendiente.
 No se cambió el detector `blocked`, no se aumentó la flota y no se hicieron
 commits. Evidencia y resultados en el
-[informe de revisión](docs/revision_visual_tres_vehiculos.md).
+[informe de revisión](revision_visual_tres_vehiculos.md).
 
 Las dos corridas sin cámaras completaron 600 s cada una: once llegadas y
 tres viajes activos al corte por escenario, cero `blocked`, fallos de ruta,
@@ -326,7 +326,7 @@ Se auditaron 36 ciclos completos y pasaron 111 pruebas. Las configuraciones
 e historiales de diez y veinte ya están preparados; sigue ejecutar diez y
 auditar antes de veinte. Una sola semilla y estos resultados no establecen
 capacidad, congestión ni las dos cantidades finales de demanda. Detalle en
-[pilotos de escalamiento](docs/pilotos_escalamiento.md).
+[pilotos de escalamiento](pilotos_escalamiento.md).
 
 ## Pilotos de diez y veinte completados — 2026-09-17
 
@@ -344,7 +344,7 @@ ejecución técnica de estos tamaños bajo estas condiciones, no saturación ni
 demanda real calibrada. Los modelos/recorridos añadidos también influyen en
 las métricas. Faltan repeticiones, semillas y mayor duración para elegir las
 dos demandas finales. La revisión visual permanece pendiente. Resultados y
-límites en [pilotos de escalamiento](docs/pilotos_escalamiento.md).
+límites en [pilotos de escalamiento](pilotos_escalamiento.md).
 
 ## Ampliación larga de veinte completada — 2026-09-17
 
@@ -358,11 +358,11 @@ distinguir callback de episodio antes de inferir frecuencia de accidentes;
 se conservan todas las métricas originales. Los historiales crecieron a
 796/791 visitas. Cada tratamiento/semilla tiene una ejecución, por lo que
 todavía falta repetición física idéntica y contraste de demandas candidatas.
-[Resultados y próximos pasos](docs/campana_larga_veinte_vehiculos.md).
+[Resultados y próximos pasos](campana_larga_veinte_vehiculos.md).
 
 ## Gráficas exploratorias de objetivos — 2026-09-17
 
-Se generaron [nueve láminas y una guía](docs/graficas_campana_veinte.md)
+Se generaron [nueve láminas y una guía](graficas_campana_veinte.md)
 con las cuatro corridas largas de veinte. Cubren las cuatro métricas del
 objetivo 3, destinos por categoría/ID, tiempos completados y censurados,
 velocidad incluyendo esperas y tasas de eventos por vehículo-km. El historial
@@ -384,7 +384,7 @@ las corridas, sin exigir conducción perfecta ni una forma teórica prefijada.
 La campaña del día 18 completó ambos selectores, 1,800 s, semilla 210.
 Los hashes de 52 salidas, métricas recalculadas y auditorías respaldan su
 integridad; las parejas son comparables. El objetivo 1 ya tiene un contraste
-exploratorio de dos cantidades simultáneas. Las [once láminas](docs/graficas_demandas_20_100.md)
+exploratorio de dos cantidades simultáneas. Las [once láminas](graficas_demandas_20_100.md)
 cubren las métricas del objetivo 3, el historial creciente y relaciones
 locales de tráfico. Pasaron 126 pruebas. No se ejecutó CARLA en este análisis.
 
@@ -407,7 +407,7 @@ significancia ni superioridad del selector. No se exige cero invasiones.
 
 ## Actualización del 23 de septiembre: repetibilidad con semilla 210
 
-La [segunda campaña de 3600 s](docs/repetibilidad_demandas_3600.md) preserva
+La [segunda campaña de 3600 s](repetibilidad_demandas_3600.md) preserva
 27 archivos de código/entradas de la primera y las condiciones registradas.
 Veinte produce métricas agregadas cercanas (423/398 llegadas); cien alcanza
 237/254 frente a 252/252, con variación importante de callbacks e invasiones.
@@ -420,7 +420,7 @@ capacidad vial; la interpretación debe conservar esta limitación.
 
 ## Actualización del 22 de septiembre: una hora por combinación
 
-La [campaña de 3600 s](docs/graficas_demandas_3600.md), semilla 210,
+La [campaña de 3600 s](graficas_demandas_3600.md), semilla 210,
 20/100 vehículos y ambos selectores, terminó con registros íntegros.
 Veinte mantiene 422/397 llegadas sin blocked ni route_failed; cien produce
 252/252 llegadas con 3932/4147 blocked y 1280/235 rechazos. La duración
@@ -433,7 +433,7 @@ la demanda definitiva. El controlador permanece intacto.
 
 ## Restricciones de trabajo vigentes
 
-- El 2026-09-20 se añadió una [lectura con líneas guía](docs/lectura_diagramas_y_guias.md)
+- El 2026-09-20 se añadió una [lectura con líneas guía](lectura_diagramas_y_guias.md)
   a la lámina de relaciones de tráfico, conservando datos y figuras previas.
   Son resúmenes de exposición por bandas de densidad, no un ajuste de modelo
   ni una estimación de capacidad. Las frecuencias 78.14 %/79.18 % de rutina
@@ -450,13 +450,13 @@ la demanda definitiva. El controlador permanece intacto.
   ambos selectores, 1,800 s simulados y ritmo 5× solicitado por el estudiante.
   Se mantiene el controlador; las semillas varían destinos y modelos.
   Los historiales iniciales permanecen fijos y crecen dentro de cada corrida.
-  [Protocolo y resultados](docs/campana_larga_veinte_vehiculos.md). Esta campaña
+  [Protocolo y resultados](campana_larga_veinte_vehiculos.md). Esta campaña
   sigue siendo validación exploratoria, sin fijar demandas definitivas.
 
 - El 2026-09-17 el estudiante pidió explicitar la influencia de las correcciones
   de conducción sobre incidentes y autorizó el piloto de diez cuando prepare
   CARLA/Town01. Se mantiene el controlador común, sin exigir cero eventos;
-  la interpretación y los cambios están en [control e incidentes](docs/control_e_incidentes.md).
+  la interpretación y los cambios están en [control e incidentes](control_e_incidentes.md).
   Posteriormente autorizó ejecutar diez y después veinte, con auditoría entre
   flotas. No hay nueva autorización de commits ni de reinicio/cambio de mapa
   por el asistente. Los pilotos conservan 600 s, semilla 42 y ambos selectores.

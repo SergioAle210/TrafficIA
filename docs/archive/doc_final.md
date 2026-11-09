@@ -1,5 +1,7 @@
 # Iteración: viajes sucesivos con un vehículo en Town01
 
+> Antecedente de una etapa anterior. Para la organización y ejecución actuales, consultar [README](../../README.md) y [la guía de carpetas](../repository-layout.md).
+
 ## Resultado
 
 La primera iteración continúa disponible sin cambios en
@@ -12,8 +14,8 @@ ML ni optimización por congestión.
 
 ## Archivos creados
 
-- `config/single_vehicle_trip.json`: parámetros reproducibles de la prueba.
-- `data/input/Town01/destinations_config.csv`: 42 destinos normalizados sobre
+- `config/trips/single_vehicle_trip.json`: parámetros reproducibles de la prueba.
+- `data/input/catalogs/Town01/destinations_config.csv`: 42 destinos normalizados sobre
   spawn points viales de Town01.
 - `scripts/run_trip_simulation.py`: punto de entrada de la nueva corrida.
 - `scripts/inspect_location.py`: obtiene la posición del spectator y el
@@ -26,13 +28,13 @@ ML ni optimización por congestión.
   limpieza, métricas y restauración del mundo.
 - `src/vehicle_history.py`: historial individual, generación dummy y selección
   80/20 sin pesos manuales.
-- `config/single_vehicle_trip_cyclic.json`: regresión de las tres rutas 6, 101
+- `config/trips/single_vehicle_trip_cyclic.json`: regresión de las tres rutas 6, 101
   y 133 que ya funcionaban.
 
 ## Archivos modificados
 
 - `scripts/generate_dummy_data.py`: además de los CSV dummy heredados, genera
-  `data/input/Town01/vehicle_history_dummy.csv` sin sobrescribir el catálogo.
+  `data/input/histories/Town01/bootstrap/vehicle_history_dummy.csv` sin sobrescribir el catálogo.
 - `README.md`: documenta ejecución, rutas, no-rendering, velocidad y captura
   manual de lugares.
 
@@ -117,7 +119,7 @@ El vehículo aparece en el spawn 133, reconocido también como `T01_133`, por lo
 que nunca se selecciona como primer destino. La configuración normal usa
 `history_80_20`. Para repetir la secuencia verificada
 `T01_006 → T01_101 → T01_133`, utiliza
-`config/single_vehicle_trip_cyclic.json`.
+`config/trips/single_vehicle_trip_cyclic.json`.
 
 Para inspeccionar visualmente los spawn points, ejecuta:
 
@@ -147,7 +149,7 @@ CARLA dibuja los índices y su orientación; el punto resaltado aparece en rojo.
   de conducción más cercano; esto evita que un spawn defectuoso lo ubique dentro
   de una casa o fuera de la carretera.
 - El origen inicial se fija mediante `initial_spawn_point_index` en
-  `config/single_vehicle_trip.json`; `initial_spawn_fallback_enabled=false`
+  `config/trips/single_vehicle_trip.json`; `initial_spawn_fallback_enabled=false`
   asegura que la corrida no cambie automáticamente a otra posición.
 - Las dependencias de `GlobalRoutePlanner` y `BasicAgent` (`networkx` y
   `shapely`) se verifican antes de crear actores; se instalan con

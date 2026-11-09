@@ -1,5 +1,7 @@
 # proyecto.md
 
+> Antecedente de una etapa anterior. Para la organización y ejecución actuales, consultar [README](../../README.md) y [la guía de carpetas](../repository-layout.md).
+
 # Contexto general del proyecto
 
 Este archivo proporciona el contexto funcional, académico y técnico del proyecto para que Codex pueda comprender qué se está desarrollando, por qué se está desarrollando, cuáles son los objetivos que no deben modificarse y cómo debe evolucionar la implementación en CARLA.
@@ -1073,9 +1075,9 @@ para resultados.
 Ejemplo:
 
 ```text
-data/input/destinations_config.csv
-data/input/zones_config.csv
-data/input/demand_profiles.csv
+data/input/examples/destinations_config.csv
+data/input/examples/zones_config.csv
+data/input/examples/demand_profiles.csv
 ```
 
 vs.
@@ -2904,7 +2906,7 @@ Por ello puede evolucionarse posteriormente a:
 
 ```text
 data/input/Town03/zones_config.csv
-data/input/Town03/destinations_config.csv
+data/input/catalogs/Town03/destinations_config.csv
 ```
 
 si resulta útil.

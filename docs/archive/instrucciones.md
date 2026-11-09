@@ -1,5 +1,7 @@
 # instrucciones.md
 
+> Antecedente de una etapa anterior. Para la organización y ejecución actuales, consultar [README](../../README.md) y [la guía de carpetas](../repository-layout.md).
+
 ## Contexto general del proyecto
 
 Este repositorio corresponde al proyecto:
@@ -491,9 +493,9 @@ Este script debe generar archivos CSV iniciales para alimentar el generador esto
 Archivos que debe crear:
 
 ```text
-data/input/zones_config.csv
-data/input/destinations_config.csv
-data/input/demand_profiles.csv
+data/input/examples/zones_config.csv
+data/input/examples/destinations_config.csv
+data/input/examples/demand_profiles.csv
 ```
 
 Código recomendado:
@@ -740,9 +742,9 @@ python .\scripts\generate_dummy_data.py
 Resultado esperado:
 
 ```text
-data/input/zones_config.csv
-data/input/destinations_config.csv
-data/input/demand_profiles.csv
+data/input/examples/zones_config.csv
+data/input/examples/destinations_config.csv
+data/input/examples/demand_profiles.csv
 ```
 
 ---
@@ -846,14 +848,14 @@ data/output/
 Correcto:
 
 ```text
-data/input/destinations_config.csv      # destinos posibles
+data/input/examples/destinations_config.csv      # destinos posibles
 data/output/run_001/trips_log.csv       # viajes generados
 ```
 
 Incorrecto:
 
 ```text
-data/input/destinations_config.csv      # destinos posibles y viajes registrados en el mismo archivo
+data/input/examples/destinations_config.csv      # destinos posibles y viajes registrados en el mismo archivo
 ```
 
 La configuración debe permanecer fija para que los experimentos sean reproducibles.
@@ -1110,7 +1112,7 @@ Implementar en este orden:
 3. Crear scripts/stable_traffic.py.
 4. Crear scripts/generate_dummy_data.py.
 5. Crear data/input/ mediante generate_dummy_data.py.
-6. Crear config/scenario_basic.json.
+6. Crear config/examples/scenario_basic.json.
 7. Crear README.md.
 8. Probar stable_traffic.py con Town03 y 10 vehículos.
 9. Probar con 20 y 30 vehículos.

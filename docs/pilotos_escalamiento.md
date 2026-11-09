@@ -22,9 +22,9 @@ No se cambió el mapa ni se reinició el servidor durante la preparación.
 
 | Vehículos | Configuración | Historial | Visitas previas |
 |---:|---|---|---:|
-| 5 | `config/pilots/town01_05.json` | `data/input/Town01/pilots/vehicle_history_05.csv` | 150 |
-| 10 | `config/pilots/town01_10.json` | `data/input/Town01/pilots/vehicle_history_10.csv` | 300 |
-| 20 | `config/pilots/town01_20.json` | `data/input/Town01/pilots/vehicle_history_20.csv` | 600 |
+| 5 | `config/experiments/scaling_pilots/town01_05.json` | `data/input/histories/Town01/scaling_pilots/vehicle_history_05.csv` | 150 |
+| 10 | `config/experiments/scaling_pilots/town01_10.json` | `data/input/histories/Town01/scaling_pilots/vehicle_history_10.csv` | 300 |
+| 20 | `config/experiments/scaling_pilots/town01_20.json` | `data/input/histories/Town01/scaling_pilots/vehicle_history_20.csv` | 600 |
 
 Cada vehículo tiene 30 visitas sintéticas usando el generador existente,
 semilla 42 y tres anclas iniciales de categorías distintas. Los primeros
@@ -43,7 +43,7 @@ no demuestra capacidad de la red ni representa demanda urbana calibrada.
 
 `scripts/prepare_pilots.py` reproduce la preparación leyendo el mapa, sin
 avanzar ticks ni crear actores. Rechaza un mapa distinto y archivos de salida
-existentes con contenido diferente. `config/pilots/preparation_manifest.json`
+existentes con contenido diferente. `config/experiments/scaling_pilots/preparation_manifest.json`
 conserva la lista de puntos, criterios y hashes. El catálogo y el historial
 original permanecen intactos. La validez geométrica de 10/20 no equivale a
 una prueba real de spawn y circulación de esas flotas.
@@ -86,7 +86,7 @@ Con CARLA/Town01 preparado, ejecutar un escenario y después el otro:
 
 ```powershell
 .\carla-env\Scripts\python.exe -u scripts/review_trip_simulation.py `
-  --no-cameras --config config/pilots/town01_05.json `
+  --no-cameras --config config/experiments/scaling_pilots/town01_05.json `
   --scenario random_baseline --seed 42 --seconds 600 --simulation-speed 1 `
   --navigation-diagnostics `
   --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla

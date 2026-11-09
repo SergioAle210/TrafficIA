@@ -1206,8 +1206,8 @@ de conducción de todos los pares posibles de destinos.
 ```powershell
 $env:CARLA_PYTHONAPI = 'C:\CARLA\WindowsNoEditor\PythonAPI\carla'
 .\carla-env\Scripts\python.exe -m unittest discover -s tests -v
-.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/multi_vehicle_trip.json --scenario history_80_20 --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
-.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/trips/multi_vehicle_trip.json --scenario history_80_20 --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
+.\carla-env\Scripts\python.exe scripts/diagnose_destination_dwell.py --config config/trips/multi_vehicle_trip.json --scenario random_baseline --town Town01 --seed 42 --seconds 600 --simulation-speed 5 --no-rendering --controller-distance-ratio 0.1 --carla-pythonapi C:\CARLA\WindowsNoEditor\PythonAPI\carla
 ```
 
 ### Validación real final
@@ -1642,7 +1642,7 @@ Se consultaron `protocolo-final.tex` (objetivos y metodología) y
 específico 3 incluye expresamente distribución de destinos, tiempo promedio
 de viaje, velocidad media y tasa de incidentes o invasiones de carril.
 
-Se creó [project-graduation-context.md](../project-graduation-context.md) con
+Se creó [project-graduation-context.md](project-graduation-context.md) con
 los objetivos transcritos literalmente, alcance, fuentes, estado comprobado,
 criterios de medición y propuestas pendientes. Se añadió su enlace al README
 y se actualizaron las prioridades para futuras sesiones.
@@ -2046,7 +2046,7 @@ Markdown/Python pendientes. Se revisaron los archivos y se repitieron las
 CARLA 0.9.15 respondió en localhost:2000 con Town01, cero vehículos/sensores,
 renderizado y el mismo clima lluvioso. Se prepararon configuraciones
 separadas para 5/10/20 y sus historiales de 30 visitas por vehículo, en
-`config/pilots/` y `data/input/Town01/pilots/`. Los primeros cinco historiales
+`config/experiments/scaling_pilots/` y `data/input/histories/Town01/scaling_pilots/`. Los primeros cinco historiales
 se preservan y las flotas mayores extienden las menores. El script
 `prepare_pilots.py` selecciona spawns dispersos del catálogo, sin crear
 actores ni cambiar mapa; conserva manifiesto con criterios, posiciones y
