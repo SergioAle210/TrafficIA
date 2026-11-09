@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Set
 
 from src.demand.destinations import Destination
+from src.project_paths import project_path
 
 
 ROUTINE = "routine"
@@ -57,6 +58,8 @@ class VehicleHistory:
     def from_csv(
         cls, path: Path, vehicle_id: str, allowed_destination_ids: Set[str]
     ) -> "VehicleHistory":
+        if not path.is_file():
+            path = project_path(path)
         if not path.is_file():
             raise FileNotFoundError("No existe el historial dummy: {0}".format(path))
         events: List[HistoryEvent] = []

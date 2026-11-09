@@ -12,15 +12,18 @@ from scripts.prepare_pilots import nested_spawns, write_new_or_identical
 from src.demand.destinations import load_destinations
 from src.simulation.trip_runner import TripSimulationConfig
 from src.demand.vehicle_history import VehicleHistory, generate_dummy_events, write_history_csv
+from src.project_paths import project_path
 
-CONFIG_DIR = Path('config/demand_20_100')
+CONFIG_DIR = Path('config/experiments/demand_20_100')
+# Keep original serialized paths so the prepared inputs/manifests stay identical.
+MANIFEST_CONFIG_DIR = Path('config/demand_20_100')
 HISTORY_PATH = Path('data/input/Town01/demand_20_100/vehicle_history_100.csv')
 
 
 def prepare(carla_map, weather, root=ROOT):
     if carla_map.name.replace('\\', '/').split('/')[-1] != 'Town01':
         raise ValueError('Se requiere Town01; no se cambia el mapa.')
-    base_path = root/'config/pilots/town01_20.json'
+    base_path = project_path('config/pilots/town01_20.json', root)
     base = json.loads(base_path.read_text(encoding='utf8'))
     points, details, signatures = {}, {}, set()
     for index, transform in enumerate(carla_map.get_spawn_points()):
@@ -41,16 +44,16 @@ def prepare(carla_map, weather, root=ROOT):
                   for k, i in enumerate(chosen) for j in chosen[k+1:])
     if minimum < 15:
         raise ValueError('Separacion entre centros menor que 15 m; revisar geometria.')
-    destinations = load_destinations(root/base['destinations_config'], 'Town01')
+    destinations = load_destinations(project_path(base['destinations_config'], root), 'Town01')
     allowed = {d.destination_id for d in destinations}
     ids = ['vehicle_%03d' % n for n in range(1, 101)]
     events = generate_dummy_events(destinations, ids, 30, base['routine_destination_count'],
                                    base['routine_probability'], 42)
     for vehicle in ids[:20]:
-        previous = VehicleHistory.from_csv(root/base['vehicle_history_config'], vehicle, allowed)
+        previous = VehicleHistory.from_csv(project_path(base['vehicle_history_config'], root), vehicle, allowed)
         if previous.events != [event for event in events if event.vehicle_id == vehicle]:
             raise ValueError('El historial de los primeros veinte no coincide: '+vehicle)
-    history_path = root/HISTORY_PATH
+    history_path = project_path(HISTORY_PATH, root)
     if history_path.exists():
         previous = [e for vehicle in ids for e in VehicleHistory.from_csv(history_path, vehicle, allowed).events]
         if previous != events:
@@ -60,23 +63,24 @@ def prepare(carla_map, weather, root=ROOT):
         write_history_csv(history_path, events)
     configs = []
     for count in (20, 100):
-        name = CONFIG_DIR/('town01_%03d.json' % count)
+        name = MANIFEST_CONFIG_DIR/('town01_%03d.json' % count)
         history = base['vehicle_history_config'] if count == 20 else HISTORY_PATH.as_posix()
         config = dict(base, seed=210, duration_seconds=1800., vehicle_count=count,
                       initial_spawn_point_indices=chosen[:count], vehicle_history_config=history)
-        write_new_or_identical(root/name, json.dumps(config, indent=2)+'\n')
-        TripSimulationConfig.from_json(root/name)
+        config_path = project_path(name, root)
+        write_new_or_identical(config_path, json.dumps(config, indent=2)+'\n', root)
+        TripSimulationConfig.from_json(config_path)
         configs.append(name.as_posix())
-    write_new_or_identical(root/CONFIG_DIR/'weather.json', json.dumps(weather, indent=2, sort_keys=True)+'\n')
+    write_new_or_identical(root/CONFIG_DIR/'weather.json', json.dumps(weather, indent=2, sort_keys=True)+'\n', root)
     manifest = dict(map=carla_map.name, configurations=configs, counts=[20,100],
                     xodr_sha256=hashlib.sha256(carla_map.to_opendrive().encode('utf8')).hexdigest(),
                     min_center_distance_m=minimum, ordered_spawns=[details[i] for i in chosen],
                     bootstrap_seed=42, run_seed_default=210, initial_visits_per_vehicle=30,
                     history_rows_100=len(events), prefix_20_preserved=True,
                     selection='Preserve first 20; extend over all unique driving/nonjunction map spawns by deterministic max-min XY distance. Geometric screening, not capacity or spawn-success proof.')
-    names = configs+[HISTORY_PATH.as_posix(), base['vehicle_history_config'], base['destinations_config'], (CONFIG_DIR/'weather.json').as_posix()]
-    manifest['input_sha256'] = {n:hashlib.sha256((root/n).read_bytes()).hexdigest() for n in names}
-    write_new_or_identical(root/CONFIG_DIR/'preparation_manifest.json', json.dumps(manifest, indent=2)+'\n')
+    names = configs+[HISTORY_PATH.as_posix(), base['vehicle_history_config'], base['destinations_config'], (MANIFEST_CONFIG_DIR/'weather.json').as_posix()]
+    manifest['input_sha256'] = {n:hashlib.sha256(project_path(n, root).read_bytes()).hexdigest() for n in names}
+    write_new_or_identical(root/CONFIG_DIR/'preparation_manifest.json', json.dumps(manifest, indent=2)+'\n', root)
     return manifest
 
 

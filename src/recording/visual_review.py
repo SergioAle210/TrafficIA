@@ -10,6 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 from src.simulation.trip_runner import TripSimulation, speed_mps
+from src.project_paths import project_path
 
 
 CAMERA = dict(width=640, height=360, height_m=18.0, interval_s=0.5, fov=90.0)
@@ -178,13 +179,13 @@ class VisualReviewSimulation(TripSimulation):
         world = self.primary_vehicle_state.actor.get_world()
         source_files = ['src/simulation/trip_runner.py', 'src/navigation/route_planner.py', 'src/navigation/carla_agent.py', 'src/navigation/arrival.py',
                         'src/navigation/navigation_diagnostics.py', 'src/recording/visual_review.py', 'src/demand/vehicle_history.py',
-                        'src/recording/run_logger.py', 'scripts/run_trip_simulation.py', 'scripts/review_trip_simulation.py']
+                        'src/recording/run_logger.py', 'src/project_paths.py', 'scripts/run_trip_simulation.py', 'scripts/review_trip_simulation.py']
         inputs = [self.config.destinations_config, self.config.vehicle_history_config]
         metadata = dict(schema_version=3, image_capture_enabled=self.capture_images,
             camera=CAMERA if self.capture_images else None,
             source_sha256={f: hashlib.sha256((self.project_root/f).read_bytes()).hexdigest() for f in source_files},
-            input_sha256={f: hashlib.sha256((self.project_root/f).read_bytes()).hexdigest()
-                          for f in inputs if f and (self.project_root/f).is_file()},
+            input_sha256={f: hashlib.sha256(project_path(f, self.project_root).read_bytes()).hexdigest()
+                          for f in inputs if f and project_path(f, self.project_root).is_file()},
             observation_semantics='After physics tick, before/after unchanged trip update. New-trip selection later in the same frame first appears next frame.',
             low_speed_threshold_mps=self.config.blocked_speed_threshold_mps,
             nearby_radius_m=30, nearby_scope='configured fleet only; offsets in ego forward/right axes; center distances, not clearance',

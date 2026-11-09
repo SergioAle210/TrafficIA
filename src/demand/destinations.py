@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
+from src.project_paths import project_path
 
 ROUTINE_CLASS = "routine"
 EXPLORATION_CLASS = "exploration"
@@ -60,6 +61,8 @@ def _enabled(value: str) -> bool:
 def load_destinations(path: Path, active_map_name: str) -> List[Destination]:
     """Load enabled destinations for the active map and validate their schema."""
 
+    if not path.is_file():
+        path = project_path(path)
     required = {
         "destination_id",
         "destination_name",

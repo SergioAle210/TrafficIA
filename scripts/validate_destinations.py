@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--destinations",
         type=Path,
-        default=PROJECT_ROOT / "data" / "input" / "Town01" / "destinations_config.csv",
+        default=PROJECT_ROOT / "data" / "input" / "catalogs" / "Town01" / "destinations_config.csv",
     )
     parser.add_argument("--origin-id", default="T01_133")
     parser.add_argument("--sampling-resolution", type=float, default=2.0)

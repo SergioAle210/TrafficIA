@@ -1,0 +1,156 @@
+{
+  "date": "2026-11-09",
+  "description": "Relocation only; original JSON and CSV bytes are preserved. Historical output directories are unchanged.",
+  "files": [
+    {
+      "old": "config/single_vehicle_trip.json",
+      "new": "config/trips/single_vehicle_trip.json",
+      "sha256": "8618e1e0efbc2710c0be470ca9630358f8e0e4666b639ecf16b238216745da03",
+      "size_bytes": 1120
+    },
+    {
+      "old": "config/single_vehicle_trip_cyclic.json",
+      "new": "config/trips/single_vehicle_trip_cyclic.json",
+      "sha256": "0fbfaab40422a3643a21babbd0a5308ccf5ec8cbdb3ba67f9b0879f987913f95",
+      "size_bytes": 1113
+    },
+    {
+      "old": "config/multi_vehicle_trip.json",
+      "new": "config/trips/multi_vehicle_trip.json",
+      "sha256": "299d694ebed18a0c7eddb4121ac165596170777bd56f2713e096aedca253d198",
+      "size_bytes": 1189
+    },
+    {
+      "old": "config/scenario_basic.json",
+      "new": "config/examples/scenario_basic.json",
+      "sha256": "e6d0dbeb82bc5f3427b1bb4b520afc20189749467ed3977593e18a89027f63f5",
+      "size_bytes": 213
+    },
+    {
+      "old": "config/scenario_low_demand.json",
+      "new": "config/examples/scenario_low_demand.json",
+      "sha256": "15a8bebe5712cb0d7775fa3d8551384656df582526d21c467f37f49c48e9a53a",
+      "size_bytes": 203
+    },
+    {
+      "old": "config/scenario_high_demand.json",
+      "new": "config/examples/scenario_high_demand.json",
+      "sha256": "7ac40e5ce49264245ad5249dbda47c184554ce424f0709dd18be558cebee0c8b",
+      "size_bytes": 204
+    },
+    {
+      "old": "config/traffic_manager.json",
+      "new": "config/examples/traffic_manager.json",
+      "sha256": "3a9d9bd52083cfdf902249eeb3a48021fed408e85cfa13d62c9136f8c9b3a822",
+      "size_bytes": 364
+    },
+    {
+      "old": "config/pilots/preparation_manifest.json",
+      "new": "config/experiments/scaling_pilots/preparation_manifest.json",
+      "sha256": "fdc1fa4eb365a93e92918faeff0281b7e144c8e45229aba1d944c243c8967959",
+      "size_bytes": 7387
+    },
+    {
+      "old": "config/pilots/town01_05.json",
+      "new": "config/experiments/scaling_pilots/town01_05.json",
+      "sha256": "4b345e73a5e16d6da1b5d7063bbf64ed09bb7c0fb9f404e86ab9c1a6bce8dcd1",
+      "size_bytes": 1302
+    },
+    {
+      "old": "config/pilots/town01_10.json",
+      "new": "config/experiments/scaling_pilots/town01_10.json",
+      "sha256": "158e4a10f328d7976c6da0f1be89a08afb6dcf4461cfd52e61199f6f3768da92",
+      "size_bytes": 1348
+    },
+    {
+      "old": "config/pilots/town01_20.json",
+      "new": "config/experiments/scaling_pilots/town01_20.json",
+      "sha256": "f52013bacb4439c19c66250528cc7866996828cf6d1eddc40cb7af097abf6d16",
+      "size_bytes": 1437
+    },
+    {
+      "old": "config/demand_20_100/preparation_manifest.json",
+      "new": "config/experiments/demand_20_100/preparation_manifest.json",
+      "sha256": "7117e58872ff23e3b9d57ae3a7419dcb9f86b6f22b52b8fd4a6d867c10d76eb6",
+      "size_bytes": 20494
+    },
+    {
+      "old": "config/demand_20_100/town01_020.json",
+      "new": "config/experiments/demand_20_100/town01_020.json",
+      "sha256": "78dd24cea0b7dab1ce5955413a2d79f9e6ce40088a8f214fcabac8c9a5dfe65f",
+      "size_bytes": 1439
+    },
+    {
+      "old": "config/demand_20_100/town01_100.json",
+      "new": "config/experiments/demand_20_100/town01_100.json",
+      "sha256": "920809c8fab6ebc449121502ce7e0bbb3ad9326e5b58deb0263e3293054da4cf",
+      "size_bytes": 2216
+    },
+    {
+      "old": "config/demand_20_100/weather.json",
+      "new": "config/experiments/demand_20_100/weather.json",
+      "sha256": "540bc49fc95a8ab6b2e453577c741bf4221c2953109d974d56e473657d51f4b2",
+      "size_bytes": 441
+    },
+    {
+      "old": "data/input/Town01/destinations_config.csv",
+      "new": "data/input/catalogs/Town01/destinations_config.csv",
+      "sha256": "17f2afcb0b52fc8f13d3aca6956fe97b404ad19007a3fd6bc67f89d4433fe7f0",
+      "size_bytes": 3909
+    },
+    {
+      "old": "data/input/Town03/destinations_config.csv",
+      "new": "data/input/catalogs/Town03/destinations_config.csv",
+      "sha256": "cb7ae46976518a2725691e2491ffa824b03c361c93774f963f944efcaf9a078c",
+      "size_bytes": 851
+    },
+    {
+      "old": "data/input/Town01/vehicle_history_dummy.csv",
+      "new": "data/input/histories/Town01/bootstrap/vehicle_history_dummy.csv",
+      "sha256": "72d326a958156422a246a30b7ca7970334e45986ae133fdcd61f6af5fdbac62d",
+      "size_bytes": 4498
+    },
+    {
+      "old": "data/input/Town01/pilots/vehicle_history_05.csv",
+      "new": "data/input/histories/Town01/scaling_pilots/vehicle_history_05.csv",
+      "sha256": "72d326a958156422a246a30b7ca7970334e45986ae133fdcd61f6af5fdbac62d",
+      "size_bytes": 4498
+    },
+    {
+      "old": "data/input/Town01/pilots/vehicle_history_10.csv",
+      "new": "data/input/histories/Town01/scaling_pilots/vehicle_history_10.csv",
+      "sha256": "6fd31ec7b6564d7be1e31da93affe44861b73087bf2b4b5cc6b2c28e11c19dc5",
+      "size_bytes": 8953
+    },
+    {
+      "old": "data/input/Town01/pilots/vehicle_history_20.csv",
+      "new": "data/input/histories/Town01/scaling_pilots/vehicle_history_20.csv",
+      "sha256": "dee48396f12cad74fc340ee49b37b79d683fa2b4c58d95a34eb06e876a6aee81",
+      "size_bytes": 17863
+    },
+    {
+      "old": "data/input/Town01/demand_20_100/vehicle_history_100.csv",
+      "new": "data/input/histories/Town01/demand_20_100/vehicle_history_100.csv",
+      "sha256": "94a70e15a056aba3dc0c445ba3630438f02c57710b817e62e6cc82aa5577d91a",
+      "size_bytes": 89143
+    },
+    {
+      "old": "data/input/zones_config.csv",
+      "new": "data/input/examples/zones_config.csv",
+      "sha256": "d13908eca5efa6a7c0c2b9942efe244e725d854172d11abbd8a7a9b855f8075d",
+      "size_bytes": 759
+    },
+    {
+      "old": "data/input/destinations_config.csv",
+      "new": "data/input/examples/destinations_config.csv",
+      "sha256": "adbdece9af7bcfbf2537bddfc285c5599855ed83bbe632cf226580909d73b445",
+      "size_bytes": 1289
+    },
+    {
+      "old": "data/input/demand_profiles.csv",
+      "new": "data/input/examples/demand_profiles.csv",
+      "sha256": "36bc27d2f8565bfdb1600518a11bcd932da5f01a71f64a15261c0b7b146252db",
+      "size_bytes": 335
+    }
+  ]
+}

@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.project_paths import project_path
 from src.demand.destinations import (
     Destination, load_destinations, select_destination, select_uniform_destination,
 )
@@ -89,6 +90,8 @@ class TripSimulationConfig:
     def from_json(
         cls, path: Path, overrides: Optional[Dict[str, Any]] = None
     ) -> "TripSimulationConfig":
+        if not path.is_file():
+            path = project_path(path)
         with path.open("r", encoding="utf-8") as config_file:
             payload = json.load(config_file)
         # CLI overrides belong to the effective config, before any validation.
@@ -1212,7 +1215,7 @@ class TripSimulation:
                 state.vehicle_history = VehicleHistory(state.vehicle_id)
                 state.initial_history_counts = {}
             return
-        history_path = self.project_root / self.config.vehicle_history_config
+        history_path = project_path(self.config.vehicle_history_config, self.project_root)
         allowed_destination_ids = set(self.destinations_by_id)
         for state in self.vehicle_states:
             state.vehicle_history = VehicleHistory.from_csv(
@@ -1288,7 +1291,7 @@ class TripSimulation:
                     )
                 )
             self.destinations = load_destinations(
-                self.project_root / self.config.destinations_config, active_map.name
+                project_path(self.config.destinations_config, self.project_root), active_map.name
             )
             self.destinations_by_id = {
                 destination.destination_id: destination

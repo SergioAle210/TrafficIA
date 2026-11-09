@@ -30,7 +30,7 @@ def main():
         raise RuntimeError("La validación requiere Town01.")
     configure_carla_agents(carla, args.carla_pythonapi)
     planner = build_global_route_planner(carla_map, 2)
-    destinations = load_destinations(ROOT / "data/input/Town01/destinations_config.csv", "Town01")
+    destinations = load_destinations(ROOT / "data/input/catalogs/Town01/destinations_config.csv", "Town01")
     goals = {d.destination_id: resolve_destination_location(carla, carla_map, d) for d in destinations}
     checks = []
 

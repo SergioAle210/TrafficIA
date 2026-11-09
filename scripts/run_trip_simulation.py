@@ -21,7 +21,7 @@ def parse_args(parser=None) -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=PROJECT_ROOT / "config" / "single_vehicle_trip.json",
+        default=PROJECT_ROOT / "config" / "trips" / "single_vehicle_trip.json",
         help="Archivo JSON de configuración de la corrida.",
     )
     parser.add_argument("--town", help="Sobrescribe el mapa esperado del JSON.")

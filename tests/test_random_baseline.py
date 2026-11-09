@@ -19,7 +19,7 @@ from src.demand.vehicle_history import VehicleHistory
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "config/multi_vehicle_trip.json"
+CONFIG = ROOT / "config/trips/multi_vehicle_trip.json"
 CATALOG = ROOT / "data/input/Town01/destinations_config.csv"
 
 

@@ -245,9 +245,9 @@ def main() -> None:
     validate_destination_weights(DESTINATIONS)
 
     output_files = (
-        (output_dir / "zones_config.csv", ZONES),
-        (output_dir / "destinations_config.csv", DESTINATIONS),
-        (output_dir / "demand_profiles.csv", DEMAND_PROFILES),
+        (output_dir / "examples" / "zones_config.csv", ZONES),
+        (output_dir / "examples" / "destinations_config.csv", DESTINATIONS),
+        (output_dir / "examples" / "demand_profiles.csv", DEMAND_PROFILES),
     )
 
     for path, rows in output_files:
@@ -257,7 +257,7 @@ def main() -> None:
     for path, _ in output_files:
         print(f"- {path}")
 
-    town01_catalog_path = output_dir / "Town01" / "destinations_config.csv"
+    town01_catalog_path = output_dir / "catalogs" / "Town01" / "destinations_config.csv"
     town01_destinations = load_destinations(town01_catalog_path, "Town01")
     vehicle_ids = ["vehicle_{0:03d}".format(index) for index in range(1, args.vehicles + 1)]
     history_events = generate_dummy_events(
@@ -268,7 +268,7 @@ def main() -> None:
         routine_probability=args.routine_probability,
         seed=args.seed,
     )
-    history_path = output_dir / "Town01" / "vehicle_history_dummy.csv"
+    history_path = output_dir / "histories" / "Town01" / "bootstrap" / "vehicle_history_dummy.csv"
     write_history_csv(history_path, history_events)
     print(f"- {history_path}")
 

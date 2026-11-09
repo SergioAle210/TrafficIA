@@ -20,6 +20,7 @@ from scripts.prepare_demand_campaign import CONFIG_DIR
 from src.analysis.mobility_analysis import analyze_run
 from src.simulation.trip_runner import TripSimulationConfig
 from src.recording.visual_review import VisualReviewSimulation
+from src.project_paths import project_path
 
 
 def stamp():
@@ -27,7 +28,7 @@ def stamp():
 
 
 def read(path):
-    return json.loads(path.read_text(encoding='utf8'))
+    return json.loads(project_path(path, ROOT).read_text(encoding='utf8'))
 
 
 def save(path, value):
@@ -38,14 +39,14 @@ def save(path, value):
 
 def digest(path):
     result = hashlib.sha256()
-    with path.open('rb') as stream:
+    with project_path(path, ROOT).open('rb') as stream:
         for chunk in iter(lambda: stream.read(1024*1024), b''):
             result.update(chunk)
     return result.hexdigest()
 
 
 def check_hashes(expected):
-    changed = [name for name, value in expected.items() if not (ROOT/name).is_file() or digest(ROOT/name)!=value]
+    changed = [name for name, value in expected.items() if not project_path(name, ROOT).is_file() or digest(ROOT/name)!=value]
     if changed:
         raise RuntimeError('Archivos congelados cambiaron: '+str(changed))
 
@@ -143,12 +144,12 @@ def run_campaign(args):
     sources = list(ROOT.glob('src/**/*.py'))+[ROOT/'scripts'/n for n in (
         'run_demand_campaign.py','prepare_demand_campaign.py','prepare_pilots.py','review_trip_simulation.py',
         'run_trip_simulation.py','audit_observation_stream.py','analyze_mobility.py')]
-    sources += [ROOT/n for n in manifest['input_sha256']]+[ROOT/CONFIG_DIR/'preparation_manifest.json']
+    sources += [project_path(n, ROOT) for n in manifest['input_sha256']]+[ROOT/CONFIG_DIR/'preparation_manifest.json']
     frozen = {p.relative_to(ROOT).as_posix():digest(p) for p in sources}
     for relative in frozen:
         dest = output/'source_snapshot'/relative
         dest.parent.mkdir(parents=True,exist_ok=True)
-        shutil.copyfile(ROOT/relative,dest)
+        shutil.copyfile(project_path(relative, ROOT),dest)
     save(output/'source_sha256.json',frozen)
     cases = [dict(vehicle_count=n,scenario=s,seed=args.seed,status='pending',run_directories=[])
              for n in args.counts for s in ('random_baseline','history_80_20')]

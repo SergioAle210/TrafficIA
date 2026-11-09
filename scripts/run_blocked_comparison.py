@@ -16,6 +16,7 @@ from scripts.audit_observation_stream import audit_stream
 from src.analysis.mobility_analysis import analyze_run, read_csv
 from src.simulation.stop_review import StopReviewSimulation
 from src.simulation.trip_runner import TripSimulationConfig
+from src.project_paths import project_path
 
 
 def json_rows(path):
@@ -110,7 +111,7 @@ def main(argv=None):
     if client.get_server_version() != '0.9.15' or client.get_client_version() != '0.9.15':
         raise RuntimeError('Se requiere CARLA 0.9.15.')
     if initial['no_rendering']: raise RuntimeError('Activa renderizado para el espectador.')
-    config_dir = ROOT/'config/demand_20_100'
+    config_dir = ROOT/'config/experiments/demand_20_100'
     manifest = read(config_dir/'preparation_manifest.json')
     check_hashes(manifest['input_sha256'])
     validate_map(world.get_map(), manifest)
@@ -120,12 +121,12 @@ def main(argv=None):
     output = ROOT/'data/output'/('blocked_comparison_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     output.mkdir(exist_ok=False)
     sources = list(ROOT.glob('src/**/*.py')) + list(ROOT.glob('scripts/*.py'))
-    sources += [ROOT/p for p in manifest['input_sha256']]+[config_dir/'preparation_manifest.json']
+    sources += [project_path(p, ROOT) for p in manifest['input_sha256']]+[config_dir/'preparation_manifest.json']
     frozen = {p.relative_to(ROOT).as_posix():digest(p) for p in sources}
     for relative in frozen:
         target = output/'source_snapshot'/relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT/relative, target)
+        shutil.copyfile(project_path(relative, ROOT), target)
     save(output/'source_sha256.json', frozen)
     cases = []
     if not args.skip_technical: cases.append(dict(label='technical_15s', policy='terminate', seconds=15., status='pending'))
