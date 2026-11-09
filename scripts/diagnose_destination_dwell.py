@@ -16,8 +16,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_trip_simulation import configuration_from_args, parse_args
-from src.navigation_diagnostics import RouteTrace, wrap_degrees
-from src.trip_runner import TripSimulation, resolve_destination_location, speed_mps
+from src.navigation.navigation_diagnostics import RouteTrace, wrap_degrees
+from src.simulation.trip_runner import TripSimulation, resolve_destination_location, speed_mps
 
 
 FIELDS = [
@@ -102,8 +102,8 @@ class DwellDiagnosticSimulation(TripSimulation):
             reference="fixed destination road/lane polyline; right positive; physical clearance is not inferred",
             sensor_corners="stock 0.9.15 MakeBounds XY, in FR/RR/FL/RL order; compare separately with physical vertices",
             source_sha256={name: hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in
-                           ["src/trip_runner.py", "src/route_planner.py", "src/carla_agent.py", "src/arrival.py",
-                            "src/navigation_diagnostics.py", "scripts/diagnose_destination_dwell.py"]},
+                           ["src/simulation/trip_runner.py", "src/navigation/route_planner.py", "src/navigation/carla_agent.py", "src/navigation/arrival.py",
+                            "src/navigation/navigation_diagnostics.py", "scripts/diagnose_destination_dwell.py"]},
         )
         (output_directory / "dwell_diagnostic_config.json").write_text(json.dumps(metadata, indent=2), encoding="utf8")
         self._dwell_file = (output_directory / "dwell_log.csv").open("w", newline="", encoding="utf8")

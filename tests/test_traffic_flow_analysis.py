@@ -1,5 +1,5 @@
 import unittest
-from src.traffic_flow_analysis import split_space_time_interval, edie_metrics, density_band_guides
+from src.analysis.traffic_flow_analysis import split_space_time_interval, edie_metrics, density_band_guides
 
 
 class TrafficFlowAnalysisTests(unittest.TestCase):

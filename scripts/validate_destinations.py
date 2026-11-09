@@ -11,14 +11,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.destinations import load_destinations
-from src.route_planner import (
+from src.demand.destinations import load_destinations
+from src.navigation.route_planner import (
     build_global_route_planner,
     configure_carla_agents,
     plan_route,
     route_distance_m,
 )
-from src.trip_runner import resolve_destination_location
+from src.simulation.trip_runner import resolve_destination_location
 
 
 def parse_args() -> argparse.Namespace:

@@ -1,5 +1,5 @@
 import unittest
-from src.incident_analysis import collision_episodes
+from src.analysis.incident_analysis import collision_episodes
 
 
 class IncidentAnalysisTests(unittest.TestCase):

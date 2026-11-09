@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from src.mobility_analysis import analyze_run, paired_checks
+from src.analysis.mobility_analysis import analyze_run, paired_checks
 
 
 def write_csv(path, rows, fields):

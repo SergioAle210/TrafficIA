@@ -5,7 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from src.mobility_analysis import analyze_run, paired_checks
+from src.analysis.mobility_analysis import analyze_run, paired_checks
 
 
 def write_rows(path, rows):

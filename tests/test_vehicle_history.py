@@ -5,9 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.destinations import load_destinations
-from src.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
-from src.vehicle_history import (
+from src.demand.destinations import load_destinations
+from src.simulation.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
+from src.demand.vehicle_history import (
     EXPLORATION,
     ROUTINE,
     VehicleHistory,

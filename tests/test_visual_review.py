@@ -8,8 +8,8 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
-from src.trip_runner import TripSimulation, TripSimulationConfig
-from src.visual_review import ImageRecorder, VisualReviewSimulation, image_index, capture_spacing, agent_light_context
+from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
+from src.recording.visual_review import ImageRecorder, VisualReviewSimulation, image_index, capture_spacing, agent_light_context
 
 ROOT = Path(__file__).resolve().parents[1]
 

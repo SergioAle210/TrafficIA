@@ -13,8 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.destinations import load_destinations
-from src.vehicle_history import generate_dummy_events, write_history_csv
+from src.demand.destinations import load_destinations
+from src.demand.vehicle_history import generate_dummy_events, write_history_csv
 
 
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "input"

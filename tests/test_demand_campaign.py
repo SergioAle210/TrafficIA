@@ -9,8 +9,8 @@ from unittest.mock import Mock
 
 from scripts.audit_observation_stream import audit_stream
 from scripts.run_demand_campaign import check_hashes, preflight, read
-from src.destinations import load_destinations
-from src.trip_runner import TripSimulation, TripSimulationConfig
+from src.demand.destinations import load_destinations
+from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 

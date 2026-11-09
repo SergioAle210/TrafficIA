@@ -9,8 +9,8 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from src.incident_analysis import collision_episodes
-from src.mobility_analysis import analyze_run, paired_checks
+from src.analysis.incident_analysis import collision_episodes
+from src.analysis.mobility_analysis import analyze_run, paired_checks
 
 
 def read(path):return json.loads(path.read_text(encoding='utf8'))

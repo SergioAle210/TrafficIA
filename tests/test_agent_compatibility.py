@@ -5,7 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from src.route_planner import configure_carla_agents
+from src.navigation.route_planner import configure_carla_agents
 
 
 class CollinearObstacleTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class CollinearObstacleTests(unittest.TestCase):
         except (ImportError, RuntimeError) as error:
             raise unittest.SkipTest("CARLA SDK/agents unavailable: {0}".format(error))
         from agents.navigation.basic_agent import BasicAgent
-        from src.carla_agent import CollinearSafeBasicAgent
+        from src.navigation.carla_agent import CollinearSafeBasicAgent
         cls.carla = carla
         cls.stock_type = BasicAgent
         cls.fixed_type = CollinearSafeBasicAgent

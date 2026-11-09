@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Set
 
-from src.destinations import Destination
+from src.demand.destinations import Destination
 
 
 ROUTINE = "routine"

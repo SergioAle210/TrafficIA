@@ -6,9 +6,9 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 
-from src.arrival import ArrivalApproach, approach_control, stopped_and_aligned
-from src.route_planner import arrival_route
-from src.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
+from src.navigation.arrival import ArrivalApproach, approach_control, stopped_and_aligned
+from src.navigation.route_planner import arrival_route
+from src.simulation.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
 
 
 class Location:

@@ -16,7 +16,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts import plot_mobility_campaign as base
-from src.traffic_flow_analysis import density_band_guides
+from src.analysis.traffic_flow_analysis import density_band_guides
 
 plt = base.plt
 SELECTORS = ('random_baseline', 'history_80_20')
@@ -55,7 +55,7 @@ class Exporter:
         self.sources = {}
         self.source(Path(__file__))
         self.source(ROOT / 'scripts/plot_mobility_campaign.py')
-        self.source(ROOT / 'src/traffic_flow_analysis.py')
+        self.source(ROOT / 'src/analysis/traffic_flow_analysis.py')
         base.style()
         # Most plots are placed at 0.48\textwidth in the thesis. A 16 pt source
         # font remains approximately 7 pt when a 6.5 inch plot is reduced there.
@@ -399,7 +399,7 @@ def export_repetitions(first, second, exporter):
 def export_collection(output, thesis_output=None, include_1800=True):
     exporter = Exporter(output)
     exporter.source(Path(__file__))
-    exporter.source(ROOT / 'src/traffic_flow_analysis.py')
+    exporter.source(ROOT / 'src/analysis/traffic_flow_analysis.py')
     loaded = {}
     for directory, prefix in CAMPAIGNS:
         if not include_1800 and prefix == 'demanda_1800s':

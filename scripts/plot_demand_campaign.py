@@ -13,7 +13,7 @@ import pandas as pd
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from scripts import plot_mobility_campaign as base
-from src.traffic_flow_analysis import density_band_guides
+from src.analysis.traffic_flow_analysis import density_band_guides
 
 plt=base.plt
 COLORS=base.COLORS
@@ -368,7 +368,7 @@ def export(out,items,runs,extra,derived,review,occupied,context):
         '```','', 'Usar carla-env y Town01.xodr local; CARLA no necesita estar abierto. Primera orden exige carpeta nueva. Figuras PNG/SVG, PDF y galería HTML se escriben únicamente en derivados.', '', '## Láminas','']
     for item in items:report+=['### '+item['title'],'',item['note'],'','!['+item['title']+']('+item['name']+'.png)','']
     (out/'informe_graficas.md').write_text('\n'.join(report),encoding='utf8')
-    sources=['scripts/plot_demand_campaign.py','scripts/plot_mobility_campaign.py','scripts/review_demand_chart_inputs.py','src/incident_analysis.py','src/traffic_flow_analysis.py']
+    sources=['scripts/plot_demand_campaign.py','scripts/plot_mobility_campaign.py','scripts/review_demand_chart_inputs.py','src/analysis/incident_analysis.py','src/analysis/traffic_flow_analysis.py']
     if (out/'repeat_comparison.json').exists():
         sources.append('scripts/campaign_comparison.py')
         with (out/'informe_graficas.md').open('a',encoding='utf8') as stream:

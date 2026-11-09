@@ -13,9 +13,9 @@ from tempfile import TemporaryDirectory
 from unittest.mock import Mock, mock_open, patch
 
 from scripts.run_trip_simulation import configuration_from_args, main
-from src.destinations import load_destinations, select_uniform_destination
-from src.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
-from src.vehicle_history import VehicleHistory
+from src.demand.destinations import load_destinations, select_uniform_destination
+from src.simulation.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
+from src.demand.vehicle_history import VehicleHistory
 
 
 ROOT = Path(__file__).resolve().parents[1]

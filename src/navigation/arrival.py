@@ -6,7 +6,7 @@ BasicAgent and retains its steering and obstacle/traffic-light decisions.
 
 import math
 
-from src.navigation_diagnostics import wrap_degrees
+from src.navigation.navigation_diagnostics import wrap_degrees
 
 
 APPROACH_DECELERATION_MPS2 = 1.5

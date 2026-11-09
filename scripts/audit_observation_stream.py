@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from src.mobility_analysis import analyze_run, read_csv
+from src.analysis.mobility_analysis import analyze_run, read_csv
 
 
 def audit_stream(run, metrics=None):

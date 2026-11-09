@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from src.trip_runner import TripSimulation, TripSimulationConfig
+from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -140,9 +140,9 @@ class RunnerScenarioTests(unittest.TestCase):
         }
         with ExitStack() as stack:
             stack.enter_context(patch.dict("sys.modules", {"carla": fake_carla}))
-            stack.enter_context(patch("src.trip_runner.time.sleep"))
+            stack.enter_context(patch("src.simulation.trip_runner.time.sleep"))
             for name, replacement in replacements.items():
-                stack.enter_context(patch("src.trip_runner." + name, replacement))
+                stack.enter_context(patch("src.simulation.trip_runner." + name, replacement))
             if failure:
                 with self.assertRaises(KeyboardInterrupt if failure == "interrupt" else RuntimeError):
                     simulation.run()

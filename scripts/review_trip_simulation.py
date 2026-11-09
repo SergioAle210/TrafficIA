@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.run_trip_simulation import configuration_from_args, parse_args
-from src.visual_review import VisualReviewSimulation
+from src.recording.visual_review import VisualReviewSimulation
 
 
 def main():

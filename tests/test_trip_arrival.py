@@ -5,7 +5,7 @@ import unittest
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 
-from src.trip_runner import is_at_destination
+from src.simulation.trip_runner import is_at_destination
 
 
 class Location:

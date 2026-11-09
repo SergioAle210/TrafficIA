@@ -13,10 +13,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src.destinations import (
+from src.demand.destinations import (
     Destination, load_destinations, select_destination, select_uniform_destination,
 )
-from src.route_planner import (
+from src.navigation.route_planner import (
     arrival_route,
     build_basic_agent,
     build_global_route_planner,
@@ -26,15 +26,15 @@ from src.route_planner import (
     steering_continuation,
     validate_route_start,
 )
-from src.run_logger import RunLogger
-from src.navigation_diagnostics import RouteTrace
-from src.arrival import (
+from src.recording.run_logger import RunLogger
+from src.navigation.navigation_diagnostics import RouteTrace
+from src.navigation.arrival import (
     ArrivalApproach, ArrivalLaneCorridor, approach_control, stopped_and_aligned, alignment_errors, is_aligned,
     APPROACH_DECELERATION_MPS2, STOP_MARGIN_M, STOPPED_SPEED_MPS,
     ALIGNMENT_TOLERANCE_DEG, CENTER_TOLERANCE_M, STEERING_CONTINUATION_M, ALIGNMENT_SPEED_KMH,
     ARRIVAL_CONTINUATION_LIMIT_M,
 )
-from src.vehicle_history import (
+from src.demand.vehicle_history import (
     DestinationDecision,
     VehicleHistory,
     select_from_history,

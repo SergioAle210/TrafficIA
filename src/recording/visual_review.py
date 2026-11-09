@@ -9,7 +9,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from src.trip_runner import TripSimulation, speed_mps
+from src.simulation.trip_runner import TripSimulation, speed_mps
 
 
 CAMERA = dict(width=640, height=360, height_m=18.0, interval_s=0.5, fov=90.0)
@@ -176,9 +176,9 @@ class VisualReviewSimulation(TripSimulation):
         self._observation_writer = csv.DictWriter(self._observation_file, fieldnames=OBSERVATION_FIELDS)
         self._observation_writer.writeheader()
         world = self.primary_vehicle_state.actor.get_world()
-        source_files = ['src/trip_runner.py', 'src/route_planner.py', 'src/carla_agent.py', 'src/arrival.py',
-                        'src/navigation_diagnostics.py', 'src/visual_review.py', 'src/vehicle_history.py',
-                        'src/run_logger.py', 'scripts/run_trip_simulation.py', 'scripts/review_trip_simulation.py']
+        source_files = ['src/simulation/trip_runner.py', 'src/navigation/route_planner.py', 'src/navigation/carla_agent.py', 'src/navigation/arrival.py',
+                        'src/navigation/navigation_diagnostics.py', 'src/recording/visual_review.py', 'src/demand/vehicle_history.py',
+                        'src/recording/run_logger.py', 'scripts/run_trip_simulation.py', 'scripts/review_trip_simulation.py']
         inputs = [self.config.destinations_config, self.config.vehicle_history_config]
         metadata = dict(schema_version=3, image_capture_enabled=self.capture_images,
             camera=CAMERA if self.capture_images else None,

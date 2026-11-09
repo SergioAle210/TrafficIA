@@ -6,8 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
-from src.route_planner import build_basic_agent, configure_carla_agents
-from src.trip_runner import TripSimulationConfig
+from src.navigation.route_planner import build_basic_agent, configure_carla_agents
+from src.simulation.trip_runner import TripSimulationConfig
 from scripts.run_trip_simulation import configuration_from_args
 
 
@@ -88,7 +88,7 @@ class LocalPlannerTurnTests(unittest.TestCase):
         self.assertEqual(control.throttle, 0)
 
     def test_builder_keeps_full_plan_and_options_are_independent(self):
-        with patch("src.carla_agent.CollinearSafeBasicAgent") as agent_type:
+        with patch("src.navigation.carla_agent.CollinearSafeBasicAgent") as agent_type:
             route = [object(), object()]
             build_basic_agent(object(), route, 20)
             first = agent_type.call_args[1]["opt_dict"]

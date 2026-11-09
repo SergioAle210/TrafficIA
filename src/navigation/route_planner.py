@@ -221,7 +221,7 @@ def build_basic_agent(
 ) -> Any:
     """Create an official CARLA BasicAgent configured with a precomputed plan."""
 
-    from src.carla_agent import CollinearSafeBasicAgent
+    from src.navigation.carla_agent import CollinearSafeBasicAgent
 
     # A fresh options dict avoids CARLA's mutable default being shared by agents.
     # Town01 tight turns: the stock 0.5 s horizon skips the curve's interior

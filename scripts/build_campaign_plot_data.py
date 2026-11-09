@@ -14,7 +14,7 @@ import carla
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from src.traffic_flow_analysis import split_space_time_interval,edie_metrics
+from src.analysis.traffic_flow_analysis import split_space_time_interval,edie_metrics
 
 
 def json_read(p):return json.loads(p.read_text(encoding='utf8'))
@@ -141,7 +141,7 @@ def main():
         print('DONE',conf['seed'],conf['scenario'],'cells',nonempty,'wall_s',round(time.monotonic()-wall,1),flush=True)
     pd.DataFrame(all_cells).to_csv(a.output/'flow_cells.csv',index=False)
     pd.DataFrame(all_series).to_csv(a.output/'time_series.csv',index=False)
-    manifest['analysis_source_sha256']={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in ('src/traffic_flow_analysis.py','scripts/build_campaign_plot_data.py')}
+    manifest['analysis_source_sha256']={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in ('src/analysis/traffic_flow_analysis.py','scripts/build_campaign_plot_data.py')}
     (a.output/'derivation_manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf8')
     print('OUTPUT',a.output.resolve(),flush=True)
 

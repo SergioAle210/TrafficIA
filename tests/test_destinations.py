@@ -4,14 +4,14 @@ import random
 import unittest
 from pathlib import Path
 
-from src.destinations import load_destinations, select_destination
-from src.trip_runner import (
+from src.demand.destinations import load_destinations, select_destination
+from src.simulation.trip_runner import (
     TripSimulation,
     TripSimulationConfig,
     spawn_vehicle_at_first_available_point,
     validate_initial_spawn_location,
 )
-from src.route_planner import plan_route, validate_route_start
+from src.navigation.route_planner import plan_route, validate_route_start
 
 
 class DestinationSelectionTests(unittest.TestCase):

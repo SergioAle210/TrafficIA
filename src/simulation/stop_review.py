@@ -3,7 +3,7 @@ import json
 import math
 from collections import Counter, deque
 
-from src.visual_review import VisualReviewSimulation
+from src.recording.visual_review import VisualReviewSimulation
 
 
 class StopEpisodes:
@@ -84,8 +84,8 @@ class StopReviewSimulation(VisualReviewSimulation):
             self.spectator = world.get_spectator()
             self.original_spectator = self.spectator.get_transform()
         import hashlib
-        sources = ['src/stop_review.py', 'scripts/run_blocked_comparison.py', 'src/carla_agent.py',
-                   'src/trip_runner.py', 'src/visual_review.py', 'src/run_logger.py']
+        sources = ['src/simulation/stop_review.py', 'scripts/run_blocked_comparison.py', 'src/navigation/carla_agent.py',
+                   'src/simulation/trip_runner.py', 'src/recording/visual_review.py', 'src/recording/run_logger.py']
         metadata = dict(policy=self.config.blocked_policy, follow_spectator=self.follow_spectator,
             cameras=False, observation_period_s=.5, follow_from_s=30, lock_at_first_warning=True,
             episode_definition='Right-endpoint time at speed <= threshold, continuous across trips; phase_seconds separates destination dwell from retry waits.',

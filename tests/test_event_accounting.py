@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from src.trip_runner import EventCollector, TripSimulation, TripSimulationConfig
+from src.simulation.trip_runner import EventCollector, TripSimulation, TripSimulationConfig
 
 
 class EventAccountingTests(unittest.TestCase):

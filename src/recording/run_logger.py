@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from typing import Dict, Iterable, List
 
-from src.navigation_diagnostics import ARRIVAL_FIELDS, CONTROL_FIELDS, ROUTE_FIELDS
+from src.navigation.navigation_diagnostics import ARRIVAL_FIELDS, CONTROL_FIELDS, ROUTE_FIELDS
 
 
 TRIP_FIELDS = [

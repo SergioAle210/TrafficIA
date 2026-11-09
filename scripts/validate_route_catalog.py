@@ -7,10 +7,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from src.destinations import load_destinations
-from src.route_planner import (configure_carla_agents, build_global_route_planner, plan_route,
+from src.demand.destinations import load_destinations
+from src.navigation.route_planner import (configure_carla_agents, build_global_route_planner, plan_route,
                                arrival_route, steering_continuation, validate_route_start, route_distance_m)
-from src.trip_runner import resolve_destination_location
+from src.simulation.trip_runner import resolve_destination_location
 
 
 def main():

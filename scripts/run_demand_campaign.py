@@ -17,9 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.audit_observation_stream import audit_stream
 from scripts.prepare_demand_campaign import CONFIG_DIR
-from src.mobility_analysis import analyze_run
-from src.trip_runner import TripSimulationConfig
-from src.visual_review import VisualReviewSimulation
+from src.analysis.mobility_analysis import analyze_run
+from src.simulation.trip_runner import TripSimulationConfig
+from src.recording.visual_review import VisualReviewSimulation
 
 
 def stamp():
@@ -140,7 +140,7 @@ def run_campaign(args):
     if output == (ROOT/'data/output').resolve():
         raise ValueError('Se requiere un subdirectorio nuevo.')
     output.mkdir(parents=True,exist_ok=False)
-    sources = list(ROOT.glob('src/*.py'))+[ROOT/'scripts'/n for n in (
+    sources = list(ROOT.glob('src/**/*.py'))+[ROOT/'scripts'/n for n in (
         'run_demand_campaign.py','prepare_demand_campaign.py','prepare_pilots.py','review_trip_simulation.py',
         'run_trip_simulation.py','audit_observation_stream.py','analyze_mobility.py')]
     sources += [ROOT/n for n in manifest['input_sha256']]+[ROOT/CONFIG_DIR/'preparation_manifest.json']

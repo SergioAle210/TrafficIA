@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 
 from scripts.prepare_pilots import nested_spawns
-from src.destinations import load_destinations
-from src.trip_runner import TripSimulation, TripSimulationConfig
-from src.vehicle_history import VehicleHistory
+from src.demand.destinations import load_destinations
+from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
+from src.demand.vehicle_history import VehicleHistory
 
 ROOT = Path(__file__).resolve().parents[1]
 

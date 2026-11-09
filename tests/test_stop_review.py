@@ -7,9 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
-from src.trip_runner import TripSimulation, TripSimulationConfig
-from src.stop_review import StopEpisodes, FollowSelector, StopReviewSimulation
-from src.route_planner import configure_carla_agents
+from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
+from src.simulation.stop_review import StopEpisodes, FollowSelector, StopReviewSimulation
+from src.navigation.route_planner import configure_carla_agents
 
 
 class StopPolicyTests(unittest.TestCase):
@@ -33,7 +33,7 @@ class StopPolicyTests(unittest.TestCase):
         return sim, state, actor
 
     def step(self, sim, state, actor, now):
-        with patch('src.trip_runner.is_at_destination', return_value=False), patch('src.trip_runner.is_aligned', return_value=True):
+        with patch('src.simulation.trip_runner.is_at_destination', return_value=False), patch('src.simulation.trip_runner.is_aligned', return_value=True):
             sim._update_active_trip(Mock(), actor, int(now*20), now, state)
 
     def test_warning_boundary_once_recovery_rearms_and_keeps_destination(self):
@@ -62,7 +62,7 @@ class StopPolicyTests(unittest.TestCase):
         sim,state,actor = self.simulation()
         state.active_trip.approach.remaining_m=0
         sim.config.navigation_diagnostics_enabled=False
-        with patch('src.trip_runner.is_at_destination',return_value=True), patch('src.trip_runner.is_aligned',return_value=True), patch('src.trip_runner.stopped_and_aligned',return_value=True):
+        with patch('src.simulation.trip_runner.is_at_destination',return_value=True), patch('src.simulation.trip_runner.is_aligned',return_value=True), patch('src.simulation.trip_runner.stopped_and_aligned',return_value=True):
             sim._update_active_trip(Mock(),actor,1200,60,state)
         sim._finish_trip.assert_called_once_with(60,'completed',state)
         sim.logger.write_blocked_warning.assert_not_called()
@@ -129,7 +129,7 @@ class EpisodeTests(unittest.TestCase):
             sim.streams['stop_episodes']=(Path(directory)/'episodes.jsonl').open('w')
             sim.episodes.update('v',1,1,0,'travel','A')
             sim.last_frame_s=1
-            with patch('src.visual_review.VisualReviewSimulation._finalize_review') as parent:
+            with patch('src.recording.visual_review.VisualReviewSimulation._finalize_review') as parent:
                 sim._finalize_review()
             sim.spectator.set_transform.assert_called_once_with(sim.original_spectator)
             self.assertTrue(sim.streams['stop_episodes'].closed)
@@ -146,7 +146,7 @@ class PassiveDetectorTests(unittest.TestCase):
         except (ImportError,RuntimeError) as error: raise unittest.SkipTest(str(error))
 
     def test_each_detector_once_returns_identical_control_and_resets_cache(self):
-        from src.carla_agent import CollinearSafeBasicAgent
+        from src.navigation.carla_agent import CollinearSafeBasicAgent
         from agents.navigation.basic_agent import BasicAgent
         import carla
         agent=CollinearSafeBasicAgent.__new__(CollinearSafeBasicAgent)

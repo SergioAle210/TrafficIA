@@ -3,7 +3,7 @@ import unittest
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 import networkx as nx
-from src.route_planner import same_edge_return_path
+from src.navigation.route_planner import same_edge_return_path
 
 
 class ReturnRouteTests(unittest.TestCase):

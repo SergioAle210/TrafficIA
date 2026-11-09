@@ -8,8 +8,8 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 
-from src.navigation_diagnostics import RouteTrace
-from src.run_logger import RunLogger
+from src.navigation.navigation_diagnostics import RouteTrace
+from src.recording.run_logger import RunLogger
 
 
 def waypoint(x, y, yaw=0, road=12):

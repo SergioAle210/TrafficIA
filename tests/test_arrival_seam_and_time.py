@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
-from src.arrival import ArrivalLaneCorridor
-from src.trip_runner import TripSimulation, TripSimulationConfig, is_at_destination
+from src.navigation.arrival import ArrivalLaneCorridor
+from src.simulation.trip_runner import TripSimulation, TripSimulationConfig, is_at_destination
 
 
 class Location:
