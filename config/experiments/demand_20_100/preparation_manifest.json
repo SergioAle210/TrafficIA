@@ -1,8 +1,8 @@
 {
   "map": "Carla/Maps/Town01",
   "configurations": [
-    "config/demand_20_100/town01_020.json",
-    "config/demand_20_100/town01_100.json"
+    "config/experiments/demand_20_100/town01_020.json",
+    "config/experiments/demand_20_100/town01_100.json"
   ],
   "counts": [
     20,
@@ -919,11 +919,11 @@
   "prefix_20_preserved": true,
   "selection": "Preserve first 20; extend over all unique driving/nonjunction map spawns by deterministic max-min XY distance. Geometric screening, not capacity or spawn-success proof.",
   "input_sha256": {
-    "config/demand_20_100/town01_020.json": "78dd24cea0b7dab1ce5955413a2d79f9e6ce40088a8f214fcabac8c9a5dfe65f",
-    "config/demand_20_100/town01_100.json": "920809c8fab6ebc449121502ce7e0bbb3ad9326e5b58deb0263e3293054da4cf",
-    "data/input/Town01/demand_20_100/vehicle_history_100.csv": "94a70e15a056aba3dc0c445ba3630438f02c57710b817e62e6cc82aa5577d91a",
-    "data/input/Town01/pilots/vehicle_history_20.csv": "dee48396f12cad74fc340ee49b37b79d683fa2b4c58d95a34eb06e876a6aee81",
-    "data/input/Town01/destinations_config.csv": "17f2afcb0b52fc8f13d3aca6956fe97b404ad19007a3fd6bc67f89d4433fe7f0",
-    "config/demand_20_100/weather.json": "540bc49fc95a8ab6b2e453577c741bf4221c2953109d974d56e473657d51f4b2"
+    "config/experiments/demand_20_100/town01_020.json": "4d97889447e9fdd3b93c99d0fbc9c115d7b772c84d2d2ccb7eb39c6dd1da6c81",
+    "config/experiments/demand_20_100/town01_100.json": "602f85aceb0f6b391d15285e945c16ec7932f8a078247e4265fd3927a9441c7b",
+    "data/input/histories/Town01/demand_20_100/vehicle_history_100.csv": "94a70e15a056aba3dc0c445ba3630438f02c57710b817e62e6cc82aa5577d91a",
+    "data/input/histories/Town01/scaling_pilots/vehicle_history_20.csv": "dee48396f12cad74fc340ee49b37b79d683fa2b4c58d95a34eb06e876a6aee81",
+    "data/input/catalogs/Town01/destinations_config.csv": "17f2afcb0b52fc8f13d3aca6956fe97b404ad19007a3fd6bc67f89d4433fe7f0",
+    "config/experiments/demand_20_100/weather.json": "540bc49fc95a8ab6b2e453577c741bf4221c2953109d974d56e473657d51f4b2"
   }
 }

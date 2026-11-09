@@ -1,24 +1,30 @@
 {
   "date": "2026-11-09",
-  "description": "Relocation only; original JSON and CSV bytes are preserved. Historical output directories are unchanged.",
+  "description": "Relocation map with current file fingerprints. Config paths were updated to their relocated locations; original_sha256 and original_size_bytes preserve the pre-update fingerprints for changed files. Historical output directories and CSV bytes are unchanged.",
   "files": [
     {
       "old": "config/single_vehicle_trip.json",
       "new": "config/trips/single_vehicle_trip.json",
-      "sha256": "8618e1e0efbc2710c0be470ca9630358f8e0e4666b639ecf16b238216745da03",
-      "size_bytes": 1120
+      "sha256": "bd21f0a78307563551190120942913bacb68d82840ed503054a95dcbba0bcad6",
+      "size_bytes": 1149,
+      "original_sha256": "8618e1e0efbc2710c0be470ca9630358f8e0e4666b639ecf16b238216745da03",
+      "original_size_bytes": 1120
     },
     {
       "old": "config/single_vehicle_trip_cyclic.json",
       "new": "config/trips/single_vehicle_trip_cyclic.json",
-      "sha256": "0fbfaab40422a3643a21babbd0a5308ccf5ec8cbdb3ba67f9b0879f987913f95",
-      "size_bytes": 1113
+      "sha256": "a26a21d9b215d6a269d4c8e7a5c40f97520a37e1b349150f1ded446ecf167297",
+      "size_bytes": 1142,
+      "original_sha256": "0fbfaab40422a3643a21babbd0a5308ccf5ec8cbdb3ba67f9b0879f987913f95",
+      "original_size_bytes": 1113
     },
     {
       "old": "config/multi_vehicle_trip.json",
       "new": "config/trips/multi_vehicle_trip.json",
-      "sha256": "299d694ebed18a0c7eddb4121ac165596170777bd56f2713e096aedca253d198",
-      "size_bytes": 1189
+      "sha256": "dea1e63e8cb63550b9e00cc60f727e7ea46e894c3ea47ac3b1941b1985c15072",
+      "size_bytes": 1218,
+      "original_sha256": "299d694ebed18a0c7eddb4121ac165596170777bd56f2713e096aedca253d198",
+      "original_size_bytes": 1189
     },
     {
       "old": "config/scenario_basic.json",
@@ -47,44 +53,58 @@
     {
       "old": "config/pilots/preparation_manifest.json",
       "new": "config/experiments/scaling_pilots/preparation_manifest.json",
-      "sha256": "fdc1fa4eb365a93e92918faeff0281b7e144c8e45229aba1d944c243c8967959",
-      "size_bytes": 7387
+      "sha256": "e456fd59f522fb0bbbf9cc5a040548923868aa0640e5fe1445bf7982d045265a",
+      "size_bytes": 7501,
+      "original_sha256": "fdc1fa4eb365a93e92918faeff0281b7e144c8e45229aba1d944c243c8967959",
+      "original_size_bytes": 7387
     },
     {
       "old": "config/pilots/town01_05.json",
       "new": "config/experiments/scaling_pilots/town01_05.json",
-      "sha256": "4b345e73a5e16d6da1b5d7063bbf64ed09bb7c0fb9f404e86ab9c1a6bce8dcd1",
-      "size_bytes": 1302
+      "sha256": "cb8cb46e7c694943b5215ae5b7922018d32a621358d5ed5c60dc667826654e64",
+      "size_bytes": 1329,
+      "original_sha256": "4b345e73a5e16d6da1b5d7063bbf64ed09bb7c0fb9f404e86ab9c1a6bce8dcd1",
+      "original_size_bytes": 1302
     },
     {
       "old": "config/pilots/town01_10.json",
       "new": "config/experiments/scaling_pilots/town01_10.json",
-      "sha256": "158e4a10f328d7976c6da0f1be89a08afb6dcf4461cfd52e61199f6f3768da92",
-      "size_bytes": 1348
+      "sha256": "1cb9b1819159d4da49f372ab37a7124a8d26bd352adf2ddf9e027ed014e191e0",
+      "size_bytes": 1375,
+      "original_sha256": "158e4a10f328d7976c6da0f1be89a08afb6dcf4461cfd52e61199f6f3768da92",
+      "original_size_bytes": 1348
     },
     {
       "old": "config/pilots/town01_20.json",
       "new": "config/experiments/scaling_pilots/town01_20.json",
-      "sha256": "f52013bacb4439c19c66250528cc7866996828cf6d1eddc40cb7af097abf6d16",
-      "size_bytes": 1437
+      "sha256": "455395e1d45ecad22d06d8af967d3116e17fcc123d6ff95a044ae42cd0f3a083",
+      "size_bytes": 1464,
+      "original_sha256": "f52013bacb4439c19c66250528cc7866996828cf6d1eddc40cb7af097abf6d16",
+      "original_size_bytes": 1437
     },
     {
       "old": "config/demand_20_100/preparation_manifest.json",
       "new": "config/experiments/demand_20_100/preparation_manifest.json",
-      "sha256": "7117e58872ff23e3b9d57ae3a7419dcb9f86b6f22b52b8fd4a6d867c10d76eb6",
-      "size_bytes": 20494
+      "sha256": "10ab06e6fd7d105fb0d2f2a915a178d328ef872fe369c334e43014aa88d33f5e",
+      "size_bytes": 20591,
+      "original_sha256": "7117e58872ff23e3b9d57ae3a7419dcb9f86b6f22b52b8fd4a6d867c10d76eb6",
+      "original_size_bytes": 20494
     },
     {
       "old": "config/demand_20_100/town01_020.json",
       "new": "config/experiments/demand_20_100/town01_020.json",
-      "sha256": "78dd24cea0b7dab1ce5955413a2d79f9e6ce40088a8f214fcabac8c9a5dfe65f",
-      "size_bytes": 1439
+      "sha256": "4d97889447e9fdd3b93c99d0fbc9c115d7b772c84d2d2ccb7eb39c6dd1da6c81",
+      "size_bytes": 1466,
+      "original_sha256": "78dd24cea0b7dab1ce5955413a2d79f9e6ce40088a8f214fcabac8c9a5dfe65f",
+      "original_size_bytes": 1439
     },
     {
       "old": "config/demand_20_100/town01_100.json",
       "new": "config/experiments/demand_20_100/town01_100.json",
-      "sha256": "920809c8fab6ebc449121502ce7e0bbb3ad9326e5b58deb0263e3293054da4cf",
-      "size_bytes": 2216
+      "sha256": "602f85aceb0f6b391d15285e945c16ec7932f8a078247e4265fd3927a9441c7b",
+      "size_bytes": 2235,
+      "original_sha256": "920809c8fab6ebc449121502ce7e0bbb3ad9326e5b58deb0263e3293054da4cf",
+      "original_size_bytes": 2216
     },
     {
       "old": "config/demand_20_100/weather.json",

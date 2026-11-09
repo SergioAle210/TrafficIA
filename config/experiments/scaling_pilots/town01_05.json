@@ -14,7 +14,7 @@
     67,
     43
   ],
-  "destinations_config": "data/input/Town01/destinations_config.csv",
+  "destinations_config": "data/input/catalogs/Town01/destinations_config.csv",
   "output_root": "data/output",
   "destination_selection_mode": "history_80_20",
   "destination_cycle_order": [
@@ -22,7 +22,7 @@
     "T01_101",
     "T01_133"
   ],
-  "vehicle_history_config": "data/input/Town01/pilots/vehicle_history_05.csv",
+  "vehicle_history_config": "data/input/histories/Town01/scaling_pilots/vehicle_history_05.csv",
   "routine_destination_count": 3,
   "required_destination_categories": [
     "residential",

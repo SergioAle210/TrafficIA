@@ -8,7 +8,7 @@
   ],
   "selection": "Preserve [133,6,101]; extend among catalog driving/nonjunction spawns by max-min XY center distance, lower-index ties. Spatial dispersion is not a network-capacity estimate.",
   "history": "30 synthetic visits per vehicle, shared existing generator; nested identical prefixes; first five unchanged.",
-  "base_config_sha256": "299d694ebed18a0c7eddb4121ac165596170777bd56f2713e096aedca253d198",
+  "base_config_sha256": "dea1e63e8cb63550b9e00cc60f727e7ea46e894c3ea47ac3b1941b1985c15072",
   "destinations_sha256": "17f2afcb0b52fc8f13d3aca6956fe97b404ad19007a3fd6bc67f89d4433fe7f0",
   "original_history_sha256": "72d326a958156422a246a30b7ca7970334e45986ae133fdcd61f6af5fdbac62d",
   "xodr_sha256": "97a7f6ac67812567e5c8ee0599cd823b23f80f30f3f97c502212e38b72e2b709",
@@ -237,29 +237,29 @@
   "fleets": [
     {
       "vehicles": 5,
-      "config": "config/pilots/town01_05.json",
-      "history": "data/input/Town01/pilots/vehicle_history_05.csv",
+      "config": "config/experiments/scaling_pilots/town01_05.json",
+      "history": "data/input/histories/Town01/scaling_pilots/vehicle_history_05.csv",
       "history_rows": 150,
       "min_spawn_center_distance_m": 75.08806789507912,
-      "config_sha256": "4b345e73a5e16d6da1b5d7063bbf64ed09bb7c0fb9f404e86ab9c1a6bce8dcd1",
+      "config_sha256": "cb8cb46e7c694943b5215ae5b7922018d32a621358d5ed5c60dc667826654e64",
       "history_sha256": "72d326a958156422a246a30b7ca7970334e45986ae133fdcd61f6af5fdbac62d"
     },
     {
       "vehicles": 10,
-      "config": "config/pilots/town01_10.json",
-      "history": "data/input/Town01/pilots/vehicle_history_10.csv",
+      "config": "config/experiments/scaling_pilots/town01_10.json",
+      "history": "data/input/histories/Town01/scaling_pilots/vehicle_history_10.csv",
       "history_rows": 300,
       "min_spawn_center_distance_m": 75.08806789507912,
-      "config_sha256": "158e4a10f328d7976c6da0f1be89a08afb6dcf4461cfd52e61199f6f3768da92",
+      "config_sha256": "1cb9b1819159d4da49f372ab37a7124a8d26bd352adf2ddf9e027ed014e191e0",
       "history_sha256": "6fd31ec7b6564d7be1e31da93affe44861b73087bf2b4b5cc6b2c28e11c19dc5"
     },
     {
       "vehicles": 20,
-      "config": "config/pilots/town01_20.json",
-      "history": "data/input/Town01/pilots/vehicle_history_20.csv",
+      "config": "config/experiments/scaling_pilots/town01_20.json",
+      "history": "data/input/histories/Town01/scaling_pilots/vehicle_history_20.csv",
       "history_rows": 600,
       "min_spawn_center_distance_m": 49.806335819000886,
-      "config_sha256": "f52013bacb4439c19c66250528cc7866996828cf6d1eddc40cb7af097abf6d16",
+      "config_sha256": "455395e1d45ecad22d06d8af967d3116e17fcc123d6ff95a044ae42cd0f3a083",
       "history_sha256": "dee48396f12cad74fc340ee49b37b79d683fa2b4c58d95a34eb06e876a6aee81"
     }
   ]
