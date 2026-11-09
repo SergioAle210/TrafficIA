@@ -4,6 +4,18 @@ Los objetivos académicos, criterios de evaluación y prioridades vigentes está
 en [project-graduation-context.md](project-graduation-context.md). Consultarlo
 antes de proponer cambios a la simulación o requisitos de aceptación.
 
+## Demostración de la defensa
+
+La [guía de la diapositiva 45](docs/demo_defensa.md) contiene los comandos
+para iniciar CARLA, comprobar las entradas y ejecutar por separado cuatro
+casos de 180 segundos simulados: 20 y 100 vehículos, con selección uniforme
+e histórica. Incluye nombres legibles para las salidas, la alternativa de
+campaña automática y el orden de archivos que se puede explicar en tres minutos.
+
+El núcleo está organizado por función en `src/demand/`, `src/navigation/`,
+`src/simulation/`, `src/recording/` y `src/analysis/`. Los puntos de entrada
+permanecen en `scripts/`; sus comandos conservan los nombres anteriores.
+
 ## Figuras organizadas para el capítulo de resultados
 
 La carpeta [images](images/README.md) reúne los pilotos de 3/5/10/20 vehículos,
@@ -52,7 +64,7 @@ deben leerse con su alcance original y no como descripción del estado actual.
 Conservar `scripts/prepare_results_images.py` como generador de la colección
 histórica: usa carpetas de campañas concretas y requiere adaptar sus rutas para
 otras campañas. Conservar también `scripts/run_blocked_comparison.py`,
-`src/stop_review.py`, sus pruebas y la [guía diagnóstica](docs/diagnostico_blocked.md)
+`src/simulation/stop_review.py`, sus pruebas y la [guía diagnóstica](docs/diagnostico_blocked.md)
 como trabajo experimental pendiente de completar las dos corridas de 300 s.
 Actualmente ese script fija 100 vehículos; todavía no permite elegir la flota
 por argumento. Sus cambios asociados en runner, agente, logger e instrumentación
@@ -161,11 +173,15 @@ al abrir una terminal nueva. Usa `deactivate` para cerrarlo.
 ## Estructura principal
 
 ```text
-config/       Configuraciones base de escenarios y Traffic Manager
-data/input/   Configuración dummy reproducible
-data/output/  Resultados de futuras corridas
-scripts/      Puntos de entrada ejecutables
-src/          Módulos compartidos para las siguientes fases
+config/          Condiciones de los escenarios
+data/input/      Catálogo e historiales iniciales
+data/output/     Corridas, campañas y sus registros
+scripts/         Comandos de preparación, ejecución, revisión y análisis
+src/demand/      Catálogo, historial y elección de destinos
+src/navigation/ Rutas, conducción y comprobación de llegada
+src/simulation/ Coordinación de vehículos y ciclo de viajes
+src/recording/  Archivos CSV y observación de cada paso
+src/analysis/   Cálculo de métricas sobre los registros
 ```
 
 Los directorios heredados `configs/`, `data/raw/`, `data/processed/` y
@@ -519,7 +535,7 @@ gráfico y resultados en la [bitácora](docs/bitacora_simulacion.md).
 
 ### Parar siguiendo el carril antes de iniciar la espera
 
-`src/arrival.py` sigue el progreso ordenado sobre la ruta y limita la velocidad
+`src/navigation/arrival.py` sigue el progreso ordenado sobre la ruta y limita la velocidad
 con `min(velocidad_crucero, sqrt(2 * 1.5 * max(distancia_restante - 0.5, 0)))`
 en m/s. A 20 km/h, la reducción empieza aproximadamente 10.8 m antes del
 destino. Al alcanzar el margen final de 0.5 m, frena completamente conservando
