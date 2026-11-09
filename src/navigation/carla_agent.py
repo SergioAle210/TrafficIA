@@ -16,10 +16,12 @@ class CollinearSafeBasicAgent(BasicAgent):
     """
 
     def run_step(self):
+        """Clear the previous hazard observations and request the agent's next driving control."""
         self.hazard_observation = {}
         return super().run_step()
 
     def _affected_by_traffic_light(self, *args, **kwargs):
+        """Run the normal traffic-light check and save its result for observation."""
         result = super()._affected_by_traffic_light(*args, **kwargs)
         if hasattr(self, 'hazard_observation'):
             affected, light = result
@@ -47,6 +49,7 @@ class CollinearSafeBasicAgent(BasicAgent):
         self, vehicle_list=None, max_distance=None,
         up_angle_th=90, low_angle_th=0, lane_offset=0,
     ):
+        """Include exactly aligned vehicles in obstacle detection and record the detected obstacle."""
         if low_angle_th == 0:
             low_angle_th = -COLLINEAR_ANGLE_EPSILON_DEG
         result = super()._vehicle_obstacle_detected(

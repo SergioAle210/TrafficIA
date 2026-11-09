@@ -9,11 +9,13 @@ from src.recording.visual_review import VisualReviewSimulation
 class StopEpisodes:
     """Right-endpoint integration at speed <= threshold across trip boundaries."""
     def __init__(self, threshold):
+        """Initialize continuous low-speed episodes for each vehicle using the supplied speed threshold."""
         self.threshold = threshold
         self.open = {}
         self.sequence = Counter()
 
     def update(self, vehicle, now, dt, speed, phase, trip_id):
+        """Extend a low-speed episode across trip boundaries, or close it when movement resumes."""
         if speed > self.threshold:
             return self.close(vehicle, now, 'recovered')
         if vehicle not in self.open:
@@ -29,6 +31,7 @@ class StopEpisodes:
         return None
 
     def close(self, vehicle, now, reason):
+        """Finish a vehicle's open stop episode and record why observation ended."""
         item = self.open.pop(vehicle, None)
         if item is not None:
             item.update(end_s=now, end_reason=reason, censored=reason != 'recovered')
@@ -37,10 +40,12 @@ class StopEpisodes:
 
 class FollowSelector:
     def __init__(self):
+        """Initialize spectator selection with no vehicle chosen or locked."""
         self.vehicle = None
         self.locked = False
 
     def choose(self, counters, warnings):
+        """Follow a long-stopped vehicle and lock the selection after the first blocked warning."""
         if not self.locked and warnings:
             self.vehicle = sorted(warnings)[0]
             self.locked = True
@@ -55,6 +60,7 @@ class FollowSelector:
 
 class StopReviewSimulation(VisualReviewSimulation):
     def __init__(self, *args, follow_spectator=True, **kwargs):
+        """Set up passive stop records, recent contacts, and optional spectator tracking."""
         super().__init__(*args, capture_images=False, **kwargs)
         if follow_spectator and self.config.no_rendering_mode:
             raise ValueError('El espectador requiere renderizado activo.')
@@ -76,6 +82,7 @@ class StopReviewSimulation(VisualReviewSimulation):
         self.spectator_restored = False
 
     def _write_run_config(self, output_directory, server_version, destinations):
+        """Open stop logs and save diagnostic settings, source hashes, and the original spectator position."""
         super()._write_run_config(output_directory, server_version, destinations)
         for name in ('stop_observations', 'stop_episodes', 'stop_thresholds'):
             self.streams[name] = (output_directory/(name+'.jsonl')).open('w', encoding='utf8')
@@ -97,23 +104,28 @@ class StopReviewSimulation(VisualReviewSimulation):
         (output_directory/'stop_review_config.json').write_text(json.dumps(metadata, indent=2), encoding='utf8')
 
     def _emit(self, name, row):
+        """Write a nonempty diagnostic record as one JSON line to the selected log."""
         if row is not None:
             self.streams[name].write(json.dumps(row, ensure_ascii=False, allow_nan=False)+'\n')
 
     def _on_sensor_event(self, state, event):
+        """Keep recent collision notifications for the vehicle's stop observations."""
         if event['event_type'] == 'collision':
             self.contacts.setdefault(state.vehicle_id, deque(maxlen=20)).append(dict(event))
 
     def _finish_trip(self, now_s, status, state=None):
+        """Remember the trip's final status before applying the normal closing procedure."""
         state = self._state_or_primary(state)
         self.ends[state.vehicle_id] = status
         return super()._finish_trip(now_s, status, state)
 
     def _on_blocked_threshold(self, state, frame, now_s):
+        """Record the normal blocked warning and flag the vehicle for spectator selection."""
         super()._on_blocked_threshold(state, frame, now_s)
         self.pending_warnings.add(state.vehicle_id)
 
     def _record_applied_control(self, state, frame, now_s, control):
+        """Save the issued control and cached hazard checks for later stop observations."""
         trip = state.active_trip
         hazard = dict(getattr(trip.agent, 'hazard_observation', {})) if trip else {}
         self.commands[state.vehicle_id] = dict(control_frame=frame, control_time_s=now_s,
@@ -123,6 +135,7 @@ class StopReviewSimulation(VisualReviewSimulation):
             dwell_brake=trip is None, hazards=hazard)
 
     def _observe_row(self, carla_map, state, trip, row):
+        """Track stop duration and record available control, lane, and recent-contact evidence."""
         vehicle, now = state.vehicle_id, row['simulation_time_s']
         active_before = row['phase_before'] == 'travel'
         phase = ('travel' if active_before else
@@ -155,6 +168,7 @@ class StopReviewSimulation(VisualReviewSimulation):
             self.sample_times[vehicle] = now
 
     def _after_observation_frame(self, frame, now_s):
+        """Update the followed vehicle, reposition the spectator, and print periodic stop observations."""
         self.last_frame_s = now_s
         counters = {v:r['counter_s'] for v,r in self.current.items() if r['phase_before']=='travel'}
         old = self.selector.vehicle
@@ -182,6 +196,7 @@ class StopReviewSimulation(VisualReviewSimulation):
                 row['speed_mps'], row['counter_s'], row['phase'], ','.join(row['evidence'])), flush=True)
 
     def _finalize_review(self):
+        """Restore the spectator, close unfinished stop episodes, and finalize all review logs."""
         try:
             if self.spectator is not None and self.original_spectator is not None:
                 self.spectator.set_transform(self.original_spectator)

@@ -14,11 +14,13 @@ from pathlib import Path
 
 
 def read_csv(path):
+    """Read a CSV file as a list of rows keyed by column name."""
     with Path(path).open(encoding="utf8", newline="") as stream:
         return list(csv.DictReader(stream))
 
 
 def number(value):
+    """Convert a measurement to a finite, nonnegative number or raise an error."""
     result = float(value)
     if not math.isfinite(result) or result < 0:
         raise ValueError("Expected a finite nonnegative measurement: %r" % value)
@@ -26,16 +28,19 @@ def number(value):
 
 
 def ratio(numerator, denominator):
+    """Divide two values, returning None when the denominator is not positive."""
     return numerator / denominator if denominator > 0 else None
 
 
 def distribution(rows, field, domain):
+    """Count each category and calculate its share, including categories with no rows."""
     counts = Counter(row[field] for row in rows)
     return [dict(value=value, count=counts[value], proportion=ratio(counts[value], len(rows)))
             for value in sorted(set(domain) | set(counts))]
 
 
 def analyze_run(path):
+    """Check one run's logs and calculate destination, travel time, speed, and event metrics."""
     path = Path(path)
     config = json.loads((path / "run_config.json").read_text(encoding="utf8"))
     trips = read_csv(path / "trips_log.csv")
@@ -47,6 +52,7 @@ def analyze_run(path):
     errors, warnings = [], []
 
     def check(condition, message):
+        """Collect an integrity error when a required condition is not met."""
         if not condition:
             errors.append(message)
 
@@ -178,7 +184,7 @@ def analyze_run(path):
 
 
 def paired_checks(runs):
-    """Pair treatments only inside matching seed/flota/duration groups."""
+    """Check whether uniform and historical runs with matching experiment settings can be compared."""
     groups = defaultdict(list)
     for run in runs:
         groups[(run["map"], run["seed"], run["vehicle_count"], round(run["simulation_duration_s"], 1))].append(run)

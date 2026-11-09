@@ -90,6 +90,7 @@ class TripSimulationConfig:
     def from_json(
         cls, path: Path, overrides: Optional[Dict[str, Any]] = None
     ) -> "TripSimulationConfig":
+        """Load simulation settings from JSON and apply supported configuration overrides."""
         if not path.is_file():
             path = project_path(path)
         with path.open("r", encoding="utf-8") as config_file:
@@ -124,6 +125,7 @@ class TripSimulationConfig:
         return config
 
     def validate(self) -> None:
+        """Reject inconsistent simulation, vehicle, destination, and recording settings before execution."""
         if self.blocked_policy not in {"terminate", "keep_trip"}:
             raise ValueError("blocked_policy debe ser terminate o keep_trip.")
         if self.max_trip_time_seconds is not None and (
@@ -222,6 +224,7 @@ class ActiveTrip:
 
     @property
     def trip_id(self) -> str:
+        """Return the trip number as an identifier such as trip_001."""
         return "trip_{0:03d}".format(self.trip_number)
 
 
@@ -229,10 +232,12 @@ class EventCollector:
     """Buffer sensor callbacks so CSV writes happen in the simulation loop."""
 
     def __init__(self) -> None:
+        """Create a thread-safe buffer for sensor notifications."""
         self._events: List[Dict[str, object]] = []
         self._lock = threading.Lock()
 
     def _append(self, event_type: str, event: Any, other_actor_id: object, details: str) -> None:
+        """Copy a sensor notification's time, position, and details into the protected buffer."""
         location = event.transform.location
         record = {
             "frame": event.frame,
@@ -248,6 +253,7 @@ class EventCollector:
             self._events.append(record)
 
     def collision(self, event: Any) -> None:
+        """Queue a collision notification with its impulse and the other actor's identity."""
         impulse = event.normal_impulse
         details = "normal_impulse=({0:.3f},{1:.3f},{2:.3f})".format(
             impulse.x, impulse.y, impulse.z
@@ -256,10 +262,12 @@ class EventCollector:
         self._append("collision", event, event.other_actor.id, details)
 
     def lane_invasion(self, event: Any) -> None:
+        """Queue a lane-crossing notification with the crossed marking types."""
         markings = ";".join(str(marking.type) for marking in event.crossed_lane_markings)
         self._append("lane_invasion", event, "", "crossed_lane_markings={0}".format(markings))
 
     def drain(self) -> List[Dict[str, object]]:
+        """Return all queued sensor notifications and clear the buffer safely."""
         with self._lock:
             events = self._events
             self._events = []
@@ -303,6 +311,7 @@ class VehicleState:
 
 
 def speed_mps(vector: Any) -> float:
+    """Calculate speed in meters per second from the three velocity components."""
     return math.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
 
 
@@ -322,6 +331,7 @@ def is_at_destination(carla_map: Any, location: Any, destination: Any, threshold
 
 
 def safe_vehicle_blueprints(world: Any, blueprint_filter: str) -> List[Any]:
+    """Return sorted vehicle models after applying wheel-count and model exclusion rules."""
     blueprints = []
     for blueprint in world.get_blueprint_library().filter(blueprint_filter):
         if any(keyword in blueprint.id.lower() for keyword in EXCLUDED_BLUEPRINT_KEYWORDS):
@@ -407,6 +417,7 @@ def spawn_vehicle_at_first_available_point(
 
 
 def resolve_destination_location(carla_module: Any, carla_map: Any, destination: Destination) -> Any:
+    """Resolve a destination onto a driving lane and check its optional road and lane IDs."""
     if destination.reference_type == "spawn_point":
         spawn_points = carla_map.get_spawn_points()
         index = destination.spawn_point_index
@@ -455,6 +466,7 @@ class TripSimulation:
         simulation_speed: int,
         carla_pythonapi: Optional[str] = None,
     ) -> None:
+        """Prepare run identifiers, independent vehicle states, random generators, and shared simulation resources."""
         if simulation_speed not in (1, 2, 3, 4, 5):
             raise ValueError("simulation_speed debe ser un entero entre 1 y 5.")
         config.validate()
@@ -494,57 +506,71 @@ class TripSimulation:
 
     @property
     def vehicle_id(self) -> str:
+        """Return the primary vehicle's logical identifier."""
         return self.primary_vehicle_state.vehicle_id
 
     @property
     def vehicle_history(self) -> VehicleHistory:
+        """Return the primary vehicle's visit history."""
         return self.primary_vehicle_state.vehicle_history
 
     @vehicle_history.setter
     def vehicle_history(self, value: VehicleHistory) -> None:
+        """Replace the primary vehicle's visit history."""
         self.primary_vehicle_state.vehicle_history = value
 
     @property
     def active_trip(self) -> Optional[ActiveTrip]:
+        """Return the primary vehicle's current trip, if any."""
         return self.primary_vehicle_state.active_trip
 
     @active_trip.setter
     def active_trip(self, value: Optional[ActiveTrip]) -> None:
+        """Set or clear the primary vehicle's current trip."""
         self.primary_vehicle_state.active_trip = value
 
     @property
     def current_destination_id(self) -> Optional[str]:
+        """Return the primary vehicle's current catalog destination ID, if known."""
         return self.primary_vehicle_state.current_destination_id
 
     @current_destination_id.setter
     def current_destination_id(self, value: Optional[str]) -> None:
+        """Set the primary vehicle's current catalog destination ID."""
         self.primary_vehicle_state.current_destination_id = value
 
     @property
     def current_location_id(self) -> str:
+        """Return the primary vehicle's current origin label."""
         return self.primary_vehicle_state.current_location_id
 
     @current_location_id.setter
     def current_location_id(self, value: str) -> None:
+        """Set the primary vehicle's current origin label."""
         self.primary_vehicle_state.current_location_id = value
 
     @property
     def current_location_name(self) -> str:
+        """Return the primary vehicle's readable location name."""
         return self.primary_vehicle_state.current_location_name
 
     @current_location_name.setter
     def current_location_name(self, value: str) -> None:
+        """Set the primary vehicle's readable location name."""
         self.primary_vehicle_state.current_location_name = value
 
     def _state_or_primary(self, state: Optional[VehicleState]) -> VehicleState:
+        """Use the supplied vehicle state, or default to the primary vehicle."""
         return state if state is not None else self.primary_vehicle_state
 
     def _output_directory(self) -> Path:
+        """Build the output directory path for this run."""
         return self.project_root / self.config.output_root / self.run_id
 
     def _write_run_config(
         self, output_directory: Path, server_version: str, destinations: List[Destination]
     ) -> None:
+        """Save the effective settings, vehicle identities, destination catalog, and measurement definitions."""
         primary = self.primary_vehicle_state
         vehicles = [
             {
@@ -681,6 +707,7 @@ class TripSimulation:
 
     @staticmethod
     def _apply_world_settings(world: Any, config: TripSimulationConfig) -> None:
+        """Configure synchronous world updates, the fixed time step, and rendering mode."""
         settings = world.get_settings()
         settings.synchronous_mode = True
         settings.fixed_delta_seconds = config.fixed_delta_seconds
@@ -721,6 +748,7 @@ class TripSimulation:
         }
 
     def _validate_destination_cycle(self) -> None:
+        """Check that every destination in a configured fixed cycle exists in the active catalog."""
         if self.config.destination_selection_mode != "cyclic":
             return
         unknown_ids = [
@@ -736,6 +764,7 @@ class TripSimulation:
             )
 
     def _validate_destination_categories(self) -> None:
+        """Check that the catalog contains exactly the required destination categories."""
         configured = set(self.config.required_destination_categories)
         observed = {destination.category for destination in self.destinations}
         if observed != configured:
@@ -748,6 +777,7 @@ class TripSimulation:
     def _select_next_destination(
         self, state: Optional[VehicleState] = None
     ) -> DestinationDecision:
+        """Choose a vehicle's next destination using the configured selection rule."""
         state = self._state_or_primary(state)
         if self.config.destination_selection_mode == "random_baseline":
             destination = select_uniform_destination(
@@ -800,6 +830,7 @@ class TripSimulation:
         now_s: float,
         state: Optional[VehicleState] = None,
     ) -> None:
+        """Choose a destination, prepare its route and agent, and record a failed route if needed."""
         state = self._state_or_primary(state)
         origin_location = vehicle.get_location()
         decision = self._select_next_destination(state)
@@ -911,6 +942,7 @@ class TripSimulation:
         status: str,
         state: Optional[VehicleState] = None,
     ) -> None:
+        """Write one attempt's destination, timings, movement, events, and termination details."""
         state = self._state_or_primary(state)
         duration = max(0.0, now_s - trip.departure_time_s)
         average_speed = trip.distance_traveled_m / duration if duration else 0.0
@@ -955,6 +987,7 @@ class TripSimulation:
     def _finish_trip(
         self, now_s: float, status: str, state: Optional[VehicleState] = None
     ) -> None:
+        """Close the attempt, update history only after arrival, and begin the vehicle's waiting period."""
         state = self._state_or_primary(state)
         if state.active_trip is None:
             return
@@ -997,6 +1030,7 @@ class TripSimulation:
     def _drain_events(
         self, now_s: float, state: Optional[VehicleState] = None
     ) -> None:
+        """Log queued sensor events and update run and eligible active-trip counters."""
         del now_s
         state = self._state_or_primary(state)
         for event in state.event_collector.drain():
@@ -1032,6 +1066,7 @@ class TripSimulation:
         now_s: float,
         state: Optional[VehicleState] = None,
     ) -> None:
+        """Write a vehicle's trip trajectory when the configured sampling interval has elapsed."""
         state = self._state_or_primary(state)
         trip = state.active_trip
         if trip is None:
@@ -1074,6 +1109,7 @@ class TripSimulation:
         now_s: float,
         state: Optional[VehicleState] = None,
     ) -> None:
+        """Update travel measurements and check for arrival, timeout, or a prolonged stop."""
         state = self._state_or_primary(state)
         trip = state.active_trip
         if trip is None:
@@ -1125,6 +1161,7 @@ class TripSimulation:
                 self._finish_trip(now_s, "blocked", state)
 
     def _on_blocked_threshold(self, state, frame, now_s):
+        """Log and print a warning when a trip reaches the blocked-time threshold."""
         trip = state.active_trip
         self.logger.write_blocked_warning(dict(
             vehicle_id=state.vehicle_id, trip_id=trip.trip_id, frame=frame,
@@ -1145,11 +1182,13 @@ class TripSimulation:
 
     @staticmethod
     def _brake(carla_module: Any, vehicle: Any) -> Any:
+        """Return a vehicle control command with full braking."""
         control = carla_module.VehicleControl(throttle=0.0, steer=0.0, brake=1.0)
         vehicle.apply_control(control)
         return control
 
     def _write_metrics(self, logger: RunLogger, simulation_duration_s: float) -> None:
+        """Aggregate all vehicle states into the run's movement, trip, and event summary."""
         trips_started = sum(state.trips_started for state in self.vehicle_states)
         trips_completed = sum(state.completed_trips for state in self.vehicle_states)
         total_distance = sum(
@@ -1210,6 +1249,7 @@ class TripSimulation:
         state.exposure_last_location = location
 
     def _load_vehicle_histories(self) -> None:
+        """Load each vehicle's initial history, or start empty histories for the uniform baseline."""
         if self.config.destination_selection_mode == "random_baseline":
             for state in self.vehicle_states:
                 state.vehicle_history = VehicleHistory(state.vehicle_id)
@@ -1228,6 +1268,7 @@ class TripSimulation:
     def _configure_blueprint(
         self, blueprint: Any, state: VehicleState
     ) -> None:
+        """Assign the vehicle's role and reproducible appearance to its blueprint."""
         if blueprint.has_attribute("role_name"):
             blueprint.set_attribute("role_name", state.vehicle_id)
         if blueprint.has_attribute("color"):
@@ -1236,6 +1277,7 @@ class TripSimulation:
                 blueprint.set_attribute("color", state.actor_rng.choice(colors))
 
     def _set_initial_location_metadata(self, state: VehicleState) -> None:
+        """Label the vehicle's starting position and recognize a catalog destination when applicable."""
         state.current_location_name = "Initial spawn point {0}".format(
             state.actual_initial_spawn_point_index
         )
@@ -1254,6 +1296,7 @@ class TripSimulation:
             state.current_location_name = matching_origins[0].destination_name
 
     def _write_initial_histories(self) -> None:
+        """Copy every vehicle's initial visits into the run's history log."""
         for state in self.vehicle_states:
             for history_event in state.vehicle_history.events:
                 self.logger.write_history(
@@ -1269,6 +1312,7 @@ class TripSimulation:
                 )
 
     def run(self) -> Path:
+        """Connect to CARLA, advance all vehicles together, save results, and clean up owned actors."""
         import carla
 
         configure_carla_agents(carla, self.carla_pythonapi)

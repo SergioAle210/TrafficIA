@@ -29,6 +29,7 @@ INDEX_FIELDS = [
 
 
 def write_csv(path, fields, rows):
+    """Write a CSV header and the supplied rows to disk."""
     with path.open('w', encoding='utf8', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
@@ -39,6 +40,7 @@ class ImageRecorder:
     """Bounded callback queue; disk I/O never issues simulator commands."""
 
     def __init__(self, output, capacity=128):
+        """Prepare a limited image queue and start a background image writer."""
         self.output = Path(output)
         self.queue = queue.Queue(capacity)
         self.lock = threading.Lock()
@@ -52,6 +54,7 @@ class ImageRecorder:
         self.worker.start()
 
     def receive(self, vehicle_id, image):
+        """Queue a camera image without waiting, recording a drop if the queue is full."""
         with self.lock:
             if not self.accepting:
                 return
@@ -65,6 +68,7 @@ class ImageRecorder:
                                       sensor_timestamp_s=image.timestamp, camera_transform_json='', path='', saved=False, error='queue_full'))
 
     def _write_images(self):
+        """Save queued images and record their metadata or any saving errors."""
         while True:
             item = self.queue.get()
             try:
@@ -94,6 +98,7 @@ class ImageRecorder:
                 self.queue.task_done()
 
     def close(self):
+        """Stop accepting images and wait for the background writer to finish."""
         if self.closed:
             return
         with self.lock:
@@ -134,6 +139,7 @@ def capture_spacing(frames, last_observed, step):
 
 
 def phase_record(trip):
+    """Return the current travel or waiting phase and its active trip ID."""
     return ('travel', trip.trip_id) if trip is not None else ('dwell', '')
 
 
@@ -148,6 +154,7 @@ class VisualReviewSimulation(TripSimulation):
     """Observe before/after updates; inherit every route/control/tick decision."""
 
     def __init__(self, *args, capture_images=True, **kwargs):
+        """Set up per-step observations and validate optional camera capture settings."""
         super().__init__(*args, **kwargs)
         self.capture_images = capture_images
         if self.capture_images and self.config.no_rendering_mode:
@@ -169,6 +176,7 @@ class VisualReviewSimulation(TripSimulation):
         self._cache_frame = None
 
     def _write_run_config(self, output_directory, server_version, destinations):
+        """Open observation logs, attach requested cameras, and save review settings and source hashes."""
         super()._write_run_config(output_directory, server_version, destinations)
         import carla
         self._review_output = output_directory
@@ -212,6 +220,7 @@ class VisualReviewSimulation(TripSimulation):
         self._start_wall = time.monotonic()
 
     def _finish_trip(self, now_s, status, state=None):
+        """Close the trip normally and retain its context for observations during the wait."""
         state = self._state_or_primary(state)
         trip = state.active_trip
         result = super()._finish_trip(now_s, status, state)
@@ -220,6 +229,7 @@ class VisualReviewSimulation(TripSimulation):
         return result
 
     def _update_active_trip(self, carla_map, vehicle, frame, now_s, state=None):
+        """Record vehicle state and trip phases around the normal trip update."""
         state = self._state_or_primary(state)
         before_phase, before_trip = phase_record(state.active_trip)
         trip = state.active_trip or self._last_trips.get(state.vehicle_id)
@@ -273,6 +283,7 @@ class VisualReviewSimulation(TripSimulation):
         """Optional passive consumer of an already collected observation."""
 
     def _write_metrics(self, logger, duration):
+        """Allow pending camera callbacks to arrive, then save the normal run metrics."""
         # Drain already rendered GPU callbacks without generating extra simulation ticks.
         if self._camera_ids:
             time.sleep(1)
@@ -280,6 +291,7 @@ class VisualReviewSimulation(TripSimulation):
         self._review_finished = True
 
     def _finalize_review(self):
+        """Close review files and save image matching, capture errors, and observation counts."""
         if self._review_output is None:
             return
         if self._recorder is not None:
@@ -316,6 +328,7 @@ class VisualReviewSimulation(TripSimulation):
         (self._review_output/'capture_summary.json').write_text(json.dumps(metadata, indent=2), encoding='utf8')
 
     def run(self):
+        """Run the simulation and finalize review records even if execution fails or is interrupted."""
         try:
             return super().run()
         finally:

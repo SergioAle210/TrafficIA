@@ -43,18 +43,22 @@ class Destination:
 
 
 def _normalise_map_name(map_name: str) -> str:
+    """Extract a lowercase map name from a name or path."""
     return map_name.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
 
 def _optional_int(value: str) -> Optional[int]:
+    """Convert a nonempty field to an integer, or return None for an empty field."""
     return int(value) if value and value.strip() else None
 
 
 def _optional_float(value: str) -> Optional[float]:
+    """Convert a nonempty field to a decimal number, or return None for an empty field."""
     return float(value) if value and value.strip() else None
 
 
 def _enabled(value: str) -> bool:
+    """Recognize supported text values that mark a destination as enabled."""
     return value.strip().lower() in ("1", "true", "yes", "si", "sí")
 
 

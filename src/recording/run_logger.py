@@ -44,6 +44,7 @@ class RunLogger:
     """Own the output files so simulation logic never writes CSV directly."""
 
     def __init__(self, output_directory: Path) -> None:
+        """Create a new run directory and open its main CSV logs."""
         output_directory.mkdir(parents=True, exist_ok=False)
         self.output_directory = output_directory
         self._files: List[object] = []
@@ -59,9 +60,11 @@ class RunLogger:
             "vehicle_id", "trip_id", "frame", "simulation_time_s", "destination_id", "counter_s", "policy"])
 
     def write_blocked_warning(self, row):
+        """Append a record of a vehicle reaching the blocked-time threshold."""
         self._blocked_writer.writerow(row)
 
     def _create_writer(self, file_name: str, fieldnames: Iterable[str]) -> csv.DictWriter:
+        """Open a CSV file, write its header, and track it for later cleanup."""
         csv_file = (self.output_directory / file_name).open("w", newline="", encoding="utf-8")
         self._files.append(csv_file)
         writer = csv.DictWriter(csv_file, fieldnames=list(fieldnames))
@@ -69,36 +72,45 @@ class RunLogger:
         return writer
 
     def write_trip(self, row: Dict[str, object]) -> None:
+        """Append a trip's destination, measurements, and final status to the trip log."""
         self._trip_writer.writerow(row)
 
     def write_trajectory(self, row: Dict[str, object]) -> None:
+        """Append a sampled vehicle position and speed to the trajectory log."""
         self._trajectory_writer.writerow(row)
 
     def write_event(self, row: Dict[str, object]) -> None:
+        """Append a sensor notification to the event log."""
         self._event_writer.writerow(row)
 
     def write_metrics(self, row: Dict[str, object]) -> None:
+        """Write the run's aggregate trip, movement, and sensor counts."""
         self._metrics_writer.writerow(row)
 
     def write_history(self, row: Dict[str, object]) -> None:
+        """Append an initial or newly completed visit to the history log."""
         self._history_writer.writerow(row)
 
     def write_route(self, row: Dict[str, object]) -> None:
+        """Append a planned waypoint, opening the optional route log when first needed."""
         if self._route_writer is None:
             self._route_writer = self._create_writer("route_log.csv", ROUTE_FIELDS)
         self._route_writer.writerow(row)
 
     def write_control(self, row: Dict[str, object]) -> None:
+        """Append driving diagnostics, opening the optional control log when first needed."""
         if self._control_writer is None:
             self._control_writer = self._create_writer("control_log.csv", CONTROL_FIELDS)
         self._control_writer.writerow(row)
 
     def close(self) -> None:
+        """Close every CSV file owned by this logger."""
         for csv_file in self._files:
             csv_file.close()
         self._files = []
 
     def write_arrival(self, row: Dict[str, object]) -> None:
+        """Append arrival checks, opening the optional arrival log when first needed."""
         if self._arrival_writer is None:
             self._arrival_writer = self._create_writer("arrival_log.csv", ARRIVAL_FIELDS)
         self._arrival_writer.writerow(row)

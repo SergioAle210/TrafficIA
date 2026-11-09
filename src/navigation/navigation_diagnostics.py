@@ -25,6 +25,7 @@ ARRIVAL_FIELDS = [
 
 
 def wrap_degrees(angle):
+    """Wrap an angle into the range from -180 degrees up to, but not including, 180."""
     return (angle + 180.0) % 360.0 - 180.0
 
 
@@ -38,6 +39,7 @@ class RouteTrace:
     """
 
     def __init__(self, route):
+        """Copy route waypoints and segments before the driving agent consumes the plan."""
         self.points = []
         for index, (waypoint, option) in enumerate(route):
             transform = waypoint.transform
@@ -55,6 +57,7 @@ class RouteTrace:
                 self.segments.append((a, b, dx, dy, length2))
 
     def project(self, x, y, yaw_deg):
+        """Find the nearest route segment and measure position and heading errors."""
         nearest = None
         for a, b, dx, dy, length2 in self.segments:
             fraction = max(0.0, min(1.0, ((x-a["x"])*dx + (y-a["y"])*dy) / length2))
@@ -77,6 +80,7 @@ class RouteTrace:
         )
 
     def sample(self, vehicle, agent, control):
+        """Collect the vehicle state, applied control, target waypoint, and route tracking errors."""
         transform = vehicle.get_transform()
         location = transform.location
         velocity = vehicle.get_velocity()

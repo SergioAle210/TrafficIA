@@ -70,6 +70,7 @@ def build_global_route_planner(carla_map: Any, sampling_resolution: float) -> An
 
     class ReturnAwareRoutePlanner(GlobalRoutePlanner):
         def _path_search(self, origin, destination):
+            """Use a valid return path for a goal behind the origin, otherwise use CARLA's search."""
             circuit = same_edge_return_path(self, origin, destination)
             return circuit if circuit is not None else super()._path_search(origin, destination)
 

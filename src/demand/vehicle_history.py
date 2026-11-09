@@ -41,6 +41,7 @@ class VehicleHistory:
     """Ordered visits and derived counts for one logical vehicle."""
 
     def __init__(self, vehicle_id: str, events: Iterable[HistoryEvent] = ()) -> None:
+        """Load one vehicle's ordered visits, count destinations, and reject duplicate sequence numbers."""
         self.vehicle_id = vehicle_id
         self.events: List[HistoryEvent] = []
         self.counts: Counter = Counter()
@@ -58,6 +59,7 @@ class VehicleHistory:
     def from_csv(
         cls, path: Path, vehicle_id: str, allowed_destination_ids: Set[str]
     ) -> "VehicleHistory":
+        """Read one vehicle's history from CSV and check that all destinations exist."""
         if not path.is_file():
             path = project_path(path)
         if not path.is_file():
@@ -94,6 +96,7 @@ class VehicleHistory:
         return cls(vehicle_id, events)
 
     def record(self, destination_id: str, source: str = "simulation") -> HistoryEvent:
+        """Append a visit and update this vehicle's destination counts."""
         event = HistoryEvent(
             vehicle_id=self.vehicle_id,
             sequence=self._next_sequence,
@@ -106,6 +109,7 @@ class VehicleHistory:
         return event
 
     def routine_ids(self, maximum: int) -> List[str]:
+        """Return the most visited destination IDs, breaking ties by ID."""
         if maximum <= 0:
             raise ValueError("routine_destination_count debe ser positivo.")
         ranked = sorted(self.counts.items(), key=lambda item: (-item[1], item[0]))
@@ -115,6 +119,7 @@ class VehicleHistory:
 def _count_weighted_choice(
     candidates: Sequence[Destination], history: VehicleHistory, rng: random.Random
 ) -> Destination:
+    """Choose a destination with probability proportional to this vehicle's previous visits."""
     total = sum(history.counts[item.destination_id] for item in candidates)
     if total <= 0:
         return rng.choice(list(candidates))
@@ -235,6 +240,7 @@ def generate_dummy_events(
 
 
 def write_history_csv(path: Path, events: Iterable[HistoryEvent]) -> None:
+    """Save vehicle visits to CSV, creating the parent directory when needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.DictWriter(
