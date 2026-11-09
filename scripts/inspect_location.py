@@ -11,10 +11,12 @@ import carla
 
 
 def short_map_name(name: str) -> str:
+    """Extract a lowercase map name from CARLA's full map path."""
     return name.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
 
 def nearest_spawn_point_index(carla_map: carla.Map, location: carla.Location) -> int:
+    """Return the closest recommended spawn index, or -1 when the map has no spawn points."""
     spawn_points = carla_map.get_spawn_points()
     if not spawn_points:
         return -1
@@ -65,6 +67,7 @@ def draw_spawn_points(
 
 
 def parse_args() -> argparse.Namespace:
+    """Read connection, map, and location-inspection options from the command line."""
     parser = argparse.ArgumentParser(
         description="Inspecciona el spectator y devuelve un waypoint vial para destinations_config.csv."
     )
@@ -92,6 +95,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Inspect the spectator's road location and optionally display indexed spawn points."""
     args = parse_args()
     client = carla.Client(args.host, args.port)
     client.set_timeout(30.0)

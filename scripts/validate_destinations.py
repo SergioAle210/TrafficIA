@@ -22,6 +22,7 @@ from src.simulation.trip_runner import resolve_destination_location
 
 
 def parse_args() -> argparse.Namespace:
+    """Read the map, origin, catalog, and CARLA API options for destination validation."""
     parser = argparse.ArgumentParser(
         description="Valida referencias y rutas desde un origen hacia todos los destinos."
     )
@@ -44,10 +45,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def short_map_name(name: str) -> str:
+    """Extract a lowercase map name from CARLA's full map path."""
     return name.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
 
 def main() -> int:
+    """Check destination references and planned routes from the selected origin on the active map."""
     args = parse_args()
     try:
         import carla

@@ -33,18 +33,22 @@ ENTRIES, OMITTED = [], []
 
 
 def read(path):
+    """Read a JSON file into Python data."""
     return json.loads(path.read_text(encoding='utf8'))
 
 
 def sha(path):
+    """Calculate a file's SHA-256 fingerprint."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def rel(path):
+    """Express a path relative to the project root using forward slashes."""
     return path.resolve().relative_to(ROOT).as_posix()
 
 
 def add_entry(folder, name, title, note, role, stage, sources, method, outputs):
+    """Register a figure's purpose, caption, source files, outputs, and fingerprints."""
     entry = dict(id=name, stage=stage, role=role, title=title, caption=note,
         method=method, sources=[dict(path=rel(p), sha256=sha(p)) for p in sources],
         files=[dict(path=rel(p), sha256=sha(p)) for p in outputs])
@@ -53,6 +57,7 @@ def add_entry(folder, name, title, note, role, stage, sources, method, outputs):
 
 
 def copy_figure(source, folder, name, title, note, role, stage):
+    """Copy existing PNG and SVG figures unchanged and register their source records."""
     directory = OUT/folder
     directory.mkdir(parents=True, exist_ok=True)
     sources, outputs = [], []
@@ -72,6 +77,7 @@ def copy_figure(source, folder, name, title, note, role, stage):
 
 
 def generated(fig, folder, name, title, note, stage, sources):
+    """Save a newly summarized figure with its title, note, and source records."""
     directory = OUT/folder
     directory.mkdir(parents=True, exist_ok=True)
     fig.suptitle(title, x=.055, ha='left', y=.98, fontsize=17, fontweight='bold')
@@ -87,6 +93,7 @@ def generated(fig, folder, name, title, note, stage, sources):
 
 
 def bars(axis, values, title, unit, labels=LABELS):
+    """Draw labeled comparison bars with their units and numeric values."""
     values = np.asarray(values, dtype=float)
     axis.bar(range(len(values)), values, color=[BLUE,ORANGE], width=.58)
     axis.set(title=title, ylabel=unit, xticks=range(len(values)), xticklabels=labels)
@@ -99,6 +106,7 @@ def bars(axis, values, title, unit, labels=LABELS):
 
 
 def pilot_figures():
+    """Prepare figures summarizing the small-vehicle pilot runs."""
     for n,base,directory in (
             (3,'visual_review_20260915','01_tres_vehiculos_600s'),
             (5,'pilot5_20260915','02_cinco_vehiculos_600s'),
@@ -164,6 +172,7 @@ DIAGNOSTIC={'estados_viaje','evolucion_resultados','comparacion_mitades','compar
 
 
 def campaign_figures():
+    """Collect the main campaign figures and identify older visualizations as supporting material."""
     campaigns=[
         ('visual_analysis20_20260917','05_veinte_vehiculos_1800s_dos_semillas','n020_1800s_semillas210_109',
          '20 vehículos · 1800 s · semillas 210 y 109 · 17 septiembre'),
@@ -201,6 +210,7 @@ def campaign_figures():
 
 
 def supporting_figures():
+    """Collect diagnostic and comparison figures for technical reference."""
     specs=[
         ('scaling_pilots_20260917/comparison','resultados/10_comparacion_pilotos',
          'n005_010_020_600s_semilla42_comparacion_escalamiento', 'Comparación descriptiva de pilotos de 5, 10 y 20 vehículos',
@@ -242,6 +252,7 @@ def supporting_figures():
 
 
 def clean_repeat_comparison():
+    """Create a readable summary chart comparing the two one-hour campaign repetitions."""
     base=DATA/'visual_analysis20_100_3600_repeat_20260923'
     source=base/'repeat_comparison.csv'
     data=pd.read_csv(source)
@@ -291,6 +302,7 @@ def clean_repeat_comparison():
 
 
 def documentation():
+    """Write the figure catalog and searchable HTML gallery from the registered entries."""
     figures=sorted(ENTRIES,key=lambda e:e['files'][0]['path'])
     counts=Counter(e['role'] for e in figures)
     lines=['# Imágenes para los resultados del trabajo de graduación','',
@@ -346,6 +358,7 @@ def documentation():
 
 
 def verify():
+    """Check figure identifiers, output files, and recorded fingerprints for consistency."""
     names=[entry['id'] for entry in ENTRIES]
     assert len(names)==len(set(names)), 'Duplicate names'
     for entry in ENTRIES:
@@ -363,6 +376,7 @@ def verify():
 
 
 def main():
+    """Prepare and verify the requested results figure collection or independent-chart export."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--independent',action='store_true',help='Regenerate the chapter plots as separate files from preserved CSV/JSON; leave the previous collection intact.')
     parser.add_argument('--output',type=Path,default=OUT/'graficas_independientes')

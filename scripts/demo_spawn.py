@@ -9,6 +9,7 @@ SEED = 42
 
 
 def main():
+    """Run a small vehicle-spawning demonstration and remove its vehicles when it finishes."""
     random.seed(SEED)
 
     client = carla.Client("localhost", 2000)

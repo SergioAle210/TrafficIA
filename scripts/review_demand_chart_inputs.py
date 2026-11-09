@@ -13,10 +13,14 @@ from src.analysis.incident_analysis import collision_episodes
 from src.analysis.mobility_analysis import analyze_run, paired_checks
 
 
-def read(path):return json.loads(path.read_text(encoding='utf8'))
+def read(path):
+    """Read a JSON file into Python data."""
+    return json.loads(path.read_text(encoding='utf8'))
 def rows(path):
+    """Read a CSV file as rows keyed by column name."""
     with path.open(encoding='utf8',newline='') as stream:return list(csv.DictReader(stream))
 def digest(path):
+    """Calculate a file's SHA-256 fingerprint by reading it in blocks."""
     h=hashlib.sha256()
     with path.open('rb') as stream:
         for block in iter(lambda:stream.read(1024*1024),b''):h.update(block)
@@ -24,6 +28,7 @@ def digest(path):
 
 
 def main():
+    """Recheck campaign logs and write an integrity report for the data used in charts."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--campaign',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)

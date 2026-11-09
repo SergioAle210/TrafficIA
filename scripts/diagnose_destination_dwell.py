@@ -49,6 +49,7 @@ def sensor_corners_xy(transform, bounding_box):
 
 
 def waypoint_record(wp):
+    """Convert a road waypoint's position, lane, and markings into a log record."""
     t = wp.transform
     return dict(x=t.location.x, y=t.location.y, z=t.location.z, yaw_deg=t.rotation.yaw,
                 road_id=wp.road_id, section_id=wp.section_id, lane_id=wp.lane_id,
@@ -60,6 +61,7 @@ class DwellDiagnosticSimulation(TripSimulation):
     """Delegate every state transition/control to the unchanged base runner."""
 
     def __init__(self, *args, **kwargs):
+        """Initialize recording state for detailed observations near the selected destination."""
         super().__init__(*args, **kwargs)
         self._dwell_file = None
         self._dwell_writer = None
@@ -68,6 +70,7 @@ class DwellDiagnosticSimulation(TripSimulation):
         self._reference = None
 
     def _write_run_config(self, output_directory, server_version, destinations):
+        """Save destination geometry and diagnostic settings, then open the detailed waiting log."""
         super()._write_run_config(output_directory, server_version, destinations)
         import carla
         vehicle = self.primary_vehicle_state.actor
@@ -111,6 +114,7 @@ class DwellDiagnosticSimulation(TripSimulation):
         self._dwell_writer.writeheader()
 
     def _finish_trip(self, now_s, status, state=None):
+        """Keep the last trip's context after normal trip completion for later waiting observations."""
         state = self._state_or_primary(state)
         trip = state.active_trip
         result = super()._finish_trip(now_s, status, state)
@@ -119,6 +123,7 @@ class DwellDiagnosticSimulation(TripSimulation):
         return result
 
     def _observe(self, carla_map, vehicle, frame, now_s, state):
+        """Collect vehicle and lane geometry when the vehicle is near the diagnostic destination."""
         import carla
         t = vehicle.get_transform()
         if self._focus is None or t.location.distance(self._focus) > 25:
@@ -161,6 +166,7 @@ class DwellDiagnosticSimulation(TripSimulation):
         )
 
     def _update_active_trip(self, carla_map, vehicle, frame, now_s, state=None):
+        """Run the normal trip update and log the phases before and after it."""
         state = self._state_or_primary(state)
         row = self._observe(carla_map, vehicle, frame, now_s, state)
         result = super()._update_active_trip(carla_map, vehicle, frame, now_s, state)
@@ -173,6 +179,7 @@ class DwellDiagnosticSimulation(TripSimulation):
         return result
 
     def run(self):
+        """Execute the diagnostic simulation and always close its waiting log."""
         try:
             return super().run()
         finally:
@@ -181,6 +188,7 @@ class DwellDiagnosticSimulation(TripSimulation):
 
 
 def main():
+    """Validate the Town01 diagnostic configuration and run the destination waiting review."""
     args = parse_args()
     config = configuration_from_args(args)
     if config.town != "Town01":

@@ -15,6 +15,7 @@ from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
 
 def parse_args(parser=None) -> argparse.Namespace:
+    """Read simulation, destination, history, and recording options from the command line."""
     parser = parser or argparse.ArgumentParser(
         description="Ejecuta viajes sucesivos de uno o más vehículos con rutas explícitas."
     )
@@ -106,6 +107,7 @@ def configuration_from_args(args: argparse.Namespace) -> TripSimulationConfig:
 
 
 def main() -> int:
+    """Validate the selected configuration, run the trip simulation, and report its output or error."""
     args = parse_args()
     try:
         config = configuration_from_args(args)

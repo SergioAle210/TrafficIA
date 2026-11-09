@@ -10,6 +10,7 @@ from src.recording.visual_review import VisualReviewSimulation
 
 
 def main():
+    """Run a trip simulation with per-step observations and optional camera images."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--no-cameras', action='store_true',
                         help='Registra fases y paradas sin crear cámaras RGB; no produce evidencia visual.')

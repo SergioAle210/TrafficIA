@@ -32,10 +32,12 @@ CAMPAIGNS = (
 
 
 def read(path):
+    """Read a JSON file into Python data."""
     return json.loads(path.read_text(encoding='utf8'))
 
 
 def sha(path):
+    """Calculate a file's SHA-256 fingerprint without loading the whole file at once."""
     result = hashlib.sha256()
     with path.open('rb') as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b''):
@@ -44,11 +46,13 @@ def sha(path):
 
 
 def relative(path):
+    """Express a path relative to the shared workspace using forward slashes."""
     return path.resolve().relative_to(ROOT.parent).as_posix()
 
 
 class Exporter:
     def __init__(self, output):
+        """Prepare the chart output folder, source tracking, and common figure style."""
         self.output = Path(output)
         self.output.mkdir(parents=True, exist_ok=True)
         self.figures = []
@@ -65,6 +69,7 @@ class Exporter:
                              'svg.hashsalt': 'TrafficIA-resultados'})
 
     def source(self, path):
+        """Register a source file's fingerprint and return its relative path."""
         path = Path(path).resolve()
         key = relative(path)
         if key not in self.sources:
@@ -72,6 +77,7 @@ class Exporter:
         return key
 
     def save(self, fig, name, title, sources, method):
+        """Save an individual chart as PNG and SVG and record its sources and method."""
         # Each scientific plot is created on its own Figure, never cropped from
         # a dashboard. Colorbars are the only possible supplementary axes.
         fig.tight_layout(pad=1.05)
@@ -86,6 +92,7 @@ class Exporter:
             sources=[self.source(path) for path in sources], method=method))
 
     def finish(self, filename='manifest.json'):
+        """Check that source files stayed unchanged and write the chart manifest."""
         # Check that exporting did not change any of the data that were read.
         for key, digest in self.sources.items():
             if sha(ROOT.parent / key) != digest:
@@ -102,6 +109,7 @@ class Exporter:
 
 
 def load_campaign(data):
+    """Load campaign metrics and plotting inputs after checking their recorded conditions and integrity."""
     data = Path(data).resolve()
     derived = read(data / 'derivation_manifest.json')
     review_path = data / 'chart_input_review.json'
@@ -162,15 +170,18 @@ def load_campaign(data):
 
 
 def axis(size=(6.5, 4.1)):
+    """Create a Matplotlib figure and axes with the requested size."""
     return plt.subplots(figsize=size)
 
 
 def grid(ax):
+    """Place a light grid behind the chart's data."""
     ax.grid(alpha=.35)
     ax.set_axisbelow(True)
 
 
 def run_labels(campaign, multiline=True):
+    """Build readable labels from each run's vehicle count or seed and selection rule."""
     separator = '\n' if multiline else ' · '
     return [('%d veh.' % r['vehicle_count'] if campaign['group_key'] == 'vehicle_count'
              else 'Semilla %d' % r['seed']) + separator + NAMES[SELECTORS.index(r['scenario'])]
@@ -178,6 +189,7 @@ def run_labels(campaign, multiline=True):
 
 
 def bar_values(ax, values, labels, ylabel, decimals=2):
+    """Draw colored bars, label their values, and configure the chart axes."""
     values = np.asarray(values)
     ax.bar(np.arange(len(values)), values, color=list(COLORS) * 2, width=.64)
     high = max(1., max(values))
@@ -190,11 +202,13 @@ def bar_values(ax, values, labels, ylabel, decimals=2):
 
 
 def export_campaign(campaign, exporter, prefix):
+    """Export separate charts for a campaign's destination choices, mobility, and recorded events."""
     c = campaign
     runs, trips, extra = c['runs'], c['trips'], c['extras']
     completed = [t[t.status == 'completed'] for t in trips]
     labels = run_labels(c)
     def save(fig, suffix, title, sources=None, method='Valores de las corridas conservadas.'):
+        """Save a campaign chart using its filename prefix and default source list."""
         exporter.save(fig, prefix + '_' + suffix, title, sources or c['sources'], method)
 
     # Destination categories, with the two fleet sizes on the same single axis.
@@ -299,6 +313,7 @@ def export_campaign(campaign, exporter, prefix):
 
 
 def export_flow(c, exporter, prefix):
+    """Export lane-flow, density, speed, and observation-coverage charts."""
     flow = c['flow']
     occupied = flow[flow.vehicle_seconds > 0]
     rows = []
@@ -362,6 +377,7 @@ def export_flow(c, exporter, prefix):
 
 
 def export_repetitions(first, second, exporter):
+    """Plot the speed and arrival evolution of both repetitions for each vehicle count."""
     for count in (20, 100):
         for metric in ('velocidad', 'llegadas'):
             fig, ax = axis((6.5, 4.2))
@@ -397,6 +413,7 @@ def export_repetitions(first, second, exporter):
 
 
 def export_collection(output, thesis_output=None, include_1800=True):
+    """Export the selected campaign charts and optionally copy identical files to the thesis folder."""
     exporter = Exporter(output)
     exporter.source(Path(__file__))
     exporter.source(ROOT / 'src/analysis/traffic_flow_analysis.py')
@@ -421,6 +438,7 @@ def export_collection(output, thesis_output=None, include_1800=True):
 
 
 def main():
+    """Read export options and generate the requested collection of individual charts."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'images/graficas_independientes')
     parser.add_argument('--thesis-output', type=Path)

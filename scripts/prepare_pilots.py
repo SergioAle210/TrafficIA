@@ -31,6 +31,7 @@ def nested_spawns(points, prefix, count):
 
 
 def write_new_or_identical(path, text, root=ROOT):
+    """Create an input file only if it is new or identical to the existing content."""
     path = project_path(path, root)
     if path.exists():
         if path.read_text(encoding='utf8') != text:
@@ -41,6 +42,7 @@ def write_new_or_identical(path, text, root=ROOT):
 
 
 def prepare(carla_map, root=ROOT):
+    """Prepare nested pilot groups with reproducible spawn positions and shared vehicle histories."""
     if carla_map.name.replace('\\','/').split('/')[-1] != 'Town01':
         raise ValueError('Prepare requires Town01; the script never changes maps')
     base_path = project_path('config/multi_vehicle_trip.json', root)

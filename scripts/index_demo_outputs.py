@@ -57,6 +57,7 @@ def build_rows(campaign_path, data_root=None):
 
 
 def render_html(rows):
+    """Build an HTML index linking each demonstration case to its available records."""
     entries = []
     for row in rows:
         run_path = Path(row["carpeta"]) if row["carpeta"] else None
@@ -98,6 +99,7 @@ Los archivos originales conservan sus nombres y contenido.</p>
 
 
 def write_index(campaign_path, data_root=None):
+    """Create CSV and HTML indexes from the campaign's explicit run mapping."""
     campaign_path = Path(campaign_path).resolve()
     rows = build_rows(campaign_path, data_root)
     csv_path = campaign_path.parent / "indice_demo.csv"
@@ -111,6 +113,7 @@ def write_index(campaign_path, data_root=None):
 
 
 def main(argv=None):
+    """Read the campaign path and create its demonstration indexes, reporting errors clearly."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--campaign", type=Path, required=True, help="campaign.json de la demostración.")
     args = parser.parse_args(argv)

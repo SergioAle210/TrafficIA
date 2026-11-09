@@ -22,13 +22,17 @@ STATUS_NAMES=['Completados','Blocked','Ruta rechazada','Corte final','Timeout']
 STATUS_COLORS=['#32867B','#B75E39','#8C679C','#A4B2BF','#DBA332']
 
 
-def read(p):return json.loads(p.read_text(encoding='utf8'))
+def read(p):
+    """Read a JSON file into Python data."""
+    return json.loads(p.read_text(encoding='utf8'))
 def sha(p):
+    """Calculate a file's SHA-256 fingerprint by reading it in blocks."""
     h=hashlib.sha256()
     with p.open('rb') as stream:
         for block in iter(lambda:stream.read(1024*1024),b''):h.update(block)
     return h.hexdigest()
 def proportions(run,population,level,values):
+    """Return destination percentages in the requested category order for the selected population."""
     bins={d['value']:d['proportion'] for d in run['destinations'][population][level]}
     return [100*(bins[v] or 0) for v in values]
 
@@ -41,6 +45,7 @@ def minute_edges(seconds):
 
 
 def main():
+    """Build demand-comparison charts from audited inputs, with optional repetition or individual-chart exports."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data',type=Path,required=True)
     parser.add_argument('--compare-data',type=Path,help='Previous figure folder; requires re-audit in data/previous_review.')
@@ -308,6 +313,7 @@ def main():
 
 
 def export(out,items,runs,extra,derived,review,occupied,context):
+    """Save the figure gallery, supporting tables, and source manifest for the demand comparison."""
     campaign=Path(derived['campaign']).parent
     for name in ('summary.csv','destinations.csv'):shutil.copyfile(campaign/'metrics'/name,out/name)
     counts=sorted({r['vehicle_count'] for r in runs});seed=runs[0]['seed']

@@ -26,10 +26,13 @@ CAT_NAMES=['Residencia','Servicios / ocio','Trabajo / educación']
 CAT_COLORS=['#508D86','#8A71B3','#DDA94C']
 
 
-def read_json(p):return json.loads(p.read_text(encoding='utf8'))
+def read_json(p):
+    """Read a JSON file into Python data."""
+    return json.loads(p.read_text(encoding='utf8'))
 
 
 def style():
+    """Set shared fonts, colors, and axis styles for the campaign figures."""
     plt.rcParams.update({'font.family':'DejaVu Sans','font.size':10,'axes.titlesize':12,
                          'axes.labelsize':10,'axes.spines.top':False,'axes.spines.right':False,
                          'axes.titlepad':12,'figure.facecolor':'white','axes.facecolor':'white',
@@ -38,6 +41,7 @@ def style():
 
 
 def bars(ax,values,title,ylabel,fmt='.1f',colors=COLORS):
+    """Draw and label the four campaign cases using consistent colors and units."""
     ax.bar(range(4),values,color=colors,width=.65)
     ax.scatter(range(4),values,color=colors,s=15,zorder=3)
     ax.set(xticks=range(4),xticklabels=SHORT,title=title,ylabel=ylabel)
@@ -49,8 +53,10 @@ def bars(ax,values,title,ylabel,fmt='.1f',colors=COLORS):
 
 class Figures:
     def __init__(self,out):
+        """Prepare figure tracking and open the campaign's multipage PDF."""
         self.out=out;self.items=[];self.pdf=PdfPages(out/'graficas_campana.pdf')
     def save(self,fig,name,title,note,group='objetivos'):
+        """Save a titled figure to image files and the campaign PDF, then record its details."""
         fig.suptitle(title,fontsize=17,fontweight='bold',x=.04,ha='left',y=.985)
         fig.text(.04,.018,note,fontsize=9,color='#475569',va='bottom')
         fig.tight_layout(rect=(.015,.075,.995,.925))
@@ -61,6 +67,7 @@ class Figures:
 
 
 def main():
+    """Load campaign data and create the main mobility charts or requested individual-chart export."""
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--data',type=Path,required=True)
     parser.add_argument('--independent-output',type=Path,help='Export one academic plot per file without changing the input directory.')
     parser.add_argument('--prefix',default='movilidad_20veh_1800s',help='Readable filename prefix for independent figures.')
@@ -144,6 +151,7 @@ def main():
 
 
 def finish_figures(figs,out,derived,campaign,runs,extended,incident,trips,completed,flow,series):
+    """Create the remaining evolution and flow figures, close the PDF, and export the gallery."""
     fig,axes=plt.subplots(2,2,figsize=(13,8))
     for si,seed in enumerate((210,109)):
         for i in (si*2,si*2+1):
@@ -224,6 +232,7 @@ def finish_figures(figs,out,derived,campaign,runs,extended,incident,trips,comple
 
 
 def export_gallery(out,items,runs,derived,campaign):
+    """Build the HTML figure gallery and copy summary tables with source fingerprints."""
     cells=pd.read_csv(out/'flow_cells.csv');occupied=cells[cells.vehicle_seconds>0]
     for name in ('summary.csv','destinations.csv'):
         shutil.copyfile(campaign/'metrics'/name,out/name)

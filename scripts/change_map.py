@@ -12,10 +12,12 @@ CLIENT_TIMEOUT_SECONDS = 30.0
 
 
 def short_map_name(map_name: str) -> str:
+    """Extract a lowercase map name from CARLA's full map path."""
     return map_name.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
 
 def parse_args() -> argparse.Namespace:
+    """Read the map name requested on the command line."""
     parser = argparse.ArgumentParser(
         description="Carga un mapa en una instancia local de CARLA 0.9.15."
     )
@@ -24,6 +26,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Connect to CARLA, load the requested map, and report any connection or loading error."""
     args = parse_args()
 
     try:

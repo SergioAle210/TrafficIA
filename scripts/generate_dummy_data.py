@@ -189,6 +189,7 @@ DEMAND_PROFILES: List[Dict[str, object]] = [
 
 
 def write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
+    """Write nonempty records to CSV, creating directories and using the first row's column names."""
     if not rows:
         raise ValueError(f"No hay filas para escribir en {path}")
 
@@ -202,6 +203,7 @@ def write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
 
 
 def validate_destination_weights(destinations: List[Dict[str, object]]) -> None:
+    """Check that the legacy destination weights sum to one."""
     total_weight = sum(float(row["weight"]) for row in destinations)
     if abs(total_weight - 1.0) > 1e-9:
         raise ValueError(
@@ -211,6 +213,7 @@ def validate_destination_weights(destinations: List[Dict[str, object]]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """Read output location and synthetic-history generation options from the command line."""
     parser = argparse.ArgumentParser(
         description="Genera los CSV dummy de configuración del proyecto."
     )
@@ -239,6 +242,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Generate example configuration CSV files and reproducible synthetic vehicle histories."""
     args = parse_args()
     output_dir = args.output_dir
 

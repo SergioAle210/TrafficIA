@@ -39,6 +39,7 @@ class ActiveMapMismatchError(Exception):
 
 
 def positive_int(value: str) -> int:
+    """Parse a command-line integer and reject zero or negative values."""
     parsed_value = int(value)
     if parsed_value <= 0:
         raise argparse.ArgumentTypeError("el valor debe ser mayor que cero")
@@ -46,6 +47,7 @@ def positive_int(value: str) -> int:
 
 
 def parse_args() -> argparse.Namespace:
+    """Read the vehicle count and options for the Traffic Manager demonstration."""
     parser = argparse.ArgumentParser(
         description="Ejecuta tráfico estable y reproducible con Traffic Manager."
     )
@@ -78,12 +80,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def speed_kmh(vehicle: carla.Vehicle) -> float:
+    """Return a vehicle's current speed in kilometers per hour."""
     velocity = vehicle.get_velocity()
     speed_ms = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
     return speed_ms * 3.6
 
 
 def get_safe_vehicle_blueprints(world: carla.World) -> List[carla.ActorBlueprint]:
+    """Filter vehicle models using the demonstration's wheel-count and exclusion rules."""
     vehicle_blueprints = world.get_blueprint_library().filter("vehicle.*")
     safe_blueprints = []
 
@@ -104,6 +108,7 @@ def get_safe_vehicle_blueprints(world: carla.World) -> List[carla.ActorBlueprint
 
 
 def apply_world_settings(world: carla.World, no_rendering: bool) -> None:
+    """Enable fixed-step synchronous simulation with the requested rendering mode."""
     settings = world.get_settings()
     settings.synchronous_mode = True
     settings.fixed_delta_seconds = FIXED_DELTA_SECONDS
@@ -112,10 +117,12 @@ def apply_world_settings(world: carla.World, no_rendering: bool) -> None:
 
 
 def short_map_name(map_name: str) -> str:
+    """Extract a lowercase map name from CARLA's full map path."""
     return map_name.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
 
 def validate_active_map(world: carla.World, expected_town: Optional[str]) -> None:
+    """Confirm the expected map is already loaded without reloading it."""
     current_map_name = world.get_map().name
     print("Mapa activo:", current_map_name)
 
@@ -132,6 +139,7 @@ def validate_active_map(world: carla.World, expected_town: Optional[str]) -> Non
 
 
 def destroy_existing_vehicles(world: carla.World) -> None:
+    """Remove existing vehicle actors from the CARLA world."""
     existing_vehicles = world.get_actors().filter("vehicle.*")
     if existing_vehicles:
         print(f"Eliminando vehículos anteriores: {len(existing_vehicles)}")
@@ -143,6 +151,7 @@ def destroy_existing_vehicles(world: carla.World) -> None:
 def configure_vehicle(
     vehicle: carla.Vehicle, traffic_manager: carla.TrafficManager
 ) -> None:
+    """Enable Traffic Manager control and apply the demonstration's following and traffic-rule settings."""
     vehicle.set_autopilot(True, traffic_manager.get_port())
     traffic_manager.auto_lane_change(vehicle, False)
     traffic_manager.distance_to_leading_vehicle(vehicle, 5.0)
@@ -160,6 +169,7 @@ def spawn_vehicles(
     requested_amount: int,
     vehicles: List[carla.Vehicle],
 ) -> None:
+    """Create vehicles at available spawn points and configure their Traffic Manager control."""
     spawn_points = list(world.get_map().get_spawn_points())
     safe_blueprints = get_safe_vehicle_blueprints(world)
 
@@ -196,6 +206,7 @@ def spawn_vehicles(
 
 
 def print_metrics(vehicles: List[carla.Vehicle], elapsed_seconds: float) -> None:
+    """Print the current average speed and number of stopped vehicles."""
     speeds = [speed_kmh(vehicle) for vehicle in vehicles if vehicle.is_alive]
     average_speed = sum(speeds) / len(speeds) if speeds else 0.0
     stopped_vehicles = sum(speed < STOPPED_SPEED_KMH for speed in speeds)
@@ -211,6 +222,7 @@ def print_metrics(vehicles: List[carla.Vehicle], elapsed_seconds: float) -> None
 def destroy_created_vehicles(
     world: carla.World, vehicles: List[carla.Vehicle]
 ) -> None:
+    """Destroy the demonstration's surviving vehicles and finish their cleanup."""
     print(f"Eliminando vehículos creados: {len(vehicles)}")
     for vehicle in vehicles:
         if vehicle is not None and vehicle.is_alive:
@@ -221,6 +233,7 @@ def destroy_created_vehicles(
 
 
 def run_simulation(args: argparse.Namespace) -> None:
+    """Run the Traffic Manager demonstration with synchronous updates and restore settings during cleanup."""
     random.seed(SEED)
 
     client = carla.Client(DEFAULT_HOST, DEFAULT_PORT)
@@ -303,6 +316,7 @@ def run_simulation(args: argparse.Namespace) -> None:
 
 
 def main() -> int:
+    """Read demonstration options, start the simulation, and report interruptions or runtime errors."""
     args = parse_args()
 
     try:

@@ -17,10 +17,13 @@ sys.path.insert(0,str(ROOT))
 from src.analysis.traffic_flow_analysis import split_space_time_interval,edie_metrics
 
 
-def json_read(p):return json.loads(p.read_text(encoding='utf8'))
+def json_read(p):
+    """Read a JSON file into Python data."""
+    return json.loads(p.read_text(encoding='utf8'))
 
 
 def file_sha256(path):
+    """Calculate a file's SHA-256 fingerprint by reading it in blocks."""
     digest=hashlib.sha256()
     with path.open('rb') as stream:
         for chunk in iter(lambda:stream.read(1024*1024),b''):digest.update(chunk)
@@ -28,12 +31,14 @@ def file_sha256(path):
 
 
 def observation_rows(path,chunk_size=100000):
+    """Yield selected observation columns in chunks to limit memory use."""
     fields=['vehicle_id','frame','simulation_time_s','x','y','z','low_speed','phase_before']
     for chunk in pd.read_csv(path,usecols=fields,chunksize=chunk_size):
         yield from chunk[fields].itertuples(index=False,name=None)
 
 
 def eligible_lanes(xodr):
+    """Find straight driving lanes outside junctions that meet the flow-analysis geometry requirements."""
     result={}
     for road in ET.fromstring(xodr).findall('road'):
         length=float(road.get('length'))
@@ -53,6 +58,7 @@ def eligible_lanes(xodr):
 
 
 def main():
+    """Build time-series and lane-flow data from a completed campaign and record their source fingerprints."""
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--campaign',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)

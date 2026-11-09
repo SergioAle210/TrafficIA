@@ -10,6 +10,7 @@ import pandas as pd
 def comparison_rows(first, second):
     """Match by scenario/fleet/seed, refuse incompatible measurement conditions."""
     def indexed(runs):
+        """Index runs by vehicle count, selector, and seed, rejecting duplicate cases."""
         result = {}
         for r in runs:
             key = (r['vehicle_count'], r['scenario'], r['seed'])
@@ -33,6 +34,7 @@ def comparison_rows(first, second):
         if differences:
             raise ValueError('Noncomparable repeat: %s %s' % (key, differences))
         def metrics(r):
+            """Extract the movement, completion, termination, and event measures used in a comparison."""
             return dict(completed=r['completed'], mean_speed_kmh=r['speed']['mean_kmh'],
                 completed_mean_time_s=r['travel_time']['mean_s'],
                 blocked=r['statuses'].get('blocked', 0), route_failed=r['statuses'].get('route_failed', 0),
@@ -51,6 +53,7 @@ def comparison_rows(first, second):
 
 
 def append_comparison(out, previous, figs, base, review):
+    """Add repetition-comparison tables, charts, and an explanation using previously audited campaign data."""
     read = lambda p: json.loads(p.read_text(encoding='utf8'))
     previous_manifest = read(previous/'figures_manifest.json')
     # Re-audited old raw files, stored with this analysis, not overwriting the old report.

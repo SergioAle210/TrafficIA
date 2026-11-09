@@ -12,6 +12,7 @@ from src.analysis.mobility_analysis import analyze_run, read_csv
 
 
 def audit_stream(run, metrics=None):
+    """Check observation continuity and arrival records while reading the log without loading it all into memory."""
     run = Path(run)
     metrics = metrics if metrics is not None else analyze_run(run)
     config = json.loads((run/'run_config.json').read_text(encoding='utf8'))
@@ -27,6 +28,7 @@ def audit_stream(run, metrics=None):
     counts, errors, states = Counter(), Counter(), {}
     matched = set()
     def check(condition, message):
+        """Count how often an observation integrity condition fails."""
         if not condition:
             errors[message] += 1
     check(len(arrival_rows)==metrics['completed'], 'arrival_completed_count_mismatch')

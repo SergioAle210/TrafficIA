@@ -11,6 +11,7 @@ from src.analysis.mobility_analysis import analyze_run, paired_checks
 
 
 def write_csv(path, rows, fields):
+    """Write the supplied column names and rows to a CSV file."""
     with path.open("w", encoding="utf8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
@@ -18,6 +19,7 @@ def write_csv(path, rows, fields):
 
 
 def main():
+    """Analyze selected runs or a campaign and export metrics, integrity checks, and comparison results."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("runs", nargs="*", type=Path)
     parser.add_argument("--campaign", type=Path, help="Manifest with cases/run_directories; paths relative to data/output")

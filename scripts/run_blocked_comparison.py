@@ -20,12 +20,14 @@ from src.project_paths import project_path
 
 
 def json_rows(path):
+    """Yield one parsed record at a time from a JSON-lines file."""
     with path.open(encoding='utf8') as stream:
         for line in stream:
             yield json.loads(line)
 
 
 def audit_stops(run, metrics):
+    """Cross-check blocked warnings and diagnostic observations against the configured stop policy."""
     warnings = read_csv(run/'blocked_warnings.csv')
     thresholds = list(json_rows(run/'stop_thresholds.jsonl'))
     config = read(run/'run_config.json')['simulation_config']
@@ -63,6 +65,7 @@ def comparison_conditions(config):
 
 
 def write_report(output, plan):
+    """Write a Markdown comparison of stop policies, outcomes, and diagnostic limitations."""
     lines = ['# Comparación diagnóstica de detenciones', '',
         'Estado: **'+plan['status']+'**. Sin cámaras; el espectador en vivo no constituye evidencia visual guardada.', '',
         '| Caso | Completados | blocked | Pendientes al cierre | Avisos | Velocidad (km/h) | Colisiones (callbacks) | Invasiones (callbacks) |',
@@ -96,6 +99,7 @@ def write_report(output, plan):
 
 
 def main(argv=None):
+    """Run the selected stop-policy diagnostic cases and save their audits and comparison report."""
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--technical-only', action='store_true', help='Solo comprobación de 15 s con 100 vehículos.')

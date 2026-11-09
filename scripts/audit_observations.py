@@ -18,11 +18,13 @@ import matplotlib.pyplot as plt
 
 
 def read(path):
+    """Read a CSV file into rows keyed by column name."""
     with path.open(encoding='utf8', newline='') as stream:
         return list(csv.DictReader(stream))
 
 
 def main():
+    """Audit recorded vehicle observations and export stop summaries and trajectory figures."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run', type=Path)
     parser.add_argument('output', type=Path)
@@ -45,6 +47,7 @@ def main():
     for row in observations: by_vehicle[row['vehicle_id']].append(row)
     errors=list(analysis['integrity_errors'])
     def check(condition, message):
+        """Collect a message when an observation check fails."""
         if not condition: errors.append(message)
     check(len(arrivals)==analysis['completed'],'arrival log missing or count differs')
     hashes={group:{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest()==value
@@ -86,6 +89,7 @@ def main():
                 recorded_complete_cycle=covered,visual_coverage=False))
         current=[]
         def finish_stop():
+            """Summarize the current low-speed interval if it lasts at least ten seconds."""
             if not current: return
             duration=float(current[-1]['simulation_time_s'])-float(current[0]['simulation_time_s'])+dt
             if duration<10: return

@@ -24,20 +24,24 @@ from src.project_paths import project_path
 
 
 def stamp():
+    """Return the current UTC time as an ISO-formatted string."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def read(path):
+    """Read project JSON data while resolving supported relocated input paths."""
     return json.loads(project_path(path, ROOT).read_text(encoding='utf8'))
 
 
 def save(path, value):
+    """Write JSON to a temporary file and replace the target after the write succeeds."""
     temp = path.with_suffix(path.suffix+'.tmp')
     temp.write_text(json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False)+'\n', encoding='utf8')
     temp.replace(path)
 
 
 def digest(path):
+    """Calculate a project's input-file fingerprint after resolving its current location."""
     result = hashlib.sha256()
     with project_path(path, ROOT).open('rb') as stream:
         for chunk in iter(lambda: stream.read(1024*1024), b''):
@@ -46,12 +50,14 @@ def digest(path):
 
 
 def check_hashes(expected):
+    """Reject missing or changed experiment inputs by comparing their recorded fingerprints."""
     changed = [name for name, value in expected.items() if not project_path(name, ROOT).is_file() or digest(ROOT/name)!=value]
     if changed:
         raise RuntimeError('Archivos congelados cambiaron: '+str(changed))
 
 
 def preflight(world):
+    """Check that CARLA has a clean asynchronous world and record its initial state."""
     settings, actors = world.get_settings(), world.get_actors()
     weather = world.get_weather()
     state = dict(at_utc=stamp(), map=world.get_map().name,
@@ -68,6 +74,7 @@ def preflight(world):
 
 
 def validate_map(carla_map, manifest):
+    """Check that the map and spawn geometry match the prepared campaign inputs."""
     if hashlib.sha256(carla_map.to_opendrive().encode('utf8')).hexdigest()!=manifest['xodr_sha256']:
         raise RuntimeError('OpenDRIVE distinto de la preparacion de entradas.')
     spawns = carla_map.get_spawn_points()
@@ -84,18 +91,22 @@ def validate_map(carla_map, manifest):
 
 class Tee:
     def __init__(self, *streams):
+        """Store the output streams that should receive the same console text."""
         self.streams = streams
     def write(self, text):
+        """Write and flush the same text to every configured output stream."""
         for stream in self.streams:
             stream.write(text)
             stream.flush()
         return len(text)
     def flush(self):
+        """Flush all configured output streams."""
         for stream in self.streams:
             stream.flush()
 
 
 def parse_args(argv=None):
+    """Read campaign options and validate the requested ascending vehicle counts."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seed', type=int, default=210)
     parser.add_argument('--seconds', type=float, default=1800)
@@ -114,6 +125,7 @@ def parse_args(argv=None):
 
 
 def run_campaign(args):
+    """Validate inputs, run the requested cases, and save campaign progress, audits, and metrics."""
     import carla
     manifest = read(ROOT/CONFIG_DIR/'preparation_manifest.json')
     check_hashes(manifest['input_sha256'])

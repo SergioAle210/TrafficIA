@@ -21,6 +21,7 @@ HISTORY_PATH = Path('data/input/Town01/demand_20_100/vehicle_history_100.csv')
 
 
 def prepare(carla_map, weather, root=ROOT):
+    """Prepare comparable 20- and 100-vehicle inputs while preserving shared spawn points, histories, and weather."""
     if carla_map.name.replace('\\', '/').split('/')[-1] != 'Town01':
         raise ValueError('Se requiere Town01; no se cambia el mapa.')
     base_path = project_path('config/pilots/town01_20.json', root)
@@ -85,6 +86,7 @@ def prepare(carla_map, weather, root=ROOT):
 
 
 def main():
+    """Connect to the active map and prepare demand inputs using weather from a previous run."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--weather-from', type=Path, required=True, help='Previous run_config.json whose weather is preserved.')
     args = parser.parse_args()

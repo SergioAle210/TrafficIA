@@ -14,6 +14,7 @@ from src.simulation.trip_runner import resolve_destination_location
 
 
 def main():
+    """Validate routes between catalog destinations and optional campaign starts, then save a report."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--campaign-manifest", type=Path)
@@ -35,6 +36,7 @@ def main():
     checks = []
 
     def check(origin_id, origin, destination_id, context):
+        """Try planning one origin-to-destination route and record its validity or failure."""
         result = dict(origin=origin_id, destination=destination_id, context=context)
         try:
             destination = goals[destination_id]
