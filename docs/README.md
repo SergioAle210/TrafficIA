@@ -2,6 +2,7 @@
 
 | Tema | Documento |
 |---|---|
+| Configuraciones y datos antes de grabar | [explanation.md](explanation.md) |
 | Organización y compatibilidad de rutas | [repository-layout.md](repository-layout.md) |
 | Contexto y alcance académico | [project-graduation-context.md](project-graduation-context.md) |
 | Lugares de Town01 | [rutas.md](rutas.md) |
