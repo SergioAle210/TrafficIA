@@ -105,6 +105,21 @@ class Tee:
             stream.flush()
 
 
+def wait_for_case_start(number, total, case):
+    """Wait for Enter before creating a case's vehicles or starting its timer."""
+    selector = {'random_baseline': 'aleatorio uniforme', 'history_80_20': 'historico 80/20'}[case['scenario']]
+    prompt = '\n[%d/%d] Preparado: %d vehiculos - %s. Pulsa Enter para iniciar (Ctrl+C para cancelar): ' % (
+        number, total, case['vehicle_count'], selector)
+    while True:
+        try:
+            answer = input(prompt)
+        except EOFError as error:
+            raise RuntimeError('Se cerro la entrada de la terminal antes de confirmar el siguiente caso.') from error
+        if not answer.strip():
+            return
+        print('Pulsa Enter sin escribir texto para iniciar.', flush=True)
+
+
 def parse_args(argv=None):
     """Read campaign options and validate the requested ascending vehicle counts."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -115,6 +130,8 @@ def parse_args(argv=None):
     parser.add_argument('--output', type=Path, help='New directory within data/output; never overwrite.')
     parser.add_argument('--purpose', choices=('exploratory_demand','technical_check'), default='exploratory_demand')
     parser.add_argument('--check-only', action='store_true', help='Validate inputs and server; create no actors and do not change weather.')
+    parser.add_argument('--manual-start', action='store_true',
+                        help='Espera Enter antes de cada caso, incluido el primero; requiere una terminal interactiva.')
     parser.add_argument('--carla-pythonapi', type=Path, default=Path(r'C:\CARLA\WindowsNoEditor\PythonAPI\carla'))
     args = parser.parse_args(argv)
     if not math.isfinite(args.seconds) or args.seconds<=0:
@@ -126,6 +143,8 @@ def parse_args(argv=None):
 
 def run_campaign(args):
     """Validate inputs, run the requested cases, and save campaign progress, audits, and metrics."""
+    if args.manual_start and not args.check_only and (sys.stdin is None or not sys.stdin.isatty()):
+        raise ValueError('--manual-start requiere una terminal interactiva con entrada de teclado.')
     import carla
     manifest = read(ROOT/CONFIG_DIR/'preparation_manifest.json')
     check_hashes(manifest['input_sha256'])
@@ -142,7 +161,8 @@ def run_campaign(args):
     if args.check_only:
         print(json.dumps(dict(status='ready', server='0.9.15', preflight=initial,
                              counts=args.counts, seed=args.seed, seconds=args.seconds,
-                             simulation_speed=args.simulation_speed, actors_created=0),indent=2))
+                             simulation_speed=args.simulation_speed, manual_start=args.manual_start,
+                             actors_created=0),indent=2))
         return 0
     name = 'demand20_100_seed_%d_%s'%(args.seed,datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     output = (args.output or ROOT/'data/output'/name).resolve()
@@ -167,6 +187,7 @@ def run_campaign(args):
              for n in args.counts for s in ('random_baseline','history_80_20')]
     plan = dict(status='prepared',created_at_utc=stamp(),purpose=args.purpose,counts=args.counts,
                 seed=args.seed,duration_s=args.seconds,simulation_speed=args.simulation_speed,
+                manual_start=args.manual_start,
                 cameras=False,bootstrap_seed=42,history_initial_visits=30,cases=cases,
                 weather=read(ROOT/CONFIG_DIR/'weather.json'),initial_world=initial,
                 invocation=sys.argv,server_version=client.get_server_version())
@@ -182,6 +203,11 @@ def run_campaign(args):
         expected_weather = preflight(world)['weather']
         plan.update(status='running',started_at_utc=stamp())
         for number,case in enumerate(cases,1):
+            if args.manual_start:
+                case['manual_start_requested_at_utc'] = stamp()
+                save(output/'campaign.json',plan)
+                wait_for_case_start(number,len(cases),case)
+                case['manual_start_confirmed_at_utc'] = stamp()
             check_hashes(frozen)
             state = preflight(world)
             if state['weather']!=expected_weather:

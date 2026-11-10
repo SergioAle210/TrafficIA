@@ -1,18 +1,176 @@
 """Prepared demand inputs and bounded-memory audit failure detection."""
 import csv
+import contextlib
+import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace as NS
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+from scripts import run_demand_campaign as campaign
 from scripts.audit_observation_stream import audit_stream
 from scripts.run_demand_campaign import check_hashes, preflight, read
 from src.demand.destinations import load_destinations
 from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class ManualCampaignTests(unittest.TestCase):
+    @contextlib.contextmanager
+    def campaign_fixture(self, manual=True, interactive=True, check_only=False):
+        """Exercise the real campaign loop with a fake server and two-second runs."""
+        with tempfile.TemporaryDirectory() as folder, contextlib.ExitStack() as stack:
+            root = Path(folder)
+            output = root/'data/output/campaign'
+            flags = ['--output', str(output), '--seconds', '180']
+            if manual:
+                flags.append('--manual-start')
+            if check_only:
+                flags.append('--check-only')
+            args = campaign.parse_args(flags)
+            world = Mock()
+            world.get_map.return_value.name = 'Town01'
+            world.get_settings.return_value = NS(synchronous_mode=False, fixed_delta_seconds=None, no_rendering_mode=False)
+            world.get_actors.return_value.filter.return_value = []
+            world.get_weather.return_value = NS(cloudiness=10.)
+            world.set_weather.side_effect = lambda weather: setattr(world.get_weather, 'return_value', weather)
+            client = Mock()
+            client.get_world.return_value = world
+            client.get_server_version.return_value = client.get_client_version.return_value = '0.9.15'
+            carla = NS(Client=Mock(return_value=client), WeatherParameters=lambda: NS(cloudiness=0.))
+            clock = [0.]
+            created = []
+
+            def make_simulation(config, *unused, **kwargs):
+                run_id = 'run_%d' % (len(created)+1)
+                created.append(run_id)
+                run_path = root/'data/output'/run_id
+
+                def run():
+                    run_path.mkdir()
+                    clock[0] += 2.
+                    return run_path
+
+                return NS(run_id=run_id, run=run)
+
+            stack.enter_context(patch.dict('sys.modules', {'carla': carla}))
+            stack.enter_context(patch.object(campaign, 'ROOT', root))
+            stack.enter_context(patch.object(campaign.sys, 'stdin', NS(isatty=lambda: interactive)))
+            stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            stack.enter_context(patch.object(campaign, 'read', side_effect=lambda path:
+                {'input_sha256': {}} if path.name == 'preparation_manifest.json' else {'cloudiness': 60.}))
+            stack.enter_context(patch.object(campaign, 'check_hashes'))
+            stack.enter_context(patch.object(campaign, 'validate_map'))
+            stack.enter_context(patch.object(campaign, 'digest', return_value='test_hash'))
+            stack.enter_context(patch.object(campaign.shutil, 'copyfile'))
+            stack.enter_context(patch.object(campaign.TripSimulationConfig, 'from_json',
+                                            side_effect=lambda *a, **k: NS(output_root='data/output')))
+            stack.enter_context(patch.object(campaign, 'VisualReviewSimulation', side_effect=make_simulation))
+            stack.enter_context(patch.object(campaign.time, 'monotonic', side_effect=lambda: clock[0]))
+            stack.enter_context(patch.object(campaign, 'analyze_run', return_value={
+                'statuses': {'completed': 1}, 'completed': 1, 'simulation_duration_s': 180.,
+                'events': {k: {'observed_callbacks': 0} for k in ('collision', 'lane_invasion')}}))
+            stack.enter_context(patch.object(campaign, 'audit_stream', return_value={
+                'integrity_errors': [], 'observations': 3600}))
+            stack.enter_context(patch.object(campaign.subprocess, 'run', return_value=NS(returncode=0)))
+            keyboard = stack.enter_context(patch('builtins.input', return_value=''))
+            yield NS(args=args, output=output, world=world, carla=carla,
+                     clock=clock, created=created, keyboard=keyboard)
+
+    def test_manual_start_waits_before_all_cases_and_excludes_wait_from_run_time(self):
+        with self.campaign_fixture() as session:
+            prompts = []
+
+            def confirm(prompt):
+                plan = json.loads((session.output/'campaign.json').read_text())
+                index = len(prompts)
+                self.assertEqual(len(session.created), index)
+                self.assertEqual([c['status'] for c in plan['cases']],
+                                 ['completed']*index + ['pending']*(4-index))
+                self.assertNotIn('started_at_utc', plan['cases'][index])
+                prompts.append(prompt)
+                session.clock[0] += 600.
+                return ''
+
+            session.keyboard.side_effect = confirm
+            self.assertEqual(campaign.run_campaign(session.args), 0)
+            plan = json.loads((session.output/'campaign.json').read_text())
+            self.assertTrue(plan['manual_start'])
+            self.assertEqual(plan['status'], 'completed')
+            self.assertEqual(len(prompts), 4)
+            for i, case in enumerate(plan['cases'], 1):
+                self.assertIn('[%d/4]' % i, prompts[i-1])
+                self.assertIn('manual_start_confirmed_at_utc', case)
+                self.assertEqual(case['wall_seconds_process'], 2.)
+                self.assertEqual(case['achieved_process_ratio'], 90.)
+                label = 'n%03d_%s' % (case['vehicle_count'], case['scenario'])
+                self.assertTrue((session.output/(label+'_audit.json')).is_file())
+                self.assertTrue((session.output/(label+'_output_sha256.json')).is_file())
+            self.assertEqual(session.world.get_weather().cloudiness, 10.)
+
+    def test_default_automatic_mode_does_not_read_keyboard(self):
+        with self.campaign_fixture(manual=False, interactive=False) as session:
+            self.assertEqual(campaign.run_campaign(session.args), 0)
+            session.keyboard.assert_not_called()
+            self.assertEqual(len(session.created), 4)
+            plan = json.loads((session.output/'campaign.json').read_text())
+            self.assertFalse(plan['manual_start'])
+
+    def test_manual_start_requires_terminal_before_connecting_or_creating_output(self):
+        with self.campaign_fixture(interactive=False) as session:
+            with self.assertRaisesRegex(ValueError, 'terminal interactiva'):
+                campaign.run_campaign(session.args)
+            session.carla.Client.assert_not_called()
+            self.assertFalse(session.output.exists())
+
+    def test_check_only_with_manual_flag_never_waits_or_changes_weather(self):
+        with self.campaign_fixture(interactive=False, check_only=True) as session:
+            self.assertEqual(campaign.run_campaign(session.args), 0)
+            session.keyboard.assert_not_called()
+            session.world.set_weather.assert_not_called()
+            self.assertFalse(session.output.exists())
+
+    def test_cancel_between_cases_preserves_completed_case_and_restores_weather(self):
+        with self.campaign_fixture() as session:
+            session.keyboard.side_effect = ['', KeyboardInterrupt]
+            self.assertEqual(campaign.run_campaign(session.args), 130)
+            plan = json.loads((session.output/'campaign.json').read_text())
+            self.assertEqual(plan['status'], 'incomplete')
+            self.assertEqual([c['status'] for c in plan['cases']], ['completed'] + ['pending']*3)
+            self.assertEqual(len(session.created), 1)
+            self.assertNotIn('manual_start_confirmed_at_utc', plan['cases'][1])
+            self.assertEqual(session.world.get_weather().cloudiness, 10.)
+
+    def test_closed_input_does_not_launch_a_case(self):
+        with self.campaign_fixture() as session:
+            session.keyboard.side_effect = EOFError
+            self.assertEqual(campaign.run_campaign(session.args), 1)
+            plan = json.loads((session.output/'campaign.json').read_text())
+            self.assertEqual(plan['status'], 'incomplete')
+            self.assertIn('entrada de la terminal', plan['error'])
+            self.assertEqual(session.created, [])
+            self.assertEqual(session.world.get_weather().cloudiness, 10.)
+
+    def test_weather_is_checked_again_after_manual_confirmation(self):
+        with self.campaign_fixture() as session:
+            def change_weather(prompt):
+                session.world.get_weather.return_value = NS(cloudiness=99.)
+                return ''
+            session.keyboard.side_effect = change_weather
+            self.assertEqual(campaign.run_campaign(session.args), 1)
+            plan = json.loads((session.output/'campaign.json').read_text())
+            self.assertIn('clima cambio', plan['error'])
+            self.assertEqual(session.created, [])
+            self.assertEqual(session.world.get_weather().cloudiness, 10.)
+
+    def test_only_an_empty_answer_confirms_the_case(self):
+        with patch('builtins.input', side_effect=['todavia no', '']) as keyboard, \
+                contextlib.redirect_stdout(io.StringIO()):
+            campaign.wait_for_case_start(1, 4, {'vehicle_count': 20, 'scenario': 'random_baseline'})
+            self.assertEqual(keyboard.call_count, 2)
 
 
 class DemandCampaignTests(unittest.TestCase):
