@@ -13,10 +13,10 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from scripts.audit_observation_stream import audit_stream
-from scripts.prepare_demand_campaign import CONFIG_DIR
+from scripts.diagnostics.observation_stream import audit_stream
+from scripts.preparation.prepare_demand import CONFIG_DIR
 from src.analysis.mobility_analysis import analyze_run
 from src.simulation.trip_runner import TripSimulationConfig
 from src.recording.visual_review import VisualReviewSimulation
@@ -174,8 +174,8 @@ def run_campaign(args):
         raise ValueError('Se requiere un subdirectorio nuevo.')
     output.mkdir(parents=True,exist_ok=False)
     sources = list(ROOT.glob('src/**/*.py'))+[ROOT/'scripts'/n for n in (
-        'run_demand_campaign.py','prepare_demand_campaign.py','prepare_pilots.py','review_trip_simulation.py',
-        'run_trip_simulation.py','audit_observation_stream.py','analyze_mobility.py')]
+        'campaigns/run_demand.py','preparation/prepare_demand.py','preparation/prepare_pilots.py','simulation/observe_trips.py',
+        'simulation/run_trips.py','diagnostics/observation_stream.py','analysis/analyze_mobility.py')]
     sources += [project_path(n, ROOT) for n in manifest['input_sha256']]+[ROOT/CONFIG_DIR/'preparation_manifest.json']
     frozen = {p.relative_to(ROOT).as_posix():digest(p) for p in sources}
     for relative in frozen:
@@ -248,7 +248,7 @@ def run_campaign(args):
             print('[%d/%d] END %s %s; collisions=%s invasions=%s'%(number,len(cases),label,case['statuses'],case['collisions'],case['invasions']),flush=True)
         plan.update(status='completed',ended_at_utc=stamp())
         save(output/'campaign.json',plan)
-        command=[sys.executable,'scripts/analyze_mobility.py','--campaign',str(output/'campaign.json'),'--output',str(output/'metrics')]
+        command=[sys.executable,'scripts/analysis/analyze_mobility.py','--campaign',str(output/'campaign.json'),'--output',str(output/'metrics')]
         with (output/'analysis_console.txt').open('w',encoding='utf8') as log:
             result=subprocess.run(command,cwd=str(ROOT),stdout=log,stderr=subprocess.STDOUT)
         if result.returncode:

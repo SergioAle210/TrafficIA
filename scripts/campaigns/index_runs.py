@@ -1,4 +1,4 @@
-"""Label existing demonstration runs without changing their configuration or logs."""
+"""Build a local index of the run directories recorded in a demand campaign."""
 
 import argparse
 import csv
@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ALIASES = {
     (20, "random_baseline"): "20_uniforme",
     (20, "history_80_20"): "20_historico_80_20",
@@ -57,7 +57,7 @@ def build_rows(campaign_path, data_root=None):
 
 
 def render_html(rows):
-    """Build an HTML index linking each demonstration case to its available records."""
+    """Build an HTML index linking each campaign case to its available records."""
     entries = []
     for row in rows:
         run_path = Path(row["carpeta"]) if row["carpeta"] else None
@@ -79,14 +79,14 @@ def render_html(rows):
         )
     return '''<!doctype html>
 <html lang="es"><meta charset="utf-8">
-<title>Demostración de TrafficIA</title>
+<title>Corridas de la campaña · TrafficIA</title>
 <style>
 body {font: 18px Arial, sans-serif; color: #1f4a76; max-width: 1100px; margin: 40px auto; padding: 0 20px;}
 h1, a {color: #0277ab;} table {border-collapse: collapse; width: 100%;}
 th, td {padding: 16px; border-bottom: 1px solid #d7e2e9; text-align: left; vertical-align: top;}
 th {background: #eaf7ff;} td a {line-height: 1.7;} p {line-height: 1.5;}
 </style>
-<h1>Demostración de TrafficIA</h1>
+<h1>Corridas de la campaña de TrafficIA</h1>
 <p>El índice identifica las salidas según <code>campaign.json</code>.
 Los archivos originales conservan sus nombres y contenido.</p>
 <table><thead><tr><th>Caso</th><th>Estado</th><th>Llegadas registradas</th><th>Registros</th></tr></thead>
@@ -113,9 +113,9 @@ def write_index(campaign_path, data_root=None):
 
 
 def main(argv=None):
-    """Read the campaign path and create its demonstration indexes, reporting errors clearly."""
+    """Create a CSV and an HTML index next to the campaign manifest."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--campaign", type=Path, required=True, help="campaign.json de la demostración.")
+    parser.add_argument("--campaign", type=Path, required=True, help="Ruta al campaign.json que identifica las corridas.")
     args = parser.parse_args(argv)
     try:
         for path in write_index(args.campaign):

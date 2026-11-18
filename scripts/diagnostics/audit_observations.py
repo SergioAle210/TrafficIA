@@ -8,9 +8,10 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from src.analysis.mobility_analysis import analyze_run
+from src.project_paths import project_path
 os.environ.setdefault('MPLCONFIGDIR', str(ROOT/'data/output/.matplotlib'))
 import matplotlib
 matplotlib.use('Agg')
@@ -23,16 +24,33 @@ def read(path):
         return list(csv.DictReader(stream))
 
 
+def matches_recorded_hash(name, expected, source_root):
+    """Compare a recorded path against the selected checkout or campaign snapshot."""
+    path = Path(name)
+    if path.is_absolute() and source_root != ROOT:
+        try:
+            path = path.relative_to(ROOT)
+        except ValueError:
+            return False
+    path = project_path(path, source_root)
+    return path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == expected
+
+
 def main():
     """Audit recorded vehicle observations and export stop summaries and trajectory figures."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--source-root', type=Path,
+                        help='Verify recorded hashes against the campaign source_snapshot directory.')
     parser.add_argument('--minimum-cycles', type=int, default=0,
                         help='Optional coverage requirement; absent arrivals alone are not corrupt logs.')
     parser.add_argument('--xodr', type=Path,
                         default=Path(r'C:\CARLA\WindowsNoEditor\CarlaUE4\Content\Carla\Maps\OpenDrive\Town01.xodr'))
     args=parser.parse_args(); run,out=args.run,args.output
+    source_root = args.source_root.resolve() if args.source_root else ROOT
+    if not source_root.is_dir():
+        parser.error('Source directory does not exist: ' + str(source_root))
     out.mkdir(parents=True, exist_ok=False)
     analysis=analyze_run(run)
     config=json.loads((run/'run_config.json').read_text(encoding='utf8'))
@@ -50,11 +68,14 @@ def main():
         """Collect a message when an observation check fails."""
         if not condition: errors.append(message)
     check(len(arrivals)==analysis['completed'],'arrival log missing or count differs')
-    hashes={group:{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest()==value
+    hashes={group:{name:matches_recorded_hash(name, value, source_root)
                    for name,value in meta[group].items()} for group in ('source_sha256','input_sha256')}
     warnings=[]
     if not all(all(group.values()) for group in hashes.values()):
-        warnings.append('Current source/input differs from recorded hashes; use the run snapshot for reproduction.')
+        if args.source_root:
+            errors.append('Snapshot files are missing or differ from the recorded hashes.')
+        else:
+            warnings.append('Current files are missing or differ from the recorded hashes. Verify the run with --source-root.')
     check(capture['simulation_completed'], 'capture not finalized as complete')
     expected=round(analysis['simulation_duration_s']/dt)
     stops=[]; vehicles=[]; cycles=[]
@@ -128,7 +149,7 @@ def main():
         check(valid,'arrival lane projection mismatch: '+a['vehicle_id']+'/'+a['trip_id'])
         lanes.append(dict(vehicle_id=a['vehicle_id'],trip_id=a['trip_id'],projected_lane_matches_log=valid))
     audit=dict(run=run.name,integrity_errors=errors,warnings=warnings,hashes_unchanged=hashes,vehicles=vehicles,
-        minimum_cycles_required=args.minimum_cycles,
+        minimum_cycles_required=args.minimum_cycles, source_root=str(source_root),
         arrival_lane_checks=lanes,xodr_sha256=hashlib.sha256(xodr.read_bytes()).hexdigest(),
         cycles=cycles,stops_10s_or_longer=stops,capture=capture,
         limitations=['This auditor reviews observations, not camera content; no visual validation claim.',

@@ -1,3 +1,6 @@
+"""Spawn up to 50 autopilot vehicles for 120 seconds on the active map."""
+
+import argparse
 import random
 import time
 import carla
@@ -10,6 +13,7 @@ SEED = 42
 
 def main():
     """Run a small vehicle-spawning demonstration and remove its vehicles when it finishes."""
+    argparse.ArgumentParser(description=__doc__).parse_args()
     random.seed(SEED)
 
     client = carla.Client("localhost", 2000)

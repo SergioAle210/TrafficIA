@@ -3,9 +3,9 @@ import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from scripts.run_trip_simulation import configuration_from_args, parse_args
+from scripts.simulation.run_trips import configuration_from_args, parse_args
 from src.recording.visual_review import VisualReviewSimulation
 
 

@@ -1,11 +1,12 @@
 """Prepare nested Town01 pilot fleets and bootstrap histories without spawning actors."""
+import argparse
 import hashlib
 import json
 import math
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from src.demand.destinations import load_destinations
 from src.simulation.trip_runner import TripSimulationConfig
@@ -81,10 +82,11 @@ def prepare(carla_map, root=ROOT):
         xodr_sha256=hashlib.sha256(carla_map.to_opendrive().encode('utf8')).hexdigest(),
         ordered_spawns=[details[i] for i in chosen], fleets=[])
     for count in COUNTS:
-        config_name = 'config/pilots/town01_%02d.json' % count
-        history_name = 'data/input/Town01/pilots/vehicle_history_%02d.csv' % count
+        config_path = project_path('config/pilots/town01_%02d.json' % count, root)
+        history_path = project_path('data/input/Town01/pilots/vehicle_history_%02d.csv' % count, root)
+        config_name = config_path.relative_to(root.resolve()).as_posix()
+        history_name = history_path.relative_to(root.resolve()).as_posix()
         selected_events = [e for e in events if e.vehicle_id in ids[:count]]
-        history_path = project_path(history_name, root)
         if history_path.exists():
             existing = [e for v in ids[:count] for e in VehicleHistory.from_csv(history_path,v,allowed).events]
             if existing != selected_events:
@@ -93,7 +95,6 @@ def prepare(carla_map, root=ROOT):
             write_history_csv(history_path, selected_events)
         config = dict(base, vehicle_count=count, initial_spawn_point_indices=chosen[:count],
                       vehicle_history_config=history_name)
-        config_path = project_path(config_name, root)
         write_new_or_identical(config_path, json.dumps(config,indent=2)+'\n', root)
         TripSimulationConfig.from_json(config_path)
         minimum = min(math.hypot(points[i][0]-points[j][0],points[i][1]-points[j][1])
@@ -109,6 +110,7 @@ def prepare(carla_map, root=ROOT):
 
 
 if __name__ == '__main__':
+    argparse.ArgumentParser(description=__doc__).parse_args()
     import carla
     client = carla.Client('localhost',2000)
     client.set_timeout(10)

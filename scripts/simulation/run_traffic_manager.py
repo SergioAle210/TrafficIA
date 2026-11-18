@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Mapa esperado. Solo valida el mapa activo; no carga ni recarga mapas. "
-            "Usa change_map.py para cambiarlo."
+            "Usa scripts/maps/load_map.py para cambiarlo."
         ),
     )
     parser.add_argument(
@@ -132,7 +132,7 @@ def validate_active_map(world: carla.World, expected_town: Optional[str]) -> Non
     if short_map_name(current_map_name) != short_map_name(expected_town):
         raise ActiveMapMismatchError(
             f"El mapa activo es {current_map_name}, pero se esperaba {expected_town}. "
-            f"Ejecuta primero: python .\\scripts\\change_map.py --town {expected_town}"
+            f"Ejecuta primero: python .\\scripts\\maps\\load_map.py --town {expected_town}"
         )
 
     print(f"Mapa esperado confirmado: {expected_town}. No se recargará.")

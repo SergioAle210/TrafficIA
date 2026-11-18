@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from src.demand.destinations import load_destinations
 from src.navigation.route_planner import (configure_carla_agents, build_global_route_planner, plan_route,

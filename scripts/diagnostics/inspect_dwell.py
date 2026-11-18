@@ -1,6 +1,6 @@
 """Observe Town01/T01_067 arrivals without changing TripSimulation controls.
 
-Accepts the same CLI as run_trip_simulation.py; pass the multi-vehicle config.
+Accepts the same CLI as scripts/simulation/run_trips.py; pass the multi-vehicle config.
 Adds a per-frame dwell log within 25 m of T01_067, including completed trips.
 """
 
@@ -11,11 +11,11 @@ import math
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.run_trip_simulation import configuration_from_args, parse_args
+from scripts.simulation.run_trips import configuration_from_args, parse_args
 from src.navigation.navigation_diagnostics import RouteTrace, wrap_degrees
 from src.simulation.trip_runner import TripSimulation, resolve_destination_location, speed_mps
 
@@ -106,7 +106,7 @@ class DwellDiagnosticSimulation(TripSimulation):
             sensor_corners="stock 0.9.15 MakeBounds XY, in FR/RR/FL/RL order; compare separately with physical vertices",
             source_sha256={name: hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in
                            ["src/simulation/trip_runner.py", "src/navigation/route_planner.py", "src/navigation/carla_agent.py", "src/navigation/arrival.py",
-                            "src/navigation/navigation_diagnostics.py", "scripts/diagnose_destination_dwell.py"]},
+                            "src/navigation/navigation_diagnostics.py", "scripts/diagnostics/inspect_dwell.py"]},
         )
         (output_directory / "dwell_diagnostic_config.json").write_text(json.dumps(metadata, indent=2), encoding="utf8")
         self._dwell_file = (output_directory / "dwell_log.csv").open("w", newline="", encoding="utf8")

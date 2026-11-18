@@ -6,18 +6,15 @@ import math
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from scripts.prepare_pilots import nested_spawns, write_new_or_identical
+from scripts.preparation.prepare_pilots import nested_spawns, write_new_or_identical
 from src.demand.destinations import load_destinations
 from src.simulation.trip_runner import TripSimulationConfig
 from src.demand.vehicle_history import VehicleHistory, generate_dummy_events, write_history_csv
 from src.project_paths import project_path
 
 CONFIG_DIR = Path('config/experiments/demand_20_100')
-# Keep original serialized paths so the prepared inputs/manifests stay identical.
-MANIFEST_CONFIG_DIR = Path('config/demand_20_100')
-HISTORY_PATH = Path('data/input/Town01/demand_20_100/vehicle_history_100.csv')
 
 
 def prepare(carla_map, weather, root=ROOT):
@@ -54,7 +51,8 @@ def prepare(carla_map, weather, root=ROOT):
         previous = VehicleHistory.from_csv(project_path(base['vehicle_history_config'], root), vehicle, allowed)
         if previous.events != [event for event in events if event.vehicle_id == vehicle]:
             raise ValueError('El historial de los primeros veinte no coincide: '+vehicle)
-    history_path = project_path(HISTORY_PATH, root)
+    history_path = project_path('data/input/Town01/demand_20_100/vehicle_history_100.csv', root)
+    history_name = history_path.relative_to(root.resolve()).as_posix()
     if history_path.exists():
         previous = [e for vehicle in ids for e in VehicleHistory.from_csv(history_path, vehicle, allowed).events]
         if previous != events:
@@ -64,24 +62,25 @@ def prepare(carla_map, weather, root=ROOT):
         write_history_csv(history_path, events)
     configs = []
     for count in (20, 100):
-        name = MANIFEST_CONFIG_DIR/('town01_%03d.json' % count)
-        history = base['vehicle_history_config'] if count == 20 else HISTORY_PATH.as_posix()
+        config_path = project_path('config/demand_20_100/town01_%03d.json' % count, root)
+        history = base['vehicle_history_config'] if count == 20 else history_name
         config = dict(base, seed=210, duration_seconds=1800., vehicle_count=count,
                       initial_spawn_point_indices=chosen[:count], vehicle_history_config=history)
-        config_path = project_path(name, root)
         write_new_or_identical(config_path, json.dumps(config, indent=2)+'\n', root)
         TripSimulationConfig.from_json(config_path)
-        configs.append(name.as_posix())
-    write_new_or_identical(root/CONFIG_DIR/'weather.json', json.dumps(weather, indent=2, sort_keys=True)+'\n', root)
+        configs.append(config_path.relative_to(root.resolve()).as_posix())
+    weather_path = project_path('config/demand_20_100/weather.json', root)
+    write_new_or_identical(weather_path, json.dumps(weather, indent=2, sort_keys=True)+'\n', root)
     manifest = dict(map=carla_map.name, configurations=configs, counts=[20,100],
                     xodr_sha256=hashlib.sha256(carla_map.to_opendrive().encode('utf8')).hexdigest(),
                     min_center_distance_m=minimum, ordered_spawns=[details[i] for i in chosen],
                     bootstrap_seed=42, run_seed_default=210, initial_visits_per_vehicle=30,
                     history_rows_100=len(events), prefix_20_preserved=True,
                     selection='Preserve first 20; extend over all unique driving/nonjunction map spawns by deterministic max-min XY distance. Geometric screening, not capacity or spawn-success proof.')
-    names = configs+[HISTORY_PATH.as_posix(), base['vehicle_history_config'], base['destinations_config'], (MANIFEST_CONFIG_DIR/'weather.json').as_posix()]
+    names = configs+[history_name, base['vehicle_history_config'], base['destinations_config'],
+                     weather_path.relative_to(root.resolve()).as_posix()]
     manifest['input_sha256'] = {n:hashlib.sha256(project_path(n, root).read_bytes()).hexdigest() for n in names}
-    write_new_or_identical(root/CONFIG_DIR/'preparation_manifest.json', json.dumps(manifest, indent=2)+'\n', root)
+    write_new_or_identical(root/'config/demand_20_100/preparation_manifest.json', json.dumps(manifest, indent=2)+'\n', root)
     return manifest
 
 

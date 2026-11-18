@@ -9,10 +9,10 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from scripts.run_demand_campaign import preflight, validate_map, check_hashes, digest, save, read, Tee
-from scripts.audit_observation_stream import audit_stream
+from scripts.campaigns.run_demand import preflight, validate_map, check_hashes, digest, save, read, Tee
+from scripts.diagnostics.observation_stream import audit_stream
 from src.analysis.mobility_analysis import analyze_run, read_csv
 from src.simulation.stop_review import StopReviewSimulation
 from src.simulation.trip_runner import TripSimulationConfig
@@ -124,7 +124,7 @@ def main(argv=None):
         return 0
     output = ROOT/'data/output'/('blocked_comparison_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     output.mkdir(exist_ok=False)
-    sources = list(ROOT.glob('src/**/*.py')) + list(ROOT.glob('scripts/*.py'))
+    sources = list(ROOT.glob('src/**/*.py')) + list(ROOT.glob('scripts/**/*.py'))
     sources += [project_path(p, ROOT) for p in manifest['input_sha256']]+[config_dir/'preparation_manifest.json']
     frozen = {p.relative_to(ROOT).as_posix():digest(p) for p in sources}
     for relative in frozen:
