@@ -1,0 +1,7 @@
+# Preserve the working-tree bytes recorded in the input SHA-256 manifest.
+config/trips/*.json text eol=lf
+config/examples/*.json text eol=lf
+data/input/catalogs/**/*.csv text eol=lf
+config/experiments/**/*.json text eol=crlf
+data/input/histories/**/*.csv text eol=crlf
+data/input/examples/**/*.csv text eol=crlf
