@@ -7,7 +7,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from src.analysis.incident_analysis import collision_episodes
 from src.analysis.mobility_analysis import analyze_run, paired_checks

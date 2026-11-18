@@ -10,9 +10,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
-from scripts import plot_mobility_campaign as base
+from scripts.figures import plot_mobility as base
 from src.analysis.traffic_flow_analysis import density_band_guides
 
 plt=base.plt
@@ -34,7 +34,7 @@ def sha(p):
 def proportions(run,population,level,values):
     """Return destination percentages in the requested category order for the selected population."""
     bins={d['value']:d['proportion'] for d in run['destinations'][population][level]}
-    return [100*(bins[v] or 0) for v in values]
+    return [100 * bins[v] if bins[v] is not None else np.nan for v in values]
 
 
 def minute_edges(seconds):
@@ -53,7 +53,7 @@ def main():
     parser.add_argument('--prefix',default='campana_demanda',help='Readable filename prefix for independent figures.')
     args=parser.parse_args();out=args.data
     if args.independent_output:
-        from scripts.export_results_charts import Exporter, load_campaign, export_campaign, export_repetitions
+        from scripts.figures.export_charts import Exporter, load_campaign, export_campaign, export_repetitions
         exporter=Exporter(args.independent_output)
         campaign=load_campaign(args.data)
         export_campaign(campaign,exporter,args.prefix)
@@ -94,7 +94,7 @@ def main():
         fixed_parameters='10 veh/km/lane width and 10 cells are transparent display choices, not estimated critical density or capacity.')
     (out/'guide_method.json').write_text(json.dumps(guide_method,indent=2),encoding='utf8')
     figs=base.Figures(out)
-    context='Town01 · %s vehículos · semilla %d · %.0f min por corrida. Una ejecución por combinación; sin intervalos entre réplicas.'%(' / '.join(map(str,counts)),seed,minutes)
+    context='Town01 · %s vehículos · semilla %d · %g min por corrida. Una ejecución por combinación.'%(' / '.join(map(str,counts)),seed,minutes)
 
     fig,ax=plt.subplots(2,2,figsize=(13,9))
     bars(ax[0,0],[r['travel_time']['mean_s'] for r in runs],'Tiempo medio de viajes completados','Segundos simulados')
@@ -147,13 +147,14 @@ def main():
               'Blocked: baja velocidad continua según el detector vigente; puede repetirse en el mismo vehículo. Ruta rechazada: route_failed.\nAborted tiene motivo simulation_end. Las reasignaciones tras fallos aumentan los intentos; no son vehículos nuevos.')
 
     fig,ax=plt.subplots(2,2,figsize=(13,8.5))
-    max_category=max(max(proportions(r,p,'by_category',base.CATS)) for r in runs for p in ('assigned','reached'))
+    max_category = np.nanmax([proportions(r, p, 'by_category', base.CATS) for r in runs for p in ('assigned', 'reached')])
     for group,count in enumerate(counts):
         for col,(population,title) in enumerate((('assigned','Asignados'),('reached','Alcanzados'))):
             for offset,i in zip((-.19,.19),(group*2,group*2+1)):
                 values=proportions(runs[i],population,'by_category',base.CATS)
                 ax[group,col].bar(np.arange(3)+offset,values,width=.36,color=COLORS[i],label=labels[i])
-                for x,v in zip(np.arange(3)+offset,values):ax[group,col].text(x,v+1,'%.1f'%v,ha='center',fontsize=9)
+                for x,v in zip(np.arange(3)+offset,values):
+                    ax[group,col].text(x, (v if np.isfinite(v) else 0) + 1, base.metric_label(v, '.1f'), ha='center', fontsize=9)
             ax[group,col].set(title='%s · %d vehículos'%(title,count),xticks=range(3),xticklabels=base.CAT_NAMES,ylabel='Porcentaje (%)',ylim=(0,max_category*1.2))
             ax[group,col].legend(fontsize=8);ax[group,col].grid(axis='y');ax[group,col].set_axisbelow(True)
     figs.save(fig,'04_destinos_categorias','Destinos asignados y alcanzados bajo las dos demandas',
@@ -162,11 +163,11 @@ def main():
     fig,ax=plt.subplots(2,1,figsize=(18,7.5));ids=[d['value'] for d in runs[0]['destinations']['assigned']['by_id']]
     arrays=[np.array([proportions(r,p,'by_id',ids) for r in runs]) for p in ('assigned','reached')]
     for axis,values,title in zip(ax,arrays,('Asignados','Alcanzados')):
-        im=axis.imshow(values,aspect='auto',cmap='YlGnBu',vmin=0,vmax=max(a.max() for a in arrays))
+        im=axis.imshow(values,aspect='auto',cmap='YlGnBu',vmin=0,vmax=np.nanmax(arrays))
         axis.set(title=title,yticks=range(4),yticklabels=labels,xticks=range(len(ids)),xticklabels=ids)
         axis.tick_params(axis='x',rotation=90,labelsize=8);fig.colorbar(im,ax=axis,pad=.015,label='% de cada población y corrida',fraction=.025)
     figs.save(fig,'05_destinos_detalle','Frecuencias de los 42 destinos',
-              'Escala común y destinos con cero visitas conservados. Cada fila suma 100 %. Los nuevos spawns son orígenes, no destinos adicionales.')
+              'Cada fila con asignaciones o llegadas suma 100 %. Una fila vacía indica que esa población carece de observaciones.')
 
     fig,ax=plt.subplots(2,2,figsize=(13,8.5))
     for group,count in enumerate(counts):
@@ -178,7 +179,7 @@ def main():
         ax[0,group].set(title='%d vehículos · velocidad de presencia'%count,ylabel='km/h',ylim=(0,20));ax[0,group].legend(fontsize=8)
         ax[1,group].set(title='%d vehículos · baja velocidad y fase dwell'%count,ylabel='% de tiempo de presencia',ylim=(0,103));ax[1,group].legend(fontsize=7)
     for axis in ax.flat:axis.grid();axis.set(xlabel='Minutos simulados',xlim=(0,minutes))
-    figs.save(fig,'06_velocidad_paradas','Evolución temporal: observar el deterioro, no solo el promedio',
+    figs.save(fig,'06_velocidad_paradas','Evolución de la velocidad y las detenciones',
               'Baja velocidad < 0,2 m/s. Dwell significa sin viaje activo: incluye espera tras llegar y tras fallos; puede solaparse con baja velocidad.\nVentanas de 60 s. Se conserva el arranque. Una parada aislada no demuestra congestión; no se seleccionan estados estacionarios.')
 
     fig,ax=plt.subplots(2,3,figsize=(16,9))
@@ -222,19 +223,17 @@ def main():
         for col,(x,y,title,xlabel,ylabel) in enumerate(relations):
             for i in (group*2,group*2+1):
                 d=occupied[occupied.run==runs[i]['run']]
-                ax[group,col].scatter(d[x],d[y],s=15,alpha=.17,color=COLORS[i],edgecolors='none',rasterized=True)
+                label = '%s · %d celdas' % (labels[i].split(' · ')[-1], len(d))
+                ax[group,col].scatter(d[x],d[y],s=15,alpha=.17,color=COLORS[i],edgecolors='none',rasterized=True,label=label)
                 line=guides[(guides.run==runs[i]['run'])&guides.supported]
-                labelled=False
                 for _,part in line.groupby('segment',sort=True):
                     ax[group,col].plot(part[x],part[y],color=COLORS[i],lw=2.3,marker='o',ms=4.5,
-                                       markeredgecolor='white',markeredgewidth=.6,zorder=5,
-                                       label=(labels[i].split(' · ')[-1]+' · guía y %d puntos'%len(d)) if not labelled else None)
-                    labelled=True
+                                       markeredgecolor='white',markeredgewidth=.6,zorder=5)
             ax[group,col].set(title='%s · %d vehículos'%(title,count),xlabel=xlabel,ylabel=ylabel,
                               xlim=(0,occupied[x].max()*1.06),ylim=(0,occupied[y].max()*1.1))
             ax[group,col].legend(fontsize=8,loc='upper right');ax[group,col].grid()
     figs.save(fig,'09_flujo_densidad_velocidad','Relaciones de tráfico: puntos observados y líneas guía',
-              'Puntos: celdas de 50 m / 60 s. Guías: promedios por bandas de 10 veh/km/carril con al menos 10 celdas; q=k·v en cada marcador.\nLas tres guías siguen densidad creciente. Se interrumpen con pocos datos; son resúmenes descriptivos, no ajustes ni capacidad estimada.\nCon cien hay bloqueos y contactos; %s muestras sin proyección driving quedan fuera de las celdas. El informe conserva los límites.'%format(sum(r['outside_driving_projection_rows'] for r in derived['runs']),','),'flujo')
+              'Celdas de 50 m y hasta 60 s. Las guías agrupan bandas de 10 veh/km/carril con al menos 10 celdas.\nCada marcador cumple q=k·v. Las bandas sin soporte interrumpen la línea.\nQuedaron fuera de las celdas %s muestras sin proyección sobre un carril de conducción.'%format(sum(r['outside_driving_projection_rows'] for r in derived['runs']),','),'flujo')
 
     fig,ax=plt.subplots(1,2,figsize=(14,6.5));bg=np.asarray(derived['background_xy'])
     ax[0].scatter(bg[:,0],bg[:,1],s=2,color='#C5CBD1')
@@ -252,7 +251,7 @@ def main():
         for label,num in zip(names,values):coverage.append(dict(vehicle_count=n,density_bin=label,occupied_cells=int(num)))
     ax[1].set(title='Cobertura local por cantidad de vehículos',xlabel='Densidad media (veh/km/carril)',ylabel='Celdas con presencia',xticks=range(len(names)),xticklabels=names);ax[1].legend();ax[1].grid(axis='y');ax[1].set_axisbelow(True)
     pd.DataFrame(coverage).to_csv(out/'density_coverage.csv',index=False)
-    figs.save(fig,'10_cobertura_flujo','Ámbito y cobertura: cien vehículos no se distribuyen uniformemente',
+    figs.save(fig,'10_cobertura_flujo','Ámbito de medición y cobertura de densidades',
               '%d tramos de 50 m; %.1f km-carril. Se excluyen cruces y restos de tramo. Las celdas vacías conservan velocidad indefinida.\nMás vehículos totales no garantiza mayor densidad en cada tramo observado; las celdas no son réplicas independientes.'%(len(derived['selected_geometry']),len(derived['selected_geometry'])*.05),'flujo')
 
     fig,ax=plt.subplots(2,2,figsize=(13,8.5));outcome_rows=[]
@@ -265,7 +264,7 @@ def main():
                 nums,edges=np.histogram(ends,bins=minute_edges(seconds));x=(edges[:-1]+edges[1:])/120
                 ax[1,group].plot(x,nums,color=COLORS[i],ls=linestyle,label=labels[i].split(' · ')[-1]+' · '+status)
                 outcome_rows.extend(dict(run=runs[i]['run'],vehicle_count=count,scenario=runs[i]['scenario'],status=status,start_elapsed_s=float(t),duration_s=float(end-t),count=int(num)) for t,end,num in zip(edges[:-1],edges[1:],nums))
-        ax[0,group].set(title='%d vehículos · llegadas acumuladas'%count,ylabel='Llegadas',ylim=(0,max(r['completed'] for r in runs)*1.1));ax[0,group].legend(fontsize=8)
+        ax[0,group].set(title='%d vehículos · llegadas acumuladas'%count,ylabel='Llegadas',ylim=(0,max(1,max(r['completed'] for r in runs))*1.1));ax[0,group].legend(fontsize=8)
         ax[1,group].set(title='%d vehículos · fallos por minuto'%count,ylabel='Terminaciones en la ventana');ax[1,group].legend(fontsize=7)
     for axis in ax.flat:axis.set(xlabel='Minutos simulados',xlim=(0,minutes));axis.grid()
     upper=max(1,max(row['count'] for row in outcome_rows))*1.12
@@ -285,8 +284,8 @@ def main():
             half_rows.append(dict(run=r['run'],vehicle_count=r['vehicle_count'],scenario=r['scenario'],half=half+1,
                 start_s=lo,end_s=hi,observed_start_s=part.start_elapsed_s.min(),
                 observed_end_s=(part.start_elapsed_s+part.duration_s).max(),vehicle_seconds=exposure,
-                speed_kmh=3.6*part.distance_m.sum()/exposure,
-                low_speed_percent=(part.low_speed_percent*part.vehicle_seconds).sum()/exposure,
+                speed_kmh=3.6*part.distance_m.sum()/exposure if exposure else np.nan,
+                low_speed_percent=(part.low_speed_percent*part.vehicle_seconds).sum()/exposure if exposure else np.nan,
                 completed=int((in_half&(trips[i].status=='completed')).sum()),
                 blocked=int((in_half&(trips[i].status=='blocked')).sum())))
     halves=pd.DataFrame(half_rows);halves.to_csv(out/'half_comparison.csv',index=False)
@@ -300,13 +299,14 @@ def main():
             axis.bar(np.arange(4)+offset,vals,width=.36,color=COLORS,alpha=.5 if h==1 else 1,
                      hatch='//' if h==1 else None,label='%g-%g min'%((h-1)*minutes/2,h*minutes/2))
             top=max(1,halves[key].max())
-            for x,v in zip(np.arange(4)+offset,vals):axis.text(x,v+.025*top,format(v,fmt),ha='center',fontsize=9)
+            for x,v in zip(np.arange(4)+offset,vals):
+                axis.text(x, (v if np.isfinite(v) else 0) + .025*top, base.metric_label(v,fmt), ha='center', fontsize=9)
         axis.set(title=title,ylabel=ylabel,xticks=range(4),xticklabels=short,ylim=(0,top*1.28))
         axis.legend(fontsize=8,ncol=2,loc='upper right');axis.grid(axis='y');axis.set_axisbelow(True)
     figs.save(fig,'12_comparacion_mitades','Primera y segunda mitad de las mismas corridas',
-              'Velocidad y baja velocidad: ponderadas por exposición en ventanas de 60 s, asignadas por su centro (desfase de 0,05 s).\nLlegadas y blocked: tiempo exacto de terminación. Son mitades de una corrida, no réplicas independientes ni continuación de la campaña anterior.')
+              'Las ventanas de hasta 60 s se asignan por su centro y se ponderan por exposición. N/D indica una mitad sin exposición medida.\nLas llegadas y los cierres por bloqueo se asignan por su instante de terminación.')
     if args.compare_data:
-        from scripts.campaign_comparison import append_comparison
+        from scripts.analysis.compare_repetitions import append_comparison
         append_comparison(out,args.compare_data,figs,base,review)
     figs.pdf.close()
     export(out,figs.items,runs,extra,derived,review,occupied,context)
@@ -320,7 +320,12 @@ def export(out,items,runs,extra,derived,review,occupied,context):
     cards=[]
     for item in items:
         cards.append('<section class="card" data-group="{group}"><h2>{title}</h2><p>{note}</p><a href="{name}.png" target="_blank"><img src="{name}.png" alt="{title}" loading="lazy"></a><p><a href="{name}.png" download>PNG</a> · <a href="{name}.svg" download>SVG vectorial</a></p></section>'.format(**{k:html.escape(v) for k,v in item.items()}))
-    warning='Las corridas terminaron y sus registros son íntegros. Con cien vehículos hay bloqueos repetidos, rutas rechazadas y contactos persistentes. No interpretar la nube como capacidad vial ni los callbacks como accidentes independientes.'
+    larger_fleet = [run for run in runs if run['vehicle_count'] == counts[-1]]
+    warning = ('En los dos casos de %d vehículos se registraron %d cierres por bloqueo, '
+               '%d rutas rechazadas y %d avisos del sensor de colisión.') % (
+        counts[-1], sum(run['statuses'].get('blocked', 0) for run in larger_fleet),
+        sum(run['statuses'].get('route_failed', 0) for run in larger_fleet),
+        sum(run['events']['collision']['observed_callbacks'] for run in larger_fleet))
     page='''<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TrafficIA · demandas 20 y 100</title><style>
     *{box-sizing:border-box}body{margin:0;background:#eef2f5;color:#182b3a;font:16px/1.55 system-ui,sans-serif}header{background:#142c3e;color:white;padding:35px 5vw}h1{font-size:36px;margin:0 0 12px}header p{color:#d3e1eb;max-width:1050px}main{max-width:1450px;margin:auto;padding:24px}.card{background:white;border-radius:12px;padding:24px;margin:24px 0}.card img{width:100%;height:auto}.card p{white-space:pre-line;color:#475569}nav{position:sticky;top:0;background:#eef2f5ef;padding:12px 0;display:flex;gap:10px;flex-wrap:wrap}button,nav a{border:1px solid #b9c9d6;border-radius:7px;background:white;padding:10px;color:#234968;text-decoration:none;font:inherit;cursor:pointer}button.active{background:#2463a6;color:white}a{color:#2463a6}.note{padding:18px;border-left:4px solid #d98420;background:#fff6df}section[hidden]{display:none}</style>
     <header><h1>20 y 100 vehículos: qué cambió</h1><p>Resultados de la campaña · versión con líneas guía · '''+datetime.now().strftime('%Y-%m-%d')+'''.</p><p>'''+html.escape(context)+'''</p></header><main><nav><button class="active" data-filter="all">Todas</button><button data-filter="objetivos">Objetivos e incidencias</button><button data-filter="flujo">Flujo y densidad</button><button data-filter="historial">Historial</button><a href="graficas_campana.pdf">PDF completo</a><a href="informe_graficas.md">Método y resultados</a></nav><div class="note">'''+html.escape(warning)+'''</div>'''+''.join(cards)+'''<p>Datos originales conservados. Consulta CSV derivados y manifiestos junto a esta galería.</p></main><script>document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.card').forEach(c=>c.hidden=b.dataset.filter!=='all'&&c.dataset.group!==b.dataset.filter)});</script></html>'''
@@ -330,29 +335,29 @@ def export(out,items,runs,extra,derived,review,occupied,context):
         '| Vehículos | Selector | Llegadas | Media completa (s) | Velocidad (km/h) | Blocked | Ruta rechazada | Corte final | Colisiones (callbacks) | Episodios descriptivos | Invasiones |',
         '|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
     for r,e in zip(runs,extra):
-        report.append('| %d | %s | %d | %.2f | %.2f | %d | %d | %d | %d | %d | %d |'%(r['vehicle_count'],r['scenario'],r['completed'],r['travel_time']['mean_s'],r['speed']['mean_kmh'],r['statuses'].get('blocked',0),r['statuses'].get('route_failed',0),r['statuses'].get('aborted',0),e['raw_callbacks'],e['episodes'],r['events']['lane_invasion']['observed_callbacks']))
+        report.append('| %d | %s | %d | %s | %s | %d | %d | %d | %d | %d | %d |'%(r['vehicle_count'],r['scenario'],r['completed'],base.metric_label(r['travel_time']['mean_s'],'.2f'),base.metric_label(r['speed']['mean_kmh'],'.2f'),r['statuses'].get('blocked',0),r['statuses'].get('route_failed',0),r['statuses'].get('aborted',0),e['raw_callbacks'],e['episodes'],r['events']['lane_invasion']['observed_callbacks']))
     report += ['', '## Primera y segunda mitad', '',
-        'Las mitades pertenecen a estas nuevas corridas. No son réplicas independientes ni se concatenan con las corridas anteriores de 1800 s. Velocidad y baja velocidad usan exposición ponderada en ventanas de un minuto, asignadas por su centro; el límite observado está desplazado 0.05 s. half_comparison.csv conserva los límites exactos. Llegadas y blocked se cuentan por instante de terminación, con el evento en el límite asignado a la segunda mitad.', '',
+        'Cada corrida se divide por su duración simulada. La velocidad y el tiempo a baja velocidad se ponderan por exposición en ventanas asignadas por su centro. N/D indica una mitad sin exposición medida. half_comparison.csv conserva los límites observados. Las llegadas y los bloqueos se asignan por el instante de terminación.', '',
         '| Vehículos | Selector | Mitad | Velocidad (km/h) | Baja velocidad (%) | Llegadas | Blocked |',
         '|---:|---|---:|---:|---:|---:|---:|']
     for row in pd.read_csv(out/'half_comparison.csv').to_dict('records'):
-        report.append('| %d | %s | %d | %.3f | %.2f | %d | %d |'%(row['vehicle_count'],row['scenario'],row['half'],row['speed_kmh'],row['low_speed_percent'],row['completed'],row['blocked']))
+        report.append('| %d | %s | %d | %s | %s | %d | %d |'%(row['vehicle_count'],row['scenario'],row['half'],base.metric_label(row['speed_kmh'],'.3f'),base.metric_label(row['low_speed_percent'],'.2f'),row['completed'],row['blocked']))
     report += ['', 'Las comparaciones entre selectores se hacen dentro de cada cantidad. Se conservan semilla, clima, controlador, flota y spawns comunes. Una semilla no estima variación entre réplicas ni demuestra mejora causal del selector.',
         '', '## Interpretación y objetivos','',
         '- Objetivo 1: primer contraste observado de dos cantidades simultáneas candidatas. No son caudales de entrada; los valores definitivos requieren evaluar la calidad del régimen observado.',
         '- Objetivo 2: agentes simultáneos con historiales crecientes. Histórico conserva 30 visitas iniciales por vehículo; baseline registra nuevas llegadas sin usar ese bootstrap para elegir.',
         '- Objetivo 3: destinos asignados/alcanzados, tiempo de completados, velocidad de presencia y eventos por vehículo-km. Los incompletos se muestran aparte: no se ocultan al interpretar medias.',
-        '- Con cien, el promedio de velocidad cae fuertemente mientras aumentan blocked y route_failed. La producción de llegadas no crece proporcionalmente a la flota. Investigar secuencias antes de identificarlo como congestión vial representativa.',
+        '- Para comparar las flotas, lee la velocidad de presencia junto a las llegadas por vehículo, los intentos pendientes al corte y los motivos de cierre.',
         '- Blocked usa el detector vigente de baja velocidad continua. Sus reasignaciones multiplican decisiones e intentos; cada grupo no equivale a un nuevo vehículo. Los route_failed llevan motivo route_planning_rejected, cuya causa concreta requiere diagnóstico posterior.',
         '- Los eventos incluyen contactos con vehículos y objetos estáticos. Episodios: par de actor IDs sin distinguir emisor, separación consecutiva máxima de 1 s. Agrupación descriptiva, no clasificación de accidentes. Se conserva el conteo bruto y se señalan IDs ambiguos en chart_input_review.json.',
         '- La media de completados está condicionada a lograr una llegada: no representa los viajes bloqueados ni el tiempo que habrían tardado los cortados. No comparar sus cajas como si fueran réplicas independientes.',
-        '', '## Cómo leer las líneas guía y las imágenes de referencia','',
+        '', '## Cómo leer las líneas guía','',
         'Los puntos pequeños siguen siendo todas las celdas ocupadas originales. La línea y sus círculos resumen bandas fijas de densidad de 10 veh/km/carril. Se suman tiempo vehicular S, distancia D y área espacio-temporal A=L*T: k=1000*sum(S)/sum(A), q=3600*sum(D)/sum(A), v=3.6*sum(D)/sum(S). Se conserva q=k*v en cada círculo; v no es una media aritmética de velocidades de celda.',
         'Se dibuja una banda si contiene al menos diez celdas. Se unen solo bandas consecutivas con soporte; los huecos rompen la guía. Ancho y umbral son decisiones transparentes de visualización, no criterios de suficiencia estadística. Los puntos de bandas escasas no se borran. flow_guides.csv guarda recuentos y todos los resúmenes, también los no dibujados; guide_method.json conserva el método. No hay extrapolación, ajuste a Greenshields ni estimación de capacidad.',
         'En velocidad-flujo la conexión sigue densidad creciente, no flujo creciente: q bajo puede corresponder a pocos vehículos rápidos o a muchos casi parados. Los mismos círculos se proyectan en los tres paneles. La igualdad q=k*v se garantiza en esos círculos, no en cada punto de los segmentos rectos que solo los unen visualmente.',
-        'La primera imagen aportada ilustra la hipótesis lineal de Greenshields v=vf*(1-k/kj); al sustituir en q=k*v se obtiene una parábola. La segunda muestra también una relación flujo-densidad triangular y curvas alternativas. No existe una única forma obligatoria deducida solo de q=k*v. Además, su panel central usa q vertical y v horizontal; nuestro panel velocidad-flujo usa los ejes intercambiados, como la primera imagen.',
+        'La hipótesis lineal de Greenshields relaciona velocidad y densidad mediante v=vf*(1-k/kj). Al sustituirla en q=k*v se obtiene una parábola. Las guías de esta campaña se calculan directamente sobre las celdas observadas.',
         'FHWA distingue la identidad entre variables, la forma funcional elegida y la calibración de estados estacionarios. En Town01 se mezclan calles, fases semafóricas, esperas, contactos y transiciones. Una curva idealizada no debería esperarse de toda esa nube. [FHWA: variables, modelos y calibración](https://ops.fhwa.dot.gov/publications/weatherempirical/sect3.htm).',
-        'Vamos avanzando en medición y contraste de demandas: con cien se observan densidades altas y velocidades bajas. Falta separar causas de detención y caracterizar tramos/estados comparables antes de validar capacidad. No hace falta conducción perfecta para comparar métricas, pero sí conocer el origen de los bloqueos y rechazos.',
+        'Para estudiar la capacidad de un tramo haría falta identificar estados comparables y distinguir semáforos, esperas en destino y contactos en la vía.',
         'Rutina histórica observada: '+ '; '.join('%d vehículos: %.2f %%'%(e['vehicle_count'],100*e['selection_counts'].get('routine',0)/sum(e['selection_counts'].values())) for e in extra if e['scenario']=='history_80_20')+'. Son ramas de decisiones, no proporciones obligatorias de llegadas, categorías o densidades. Su funcionamiento no prueba por sí solo la validez del diagrama fundamental.',
         '', '## Método de flujo, densidad y velocidad','',
         'Se reutiliza la selección geométrica previa: carriles driving rectos fuera de cruces, ancho/offset constante y una laneSection. Solo bloques completos de 50 m y ventanas de 60 s; última ventana parcial. API de mapa OpenDRIVE offline, sin cliente ni simulación nueva.',
@@ -368,15 +373,15 @@ def export(out,items,runs,extra,derived,review,occupied,context):
     report += ['', 'Se validaron %d archivos de salida contra los hashes guardados por la campaña, además de la instantánea de fuentes. Sin errores en auditorías conservadas ni en métricas recalculadas; parejas comparables.'%review['verified_output_files'],
         'Las gráficas se derivan leyendo el CSV por bloques, sin retener millones de filas a la vez. No se cambian controlador, simulación ni logs originales.',
         '', '## Reproducción','', '```powershell',
-        '.\\carla-env\\Scripts\\python.exe scripts/build_campaign_plot_data.py --campaign '+str(Path(derived['campaign']).relative_to(ROOT)).replace('\\','/')+' --output data/output/NUEVA_CARPETA',
-        '.\\carla-env\\Scripts\\python.exe scripts/review_demand_chart_inputs.py --campaign '+str(Path(derived['campaign']).relative_to(ROOT)).replace('\\','/')+' --output data/output/NUEVA_CARPETA',
-        '.\\carla-env\\Scripts\\python.exe scripts/plot_demand_campaign.py --data data/output/NUEVA_CARPETA',
+        '.\\carla-env\\Scripts\\python.exe scripts/figures/build_plot_data.py --campaign '+str(Path(derived['campaign']).relative_to(ROOT)).replace('\\','/')+' --output data/output/NUEVA_CARPETA',
+        '.\\carla-env\\Scripts\\python.exe scripts/figures/verify_plot_inputs.py --campaign '+str(Path(derived['campaign']).relative_to(ROOT)).replace('\\','/')+' --output data/output/NUEVA_CARPETA',
+        '.\\carla-env\\Scripts\\python.exe scripts/figures/plot_demand.py --data data/output/NUEVA_CARPETA',
         '```','', 'Usar carla-env y Town01.xodr local; CARLA no necesita estar abierto. Primera orden exige carpeta nueva. Figuras PNG/SVG, PDF y galería HTML se escriben únicamente en derivados.', '', '## Láminas','']
     for item in items:report+=['### '+item['title'],'',item['note'],'','!['+item['title']+']('+item['name']+'.png)','']
     (out/'informe_graficas.md').write_text('\n'.join(report),encoding='utf8')
-    sources=['scripts/plot_demand_campaign.py','scripts/plot_mobility_campaign.py','scripts/review_demand_chart_inputs.py','src/analysis/incident_analysis.py','src/analysis/traffic_flow_analysis.py']
+    sources=['scripts/figures/plot_demand.py','scripts/figures/plot_mobility.py','scripts/figures/verify_plot_inputs.py','src/analysis/incident_analysis.py','src/analysis/traffic_flow_analysis.py']
     if (out/'repeat_comparison.json').exists():
-        sources.append('scripts/campaign_comparison.py')
+        sources.append('scripts/analysis/compare_repetitions.py')
         with (out/'informe_graficas.md').open('a',encoding='utf8') as stream:
             stream.write('\n\n[Comparación detallada con la primera campaña](comparacion_repeticiones.md).\n')
     manifest=dict(figures=items,campaign=derived['campaign'],source_sha256={name:sha(ROOT/name) for name in sources},
