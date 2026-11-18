@@ -10,3 +10,5 @@ __pycache__/
 
 # Generated figure collection (images, gallery, catalogue and LaTeX snippets)
 /images/
+
+/docs/archivo-local/

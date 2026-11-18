@@ -187,7 +187,7 @@ class VisualReviewSimulation(TripSimulation):
         world = self.primary_vehicle_state.actor.get_world()
         source_files = ['src/simulation/trip_runner.py', 'src/navigation/route_planner.py', 'src/navigation/carla_agent.py', 'src/navigation/arrival.py',
                         'src/navigation/navigation_diagnostics.py', 'src/recording/visual_review.py', 'src/demand/vehicle_history.py',
-                        'src/recording/run_logger.py', 'src/project_paths.py', 'scripts/run_trip_simulation.py', 'scripts/review_trip_simulation.py']
+                        'src/recording/run_logger.py', 'src/project_paths.py', 'scripts/simulation/run_trips.py', 'scripts/simulation/observe_trips.py']
         inputs = [self.config.destinations_config, self.config.vehicle_history_config]
         metadata = dict(schema_version=3, image_capture_enabled=self.capture_images,
             camera=CAMERA if self.capture_images else None,
