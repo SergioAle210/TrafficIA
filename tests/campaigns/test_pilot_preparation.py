@@ -1,14 +1,13 @@
 """Pilot invariants: nested fleets, complete histories, stable personal RNGs."""
 import json
 import unittest
-from pathlib import Path
 
-from scripts.prepare_pilots import nested_spawns
+from src.project_paths import PROJECT_ROOT as ROOT
+from scripts.preparation.prepare_pilots import nested_spawns
 from src.demand.destinations import load_destinations
 from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 from src.demand.vehicle_history import VehicleHistory
 
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class PilotPreparationTests(unittest.TestCase):

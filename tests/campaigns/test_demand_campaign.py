@@ -9,13 +9,13 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
-from scripts import run_demand_campaign as campaign
-from scripts.audit_observation_stream import audit_stream
-from scripts.run_demand_campaign import check_hashes, preflight, read
+from scripts.campaigns import run_demand as campaign
+from src.project_paths import PROJECT_ROOT as ROOT
+from scripts.diagnostics.observation_stream import audit_stream
+from scripts.campaigns.run_demand import check_hashes, preflight, read
 from src.demand.destinations import load_destinations
 from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class ManualCampaignTests(unittest.TestCase):

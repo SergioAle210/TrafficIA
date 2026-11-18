@@ -1,9 +1,9 @@
 """Arrival seams, optional deadlines and matched full-run exposure."""
 import math
 import unittest
-from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
+from src.project_paths import PROJECT_ROOT
 from src.navigation.arrival import ArrivalLaneCorridor
 from src.simulation.trip_runner import TripSimulation, TripSimulationConfig, is_at_destination
 
@@ -92,7 +92,7 @@ class ArrivalSeamTests(unittest.TestCase):
 
     def test_deadline_configuration_rejects_nonfinite_or_nonpositive_values(self):
         """Check that invalid trip deadlines are rejected during configuration validation."""
-        config = Path(__file__).resolve().parents[1] / "config/multi_vehicle_trip.json"
+        config = PROJECT_ROOT / "config/multi_vehicle_trip.json"
         for limit in [-1, 0, float("nan"), float("inf")]:
             with self.assertRaises(ValueError):
                 TripSimulationConfig.from_json(config, dict(max_trip_time_seconds=limit))
@@ -100,8 +100,8 @@ class ArrivalSeamTests(unittest.TestCase):
 
     def test_cli_can_restore_legacy_deadline_or_disable_it(self):
         """Check that command-line options can enable or disable the trip deadline."""
-        from scripts.run_trip_simulation import parse_args, configuration_from_args
-        config = Path(__file__).resolve().parents[1] / "config/multi_vehicle_trip.json"
+        from scripts.simulation.run_trips import parse_args, configuration_from_args
+        config = PROJECT_ROOT / "config/multi_vehicle_trip.json"
         for argument, expected in [("0", None), ("300", 300)]:
             with patch("sys.argv", ["run", "--config", str(config), "--max-trip-seconds", argument]):
                 self.assertEqual(configuration_from_args(parse_args()).max_trip_time_seconds, expected)

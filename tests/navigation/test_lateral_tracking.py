@@ -2,16 +2,15 @@
 
 import os
 import unittest
-from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
+from src.project_paths import PROJECT_ROOT as ROOT
 from src.navigation.route_planner import build_basic_agent, configure_carla_agents
 from src.simulation.trip_runner import TripSimulationConfig
-from scripts.run_trip_simulation import configuration_from_args
+from scripts.simulation.run_trips import configuration_from_args
 
 
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class TrackingConfigurationTests(unittest.TestCase):

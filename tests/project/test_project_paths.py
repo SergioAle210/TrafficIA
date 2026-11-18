@@ -7,16 +7,30 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.prepare_pilots import write_new_or_identical
-from scripts.run_demand_campaign import check_hashes
+from scripts.preparation.prepare_pilots import write_new_or_identical
+from scripts.campaigns.run_demand import check_hashes
+from scripts.diagnostics.audit_observations import matches_recorded_hash
 from src.project_paths import PROJECT_ROOT, project_path
 from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
 
 class ProjectPathTests(unittest.TestCase):
+    def test_audit_uses_the_historical_snapshot_for_script_fingerprints(self):
+        contents = b"original source"
+        digest = hashlib.sha256(contents).hexdigest()
+        with tempfile.TemporaryDirectory() as folder:
+            snapshot = Path(folder)
+            script = snapshot / "scripts/run_trip_simulation.py"
+            script.parent.mkdir()
+            self.assertFalse(matches_recorded_hash(script.relative_to(snapshot), digest, snapshot))
+            script.write_bytes(contents)
+            self.assertTrue(matches_recorded_hash(script.relative_to(snapshot), digest, snapshot))
+            script.write_bytes(b"changed")
+            self.assertFalse(matches_recorded_hash(script.relative_to(snapshot), digest, snapshot))
+
     def test_all_relocated_inputs_keep_their_original_bytes(self):
         """Check that relocated input files still match their recorded original fingerprints."""
-        manifest = json.loads((PROJECT_ROOT / "docs/relocation-manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads((PROJECT_ROOT / "docs/referencia/huellas-entradas.json").read_text(encoding="utf-8"))
         self.assertEqual(len(manifest["files"]), 25)
         for entry in manifest["files"]:
             with self.subTest(path=entry["new"]):
@@ -87,7 +101,7 @@ class ProjectPathTests(unittest.TestCase):
 
     def test_relocated_snapshot_can_load_its_own_catalog_and_histories(self):
         """Check that a relocated snapshot can load its own catalog and vehicle histories."""
-        manifest = json.loads((PROJECT_ROOT / "docs/relocation-manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads((PROJECT_ROOT / "docs/referencia/huellas-entradas.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             for entry in manifest["files"]:
@@ -103,7 +117,7 @@ class ProjectPathTests(unittest.TestCase):
             self.assertEqual(len(simulation.destinations), 42)
             self.assertEqual(len(simulation.vehicle_states), 100)
             self.assertTrue(all(len(state.vehicle_history.events) == 30 for state in simulation.vehicle_states))
-            self.assertTrue(str(project_path(config.vehicle_history_config, root)).startswith(str(root)))
+            self.assertIn(root.resolve(), project_path(config.vehicle_history_config, root).parents)
 
 
 if __name__ == "__main__":

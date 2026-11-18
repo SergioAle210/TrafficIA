@@ -12,13 +12,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, mock_open, patch
 
-from scripts.run_trip_simulation import configuration_from_args, main
+from src.project_paths import PROJECT_ROOT as ROOT
+from scripts.simulation.run_trips import configuration_from_args, main
 from src.demand.destinations import load_destinations, select_uniform_destination
 from src.simulation.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
 from src.demand.vehicle_history import VehicleHistory
 
 
-ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config/trips/multi_vehicle_trip.json"
 CATALOG = ROOT / "data/input/Town01/destinations_config.csv"
 
@@ -151,15 +151,15 @@ class ScenarioConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "--history-in"):
             configuration_from_args(cli_args(scenario="random_baseline", history_in=Path("missing.csv")))
         config = simulation_for().config
-        with patch("scripts.run_trip_simulation.TripSimulationConfig.from_json", return_value=config):
+        with patch("scripts.simulation.run_trips.TripSimulationConfig.from_json", return_value=config):
             with self.assertRaisesRegex(ValueError, "--history-in"):
                 configuration_from_args(cli_args(history_in=Path("missing.csv")))
 
     def test_configuration_errors_do_not_connect_to_carla(self):
         """Check that invalid configurations fail before any CARLA connection is attempted."""
         args = cli_args(scenario="random_baseline", history_in=Path("missing.csv"))
-        with patch("scripts.run_trip_simulation.parse_args", return_value=args), \
-                patch("scripts.run_trip_simulation.TripSimulation") as runner, \
+        with patch("scripts.simulation.run_trips.parse_args", return_value=args), \
+                patch("scripts.simulation.run_trips.TripSimulation") as runner, \
                 redirect_stderr(io.StringIO()) as error:
             self.assertEqual(main(), 1)
         runner.assert_not_called()

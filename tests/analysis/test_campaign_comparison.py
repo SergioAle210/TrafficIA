@@ -1,6 +1,6 @@
 import copy
 import unittest
-from scripts.campaign_comparison import comparison_rows
+from scripts.analysis.compare_repetitions import comparison_rows
 
 
 class CampaignComparisonTests(unittest.TestCase):

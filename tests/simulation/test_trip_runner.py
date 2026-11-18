@@ -7,15 +7,14 @@ import json
 import math
 import unittest
 from contextlib import ExitStack
-from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from src.project_paths import PROJECT_ROOT as ROOT
 from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 
 
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class Location:

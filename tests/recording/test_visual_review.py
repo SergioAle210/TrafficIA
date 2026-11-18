@@ -8,10 +8,10 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
+from src.project_paths import PROJECT_ROOT as ROOT
 from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 from src.recording.visual_review import ImageRecorder, VisualReviewSimulation, image_index, capture_spacing, agent_light_context
 
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class Image:

@@ -2,10 +2,10 @@
 
 import math
 import unittest
-from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 
+from src.project_paths import PROJECT_ROOT
 from src.navigation.arrival import ArrivalApproach, approach_control, stopped_and_aligned
 from src.navigation.route_planner import arrival_route
 from src.simulation.trip_runner import ActiveTrip, TripSimulation, TripSimulationConfig
@@ -122,7 +122,7 @@ class ArrivalControlTests(unittest.TestCase):
 
     def test_runner_wait_starts_only_after_stopping_and_records_one_visit(self):
         """Check that waiting starts only after a valid stop and exactly one visit is recorded."""
-        root = Path(__file__).resolve().parents[1]
+        root = PROJECT_ROOT
         sim = TripSimulation(TripSimulationConfig.from_json(root/'config/multi_vehicle_trip.json'),root,1)
         sim.logger = Mock()
         sim._sample_trajectory = Mock()

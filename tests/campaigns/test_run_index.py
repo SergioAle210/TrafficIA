@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.index_demo_outputs import build_rows, write_index
+from scripts.campaigns.index_runs import build_rows, write_index
 
 
 class DemoIndexTests(unittest.TestCase):
@@ -60,8 +60,8 @@ class DemoIndexTests(unittest.TestCase):
         self.assertEqual(rows[0]["caso"], "20_uniforme")
         self.assertEqual(Path(rows[0]["carpeta"]), run.resolve())
         markup = html_path.read_text(encoding="utf-8")
-        self.assertIn(log.as_uri(), markup)
-        self.assertNotIn('href="' + (run / "events_log.csv").as_uri(), markup)
+        self.assertIn(log.resolve().as_uri(), markup)
+        self.assertNotIn('href="' + (run.resolve() / "events_log.csv").as_uri(), markup)
         self.assertEqual(before, (self.path.read_bytes(), log.read_bytes()))
 
     def test_duplicate_combination_is_rejected(self):

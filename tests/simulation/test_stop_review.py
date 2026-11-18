@@ -73,7 +73,7 @@ class StopPolicyTests(unittest.TestCase):
 
     def test_cli_and_invalid_policy(self):
         """Check command-line stop-policy selection and rejection of invalid policy values."""
-        from scripts.run_trip_simulation import parse_args, configuration_from_args
+        from scripts.simulation.run_trips import parse_args, configuration_from_args
         with patch('sys.argv',['run','--config','config/multi_vehicle_trip.json','--blocked-policy','keep_trip']):
             self.assertEqual(configuration_from_args(parse_args()).blocked_policy,'keep_trip')
         self.assertEqual(TripSimulationConfig.from_json(Path('config/multi_vehicle_trip.json')).blocked_policy,'terminate')
@@ -94,7 +94,7 @@ class StopPolicyTests(unittest.TestCase):
 
     def test_policy_comparison_rejects_other_configuration_changes(self):
         """Check that stop-policy comparisons reject unrelated configuration changes."""
-        from scripts.run_blocked_comparison import comparison_conditions
+        from scripts.diagnostics.compare_stop_policies import comparison_conditions
         a=dict(simulation_config=dict(blocked_policy='terminate',output_root='a',seed=210),
                vehicles=[dict(carla_actor_id=1,blueprint_id='car',vehicle_id='v')], environment={'weather':'same'})
         b=dict(simulation_config=dict(blocked_policy='keep_trip',output_root='b',seed=210),

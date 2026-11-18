@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
-from scripts.diagnose_destination_dwell import DwellDiagnosticSimulation, sensor_corners_xy
+from scripts.diagnostics.inspect_dwell import DwellDiagnosticSimulation, sensor_corners_xy
 from src.simulation.trip_runner import TripSimulation
 
 
