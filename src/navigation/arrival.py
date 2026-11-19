@@ -100,6 +100,8 @@ class ArrivalApproach:
         if self.settling and self.remaining_m <= STOP_MARGIN_M:
             return min(cruise_speed_kmh, ALIGNMENT_SPEED_KMH)
         distance = max(0.0, self.remaining_m - STOP_MARGIN_M)
+        # Inverting the constant-deceleration stopping distance gives a speed
+        # in m/s. BasicAgent expects its target in km/h.
         return min(cruise_speed_kmh, 3.6*math.sqrt(2*APPROACH_DECELERATION_MPS2*distance))
 
 

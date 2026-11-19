@@ -146,6 +146,8 @@ class StopReviewSimulation(VisualReviewSimulation):
         command = self.commands.get(vehicle, {})
         counter = (max(0., now-trip.last_moving_time_s) if active_before and trip else 0.)
         evidence = []
+        # The observation follows a physics tick. Match it to the command issued
+        # one tick earlier so stale hazard checks are excluded.
         if command and row['frame']-command['control_frame'] == 1:
             if command['arrival_brake']: evidence.append('arrival_brake')
             if command['dwell_brake']: evidence.append('dwell_brake')
