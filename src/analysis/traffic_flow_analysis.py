@@ -16,6 +16,8 @@ def split_space_time_interval(s0, s1, t0, t1, road_length_m,
         raise ValueError('Nonfinite trajectory or aggregation parameter')
     if t1<=t0 or t0<0 or road_length_m<=0 or section_length_m<=0 or window_s<=0:
         raise ValueError('Invalid time interval or aggregation parameter')
+    # Express section and time-window crossings as fractions of one trajectory
+    # interval. Each resulting piece lies in the cell containing its midpoint.
     cuts={0.0,1.0}; ds=s1-s0; dt=t1-t0
     if ds:
         for n in range(math.floor(min(s0,s1)/section_length_m)+1,
@@ -41,6 +43,8 @@ def edie_metrics(vehicle_seconds, distance_m, length_m, duration_s):
         raise ValueError('Invalid exposure or cell dimensions')
     k=1000*vehicle_seconds/(length_m*duration_s)
     q=3600*distance_m/(length_m*duration_s)
+    # A stopped vehicle contributes time at zero speed. An empty cell has no
+    # speed observation.
     v=3.6*distance_m/vehicle_seconds if vehicle_seconds else None
     if not vehicle_seconds and distance_m:
         raise ValueError('Distance cannot occur without temporal exposure')

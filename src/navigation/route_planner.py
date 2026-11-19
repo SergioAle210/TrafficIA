@@ -10,13 +10,12 @@ from typing import Any, List, Optional, Sequence
 
 
 def configure_carla_agents(carla_module: Any, carla_pythonapi: Optional[str] = None) -> None:
-    """Make CARLA's bundled ``agents`` package importable before actors spawn.
+    """Make CARLA's bundled agents package importable before actors spawn.
 
-    CARLA distributes ``carla`` (the API) and ``agents`` (BasicAgent and the
+    CARLA distributes carla (the API) and agents (BasicAgent and the
     GlobalRoutePlanner) separately. Installing only the CARLA wheel/egg often
-    exposes the former but not the latter. The explicit CLI path must be the
-    directory that directly contains the ``agents`` folder, usually
-    ``...\\PythonAPI\\carla``.
+    exposes the former but not the latter. The CLI accepts the directory
+    containing agents, usually PythonAPI/carla, or its parent PythonAPI.
     """
 
     try:
@@ -107,7 +106,7 @@ def plan_route(
     destination_location: Any,
     endpoint_tolerance_m: float = 5.0,
 ) -> List[Any]:
-    """Return a route whose first and last waypoints cover both requested ends."""
+    """Return a nonempty route ending within endpoint_tolerance_m of the destination."""
 
     route = list(planner.trace_route(origin_location, destination_location))
     if not route:

@@ -140,7 +140,7 @@ def select_from_history(
     routine_destination_count: int,
     rng: random.Random,
 ) -> DestinationDecision:
-    """Select 80/20 from personal recurrence, never from manual weights.
+    """Choose from personal visit counts using the configured routine probability.
 
     Routine candidates are the vehicle's most visited destinations. Exploration
     first uses destinations never visited by this vehicle; after that pool is
@@ -163,6 +163,8 @@ def select_from_history(
         item for item in remaining_candidates if history.counts[item.destination_id] == 0
     ]
 
+    # The draw chooses a preferred pool. If it is empty, the decision records
+    # the pool that actually supplied the destination.
     wants_routine = rng.random() < routine_probability
     if wants_routine and routine_candidates:
         selected_class = ROUTINE
@@ -221,6 +223,7 @@ def generate_dummy_events(
             remaining.remove(selected)
             anchors.append(selected)
 
+        # Seed one visit per anchor so even the shortest valid history includes them all.
         sequence_destinations = list(anchors)
         previous = anchors[-1]
         while len(sequence_destinations) < history_length:

@@ -50,6 +50,12 @@ EXCLUDED_BLUEPRINT_KEYWORDS = (
 
 @dataclass
 class TripSimulationConfig:
+    """Fleet settings for one run.
+
+    Setting max_trip_time_seconds to None disables the per-trip deadline.
+    The run duration and blocked policy still apply.
+    """
+
     town: str
     seed: int
     duration_seconds: float
@@ -197,6 +203,8 @@ class TripSimulationConfig:
 
 @dataclass
 class ActiveTrip:
+    """A single destination attempt, with no agent if route planning failed."""
+
     trip_number: int
     origin_id: str
     origin_name: str
@@ -483,6 +491,8 @@ class TripSimulation:
             config.resolved_spawn_point_indices()
         ):
             vehicle_id = "vehicle_{0:03d}".format(vehicle_index + 1)
+            # Separate streams keep actor setup and draws for other vehicles
+            # from advancing this vehicle's destination sequence.
             seed_offset = vehicle_index * 1_000_003
             self.vehicle_states.append(
                 VehicleState(
@@ -1120,6 +1130,8 @@ class TripSimulation:
         current_speed = speed_mps(vehicle.get_velocity())
         interval_s = max(0.0, now_s - (trip.last_update_time_s if trip.last_update_time_s is not None
                                       else trip.departure_time_s))
+        # The final speed represents the elapsed tick. At exactly the threshold,
+        # stopped time stays unchanged and the blocked clock continues to run.
         if current_speed < self.config.blocked_speed_threshold_mps:
             trip.stopped_time_s += interval_s
         trip.last_update_time_s = now_s
@@ -1471,6 +1483,8 @@ class TripSimulation:
                 snapshot = world.get_snapshot()
                 now_s = snapshot.timestamp.elapsed_seconds
                 elapsed_s = now_s - start_sim_time_s
+                # Observe the completed tick for the whole fleet before issuing
+                # controls for the next tick.
                 for state in self.vehicle_states:
                     self._sample_vehicle_exposure(state, now_s)
                     self._drain_events(now_s, state)

@@ -21,7 +21,11 @@ from src.simulation.trip_runner import TripSimulation, TripSimulationConfig
 class ManualCampaignTests(unittest.TestCase):
     @contextlib.contextmanager
     def campaign_fixture(self, manual=True, interactive=True, check_only=False):
-        """Exercise the real campaign loop with a fake server and two-second runs."""
+        """Exercise the real campaign loop with a fake server and clock.
+
+        Each case reports 180 simulated seconds and uses two seconds of mock
+        wall time. Tests can advance the clock separately at the keyboard prompt.
+        """
         with tempfile.TemporaryDirectory() as folder, contextlib.ExitStack() as stack:
             root = Path(folder)
             output = root/'data/output/campaign'

@@ -357,6 +357,11 @@ def export_campaign(campaign, exporter, prefix):
 
 
 def export_history(c, exporter, prefix, historical):
+    """Plot history growth and selection shares for the run indices in historical.
+
+    Completed arrivals extend the bootstrap history. Every trip attempt counts
+    toward the routine and exploration shares.
+    """
     runs, trips, extra = c['runs'], c['trips'], c['extras']
     labels = run_labels(c)
     for per_vehicle, suffix in ((False, 'historial_total'), (True, 'historial_por_vehiculo')):
