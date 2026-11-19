@@ -1,5 +1,10 @@
 /carla-env
 
+# Local environment configuration
+.env
+.env.*
+!.env.example
+
 # Python cache files
 __pycache__/
 *.py[cod]
