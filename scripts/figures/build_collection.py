@@ -75,6 +75,7 @@ def write_catalog(directory, figures):
 
 
 def build_collection(galleries, extra_files, output):
+    """Publish gallery figures and standalone PNGs only after verifying every copy."""
     output = output.resolve()
     if output.exists():
         raise FileExistsError('Elige una carpeta nueva para la colección: ' + str(output))

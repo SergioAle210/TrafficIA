@@ -14,7 +14,10 @@ from src.simulation.trip_runner import resolve_destination_location
 
 
 def main():
-    """Validate routes between catalog destinations and optional campaign starts, then save a report."""
+    """Check catalog pairs and replan failed campaign trips from their logged origins.
+
+    Write the route checks to the requested report and return True if any failed.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--campaign-manifest", type=Path)

@@ -177,6 +177,8 @@ def run_campaign(args):
         'campaigns/run_demand.py','preparation/prepare_demand.py','preparation/prepare_pilots.py','simulation/observe_trips.py',
         'simulation/run_trips.py','diagnostics/observation_stream.py','analysis/analyze_mobility.py')]
     sources += [project_path(n, ROOT) for n in manifest['input_sha256']]+[ROOT/CONFIG_DIR/'preparation_manifest.json']
+    # Cases use the working tree. Keep a copy so later audits can check the
+    # recorded hashes even after the checkout changes.
     frozen = {p.relative_to(ROOT).as_posix():digest(p) for p in sources}
     for relative in frozen:
         dest = output/'source_snapshot'/relative
@@ -219,6 +221,8 @@ def run_campaign(args):
                 navigation_diagnostics_enabled=True))
             simulation=VisualReviewSimulation(config,ROOT,args.simulation_speed,str(args.carla_pythonapi),capture_images=False)
             expected_run=ROOT/config.output_root/simulation.run_id
+            # Record the directory before spawning so a failed case can still be
+            # matched to its partial logs.
             case.update(status='running',started_at_utc=stamp(),run=expected_run.name,
                         run_directories=[expected_run.relative_to(ROOT/'data/output').as_posix()])
             save(output/'campaign.json',plan)

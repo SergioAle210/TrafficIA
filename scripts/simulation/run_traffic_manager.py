@@ -258,6 +258,8 @@ def run_simulation(args: argparse.Namespace) -> None:
         traffic_manager = client.get_trafficmanager(TRAFFIC_MANAGER_PORT)
         traffic_manager.set_synchronous_mode(True)
         traffic_manager_is_synchronous = True
+        # Python seeds the spawn and blueprint draws. Traffic Manager needs
+        # its own seed for driving decisions.
         traffic_manager.set_random_device_seed(SEED)
         traffic_manager.set_global_distance_to_leading_vehicle(5.0)
 

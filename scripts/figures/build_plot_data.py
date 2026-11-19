@@ -105,6 +105,8 @@ def main():
             distance=math.sqrt((x-px)**2+(y-py)**2+(z-pz)**2)
             bucket=series[bin_];bucket[0]+=dt;bucket[1]+=distance
             bucket[2]+=dt*bool(low);bucket[3]+=dt*(phase=='dwell')
+            # A road or lane change leaves the crossing time unknown. Keep the
+            # interval in the fleet totals without assigning it to a lane cell.
             if key!=pk:
                 if key in eligible or pk in eligible:transitions_s+=dt
                 continue
